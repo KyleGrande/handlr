@@ -1,5 +1,11 @@
 # Current verification — 2026-11-10
 
+## Right-edge status ordering
+
+- Service row trailing items now run left-to-right as port/metrics icons, HTTP open-URL arrows, then the status dot at the far right. Endpoint icons remain live-only and lifecycle controls remain hover-only.
+- The fixture metrics endpoint reports pending/processing/done job counts; it is a second optional API endpoint, not an additional owned service.
+- Generated/installed without tests/native checks under the user’s continuing preference.
+
 ## Match individual rig entries to Space entries
 
 - Compared the shipped Spaces row builder with the rig row. The rig name was still 12px semibold/muted, unlike Space entries using inherited regular 13px foreground text. The earlier styling update changed only the section heading.

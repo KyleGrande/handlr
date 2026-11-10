@@ -391,7 +391,7 @@ export default class Rigs extends View {
             tooltip: `Repository: ${repo}\nWorktree: ${checkout.root}\nBranch: ${branch}\nApp: ${app}\nRepo slot: ${service.repo}` };
     }
     endpointIcons(rig, service) {
-        const endpoints = Object.entries(service.endpoints);
+        const endpoints = Object.entries(service.endpoints).sort(([, a], [, b]) => Number(a.protocol === 'http' || a.protocol === 'https') - Number(b.protocol === 'http' || b.protocol === 'https'));
         const t = theme();
         return h_flex().gap(1).items_center().flex_none().children(endpoints.map(([name, endpoint]) => {
             const browser = endpoint.protocol === 'http' || endpoint.protocol === 'https';
@@ -636,8 +636,8 @@ export default class Rigs extends View {
                     .child(div().flex_1().min_w(0).truncate().text_size(11).text_color(t.dim).child(source.label)))
                     .child(this.controls(rig, service))
                     .child(h_flex().gap(2).items_center().flex_none()
-                    .child(this.statusIcon(this.operationIndicator(serviceKey, this.serviceIndicator(service))))
-                    .when(service.state === 'running' && service.assignments === 'allocated' && Object.keys(service.endpoints).length > 0, el => el.child(this.endpointIcons(rig, service)))));
+                    .when(service.state === 'running' && service.assignments === 'allocated' && Object.keys(service.endpoints).length > 0, el => el.child(this.endpointIcons(rig, service)))
+                    .child(this.statusIcon(this.operationIndicator(serviceKey, this.serviceIndicator(service))))));
                 if (service.degraded_dependencies.length)
                     row.child(div().text_color(t.blocked).child(`Dependency degraded: ${service.degraded_dependencies.join(', ')}`));
                 card.child(row);
