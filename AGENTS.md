@@ -1,0 +1,111 @@
+# Herdr Rigs
+
+Rigs manages named, restartable development stacks. This repository contains the TypeScript CLI and a native Herdr sidebar mod. The CLI owns resolution, approval, reservations and lifecycle; the panel calls that same CLI. Services run in parentless herdr-core terminals and survive closing the panel or app.
+
+This is a tooling project. It has no application server, database, cache or queue. `fixtures/` contains disposable demos, not services needed to develop Rigs. A compiler watcher is optional and has no managed port or browser URL.
+
+## Start here
+
+- Read `README.md` for the version 1 profile format and lifecycle behavior. In an installed copy, use the absolute source checkout and README link in the installation context above.
+- Read this guide when setting up, operating or changing Rigs. For native panel work, also read the running Herdr installation's `AGENTS.md`, `herdr.d.ts` and `gpui-kit.d.ts` under `HERDR_APP_HOME` (default `~/.config/herdr-app`). Those files describe the installed native API; Herdr rewrites them, so do not edit them.
+- User instructions and decisions already made in the conversation take precedence over defaults here. Do not ask for the same permission twice.
+- Make authorized draft work concrete before requesting launch approval. A valid selected checkout, suggested name or absence of infrastructure does not require a separate confirmation round.
+
+## Set up a project rig
+
+1. Use the selected/current project checkout. Resolve its canonical Git worktree root and show it in the preview. Ask for another path only if the intended project is ambiguous or invalid. A repository with no commits is valid; show its branch with “no commits.” Never create a commit or switch branches to make validation pass.
+2. Inspect package scripts, framework configuration, environment-example variable names and development docs. Do not execute configuration, install packages or start services during discovery. `rig init --checkout <path> --output <new-profile.json>` writes an unapproved proposal and evidence list without reserving ports or checkouts. It refuses to overwrite an existing output file.
+3. Separate application servers from optional development tools and explicit demo fixtures. Use commands supported by project evidence. If no supported long-running services are found, report that result and any documented optional tools. Do not invent a web/API/worker stack or create a rig with no services.
+4. Choose a sensible unused project-based name and propose one concrete existing worktree for each repo slot. Write the profile, keep `setup.approved` false and put proposed choices in `setup.decisions`. `setup.questions` lists the choices requiring review. Remove irrelevant categories. Ask only about material uncertainty that affects commands, connections or data ownership; keep unresolved choices blank and explain them. Continue independent draft work while waiting.
+5. Save the draft with `rig create`, then show `rig plan` (or click the rig name to open its preview popup): checkouts/branches, foreground command arguments, working directories, proposed ports, connections, readiness and data/output scope. Saving and previewing do not start processes or reserve resources.
+6. Get explicit approval of that concrete preview before launch. The panel's **Approve and start** records the reviewed choices and launches. With the CLI, run `rig approve <name> --review <fingerprint-from-plan>`, adding `--decision key=value` for missing or corrected choices, then `rig up <name> --review <same-fingerprint>`. Approval is recorded in the registry; editing `setup.approved` alone does not authorize a discovered draft. Never approve on the user's behalf before they approve the preview.
+7. After launch, show actual URLs from status if there are endpoints. Explain clicking the rig name to open its preview popup, clicking a service row to open its live output, and **Stop owned services**. Service rows with an existing terminal open a peek; rows without one do not start anything. Endpoint links are separate actions. A portless watcher uses state and output; it needs no fake HTTP readiness check.
+
+Rig names open a centered native preview popup; there is no separate Preview button or inline sidebar preview. The popup has a scrollable plan, editable decisions, Refresh, Close and an explicit launch action. Opening or closing it never starts or stops services. Rig and service status indicators match the Agents list: spinning working icon for running/starting, idle ring for stopped/draft, done dot for a successful exit, and compact warning for errors, degraded health or unknown state. Hover an indicator for the specific status.
+
+Review decisions are notes about the displayed configuration, not executable configuration edits. Change commands, bindings, ports and data scope in the profile, then refresh the preview. Approval is bound to the profile, rig identity and concrete checkout/branch metadata. Material changes invalidate it. Port ranges are reviewed configuration; exact free-port observations are proposals until allocation. Secret source references are reviewed; secret values are never part of approval or previews.
+
+## Commands
+
+Use the exact executable/module paths in the linked installed guide’s installation context. The copied prompt is a one-sentence pointer to that guide plus the selected checkout or explicit demo request; keep workflow rules here instead of duplicating them in the clipboard text. From this source checkout, run `npm run build` first and use `./bin/rig`.
+
+```sh
+./bin/rig init --checkout /absolute/project --output /absolute/new-rig.json
+./bin/rig create project-dev --profile /absolute/new-rig.json --repo app=/absolute/project
+./bin/rig plan project-dev --json
+# Only after the user approves that preview:
+./bin/rig approve project-dev --review <fingerprint-from-plan>
+./bin/rig up project-dev --review <same-fingerprint>
+./bin/rig status project-dev --json
+./bin/rig status --checkout /absolute/project/subdirectory --json
+./bin/rig logs project-dev compiler --json
+./bin/rig down project-dev
+# Repair a mapping only after stopping:
+./bin/rig configure project-dev --repo app=/absolute/moved-project
+```
+
+All operational responses are versioned JSON (`schema_version: 1`), including errors. Check the exit code and `outcome`. An `init` outcome of `no_services` is a successful discovery result; its empty proposal needs a documented service before `create`. `RIG_HOME` selects the registry, defaulting to `~/.local/state/herdr-rigs`. Use a separate temp registry for automated tests; never erase the real registry to recover from an error.
+
+Profiles without `setup` remain usable through explicit `up` for existing manual integrations. The panel always approves its preview. Once a rig has a recorded approval, later starts require that approval to remain current.
+
+## Profile rules
+
+- Commands are foreground argument arrays (`argv`), never shell command strings. Do not add shell wrappers, backgrounding or daemonization to work around lifecycle handling.
+- A service declares its repo slot and a relative `directory`; its real working directory must stay inside that selected worktree, including through symlinks.
+- Managed endpoints resolve to loopback. The actual command must honor the assigned host/port and fail strictly instead of silently choosing another port. Do not claim readiness or exposure guarantees that the service command does not enforce.
+- Services may have multiple endpoints or none. HTTP/TCP probes have deadlines. `depends_on` is an acyclic readiness graph; its prerequisites need probes. Environment bindings do not imply startup order.
+- Use endpoint bindings for owned connections and explicit external URLs for providers Rigs does not own. An external probe never grants permission to stop the provider.
+- Put credentials in `secret_env`/`secret_file` references. Never copy secret values into profile literals, argv, labels, review text, logs or registry records. Preview/status redact declared values. Native terminal peeks show raw application output; the application controls what it prints.
+- Record actual data/output scope. Ask about sharing versus isolation only for infrastructure the project uses or where evidence leaves a real ambiguity. No infrastructure detected is a finding, not a reason to invent database questions. Distinct worktrees can still share external databases or namespaces.
+
+## Ownership and recovery rules
+
+- One active rig may claim a canonical worktree. Worktree and port reservations commit together under the registry lock. Distinct worktrees of one repository may run concurrently.
+- Persist a launch intent before starting Core. Identify an owned process by rig/service/launch labels and its recorded terminal address together. Never adopt or stop a process based only on a port, process name, checkout or terminal address.
+- Closing the panel, switching layouts, hiding the sidebar or quitting Herdr must not stop a rig. Do not attach lifecycle ownership to a space or pane.
+- `down` stops only verified owned launches, releasing reservations when absence/stop is confirmed. It does not delete data, profiles or checkouts, change branches, or stop external/manual providers.
+- Unknown ownership, unavailable Core and possibly in-flight launches retain reservations. Restore Core and inspect `status`; use `down` to reconcile before replacing an unresolved launch. An absent possibly in-flight launch requires the existing 30-second reconciliation window. Do not bypass ownership checks or manually delete reservations.
+- Startup rollback stops launches from that attempt only and preserves pre-existing services. Diagnostic capture must never prevent cleanup of verified owned launches. Preserve and redact bounded diagnostic output.
+- Missing/moved checkouts remain stale until stopped and explicitly repaired with `configure`. Never substitute a sibling worktree by matching its branch name.
+
+## Try a disposable demo
+
+Use this path only when the user explicitly requests a demo or when running authorized fixture tests. The panel offers a separate **Setup options → Try a demo · copy setup prompt** action.
+
+From the source checkout, run `npm run prepare:desktop`. It prepares temp Git checkouts, profiles and a manifest with unique names; it does not register or launch rigs. Use the manifest's exact paths to create and preview its mono or split rig. Obtain approval before interactive demo launch. Fixture Git commits are confined to those new temp repositories; never modify the user's checkout history. Follow `docs/DESKTOP_ACCEPTANCE.md` for actual desktop checks and stop only the named fixture rigs you started.
+
+## Change Rigs itself
+
+| Source | Responsibility |
+| --- | --- |
+| `src/types.ts`, `src/profile.ts` | Profile contract, Git context, validation, resolution, review identity, secret references |
+| `src/init.ts`, `mods/rigs/setup.ts` | Evidence discovery and the copied setup prompt |
+| `src/lifecycle.ts`, `src/store.ts`, `src/core.ts` | Approval, ownership, locks, durable registry, Core transport and recovery |
+| `src/cli.ts` | Shared versioned command interface for agents, shell and panel |
+| `mods/rigs/main.ts` | Native GPUI sidebar; no DOM, browser framework or Node APIs |
+| `scripts/` | Builds, installation, guarded syncing and disposable acceptance preparation |
+| `tests/`, `fixtures/` | Resolver/lifecycle regressions and disposable Core/demo services |
+
+Edit TypeScript sources. `mods/rigs/main.js`, `mods/rigs/setup.js`, `mods/rigs/AGENTS.md`, `docs/SETUP_PROMPT.md` and `dist/` are generated. The root `AGENTS.md` is the editable guide; build copies it into the mod, and installation adds exact local paths. Keep README, CLI help, agent guide and acceptance instructions consistent with actual behavior.
+
+The ordinary compiler build covers `src/`, `tests/` and `scripts/`; it excludes the native mod. The native mod build checks against the installed Herdr declarations and emits its separate JS. Installed panel files are copies, so a compiler watcher alone cannot update the panel.
+
+```sh
+npm run build             # CLI, tests and TypeScript scripts -> dist/
+npm run build:mod         # Native mod type check, JS and generated guides
+npm run watch:cli         # Optional portless compiler watcher
+npm run watch:mod         # Optional native-mod source watcher; builds local files
+npm run sync:mod          # Build and update this checkout's existing rigs mod only
+npm run watch:mod:installed  # Watch native sources and sync that existing installation
+npm run install:mod       # First install: personal layout clone plus mod
+```
+
+`sync:mod` does not rewrite layouts or switch the current layout. It refuses to overwrite a mod that does not identify this source checkout. To sync an installation with another name, use `npm run sync:mod -- my-rigs`. The installed watcher targets the default `rigs` installation. Never modify Herdr's shipped layouts/mods or rewrite user layout choices just to refresh Rigs code. Keep this source checkout in place; the installed panel calls its compiled CLI through the absolute Node executable.
+
+## Verify changes
+
+- Run `npm test` for resolver/lifecycle/discovery/approval changes. Add meaningful regressions for new behavior or ownership failure cases. Fixture repositories are disposable; do not stage, commit or change branches in the actual source checkout unless requested.
+- For native changes run `npm run build:mod` and `npm run check:mod`. `herdr-app check` exercises initial/eager descriptions, not every deferred or asynchronous state. Exercise changed preview/review states in a native checker harness and, when app access is available, in the actual app.
+- Run `npm run test:live` when changing Core lifecycle or the command interface used by live fixtures. `npm run test:crash` covers durable launch recovery and stale-lock behavior. Both start disposable test processes and clean up only their own launches.
+- Follow `docs/DESKTOP_ACCEPTANCE.md` for native click-through, endpoint opening, output peeks, visibility polling and actual app quit/reopen. Do not quit the user's app without authorization. Source review, checker rendering and registry reopen tests do not prove those desktop behaviors.
+- Record exactly what was checked and any remaining limits in `docs/verification.md`. Do not present historical test results as a fresh run, or mark UI acceptance complete based on build success.
