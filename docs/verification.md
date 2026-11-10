@@ -1,5 +1,10 @@
 # Current verification — 2026-11-10
 
+## Hide metrics and port-only endpoint icons
+
+- Removed the metrics icon from the sidebar through mod presentation rules: TCP endpoints and endpoints named metrics are kept in Preview rather than rendered as service-row shortcuts. Live HTTP app/API shortcuts remain beside the status dot. Profile endpoints and running services are unchanged.
+- Generated and installed without tests/native checks as requested.
+
 ## Right-edge status ordering
 
 - Service row trailing items now run left-to-right as port/metrics icons, HTTP open-URL arrows, then the status dot at the far right. Endpoint icons remain live-only and lifecycle controls remain hover-only.

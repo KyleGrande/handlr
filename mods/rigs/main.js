@@ -390,16 +390,17 @@ export default class Rigs extends View {
         return { label: `${repo}${tree !== repo ? ` / ${tree}` : ''} · ${branch} · ${app === '.' ? 'root' : app}`,
             tooltip: `Repository: ${repo}\nWorktree: ${checkout.root}\nBranch: ${branch}\nApp: ${app}\nRepo slot: ${service.repo}` };
     }
+    sidebarEndpoints(service) {
+        return Object.entries(service.endpoints).filter(([name, endpoint]) => name.toLowerCase() !== 'metrics' && (endpoint.protocol === 'http' || endpoint.protocol === 'https'));
+    }
     endpointIcons(rig, service) {
-        const endpoints = Object.entries(service.endpoints).sort(([, a], [, b]) => Number(a.protocol === 'http' || a.protocol === 'https') - Number(b.protocol === 'http' || b.protocol === 'https'));
         const t = theme();
-        return h_flex().gap(1).items_center().flex_none().children(endpoints.map(([name, endpoint]) => {
-            const browser = endpoint.protocol === 'http' || endpoint.protocol === 'https';
-            const enabled = browser && service.state === 'running' && service.assignments === 'allocated';
+        return h_flex().gap(1).items_center().flex_none().children(this.sidebarEndpoints(service).map(([name, endpoint]) => {
+            const enabled = service.state === 'running' && service.assignments === 'allocated';
             return div().id(`endpoint-${rig.id}-${service.id}-${name}`).size(22).rounded(5).flex().items_center().justify_center()
                 .text_color(t.dim).text_size(15).tooltip(`${name}: ${endpoint.url} (${service.assignments})`)
                 .when(enabled, el => el.cursor_pointer().hover(style => style.bg(t.hover).text_color(t.foreground)))
-                .child(browser ? div().child('↗') : svg('mods/workspace-chrome/server.svg').size(12))
+                .child(div().child('↗'))
                 .on_click((_event, cx) => { cx.stop_propagation(); if (enabled)
                 cx.open_url(endpoint.url); });
         }));
@@ -636,7 +637,7 @@ export default class Rigs extends View {
                     .child(div().flex_1().min_w(0).truncate().text_size(11).text_color(t.dim).child(source.label)))
                     .child(this.controls(rig, service))
                     .child(h_flex().gap(2).items_center().flex_none()
-                    .when(service.state === 'running' && service.assignments === 'allocated' && Object.keys(service.endpoints).length > 0, el => el.child(this.endpointIcons(rig, service)))
+                    .when(service.state === 'running' && service.assignments === 'allocated' && this.sidebarEndpoints(service).length > 0, el => el.child(this.endpointIcons(rig, service)))
                     .child(this.statusIcon(this.operationIndicator(serviceKey, this.serviceIndicator(service))))));
                 if (service.degraded_dependencies.length)
                     row.child(div().text_color(t.blocked).child(`Dependency degraded: ${service.degraded_dependencies.join(', ')}`));
