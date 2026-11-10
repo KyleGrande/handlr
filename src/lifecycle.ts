@@ -5,7 +5,16 @@ import { Store } from './store.js';
 import { Core, type CoreAPI } from './core.js';
 import { rigConnections, type ConnectionRig } from './connections.js';
 import { available, checkout, launchEnv, publicPlan, resolve } from './profile.js';
-import { now, requireValue as check, type Launch, type Rig, type Terminal, type ResolvedService, type Plan } from './types.js';
+import { now, requireValue as check, type Launch, type Registry, type Rig, type Terminal, type ResolvedService, type Plan } from './types.js';
+
+function reservedPorts(registry: Registry, excludedRig: string) {
+  const ports = new Map<number, string>();
+  for (const rig of Object.values(registry.rigs)) {
+    if (rig.id === excludedRig || !rig.claimed) continue;
+    for (const endpoint of Object.values(rig.allocation?.endpoints ?? {})) ports.set(endpoint.port, rig.name);
+  }
+  return ports;
+}
 
 export function owned(launch: Launch, terminals: Terminal[]): Terminal | undefined {
   const matches = terminals.filter(t => Object.entries(launch.labels).every(([k,v]) => t.labels[k] === v));
@@ -68,7 +77,8 @@ export class Rigs {
   }
   async plan(name: string) {
     const rig = await this.get(name);
-    return publicPlan(await resolve(rig, new Set(), true, this.ownedPorts(rig)));
+    const reserved = reservedPorts(await this.store.load(), rig.id);
+    return publicPlan(await resolve(rig, reserved, true, this.ownedPorts(rig)));
   }
   async approve(name: string, fingerprint: string, decisions: Record<string,string> = {}) {
     const initial = await this.get(name);
@@ -115,10 +125,8 @@ export class Rigs {
       let plan: Plan, order: string[] = [];
       // Cross-rig worktree and port claims are committed together, before any launch.
       await this.store.lock('registry', async () => {
-        const data = await this.store.load(), reserved = new Set<number>();
-        for (const other of Object.values(data.rigs)) if (other.id !== rig.id && other.claimed) {
-          for (const endpoint of Object.values(other.allocation?.endpoints ?? {})) reserved.add(endpoint.port);
-        }
+        const data = await this.store.load();
+        const reserved = reservedPorts(data, rig.id);
         plan = await resolve(rig, reserved, true, this.ownedPorts(rig));
         const selected = new Set<string>();
         const include = (id: string) => {

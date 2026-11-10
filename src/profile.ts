@@ -110,7 +110,7 @@ export function validate(profile: Profile): string[] {
   Object.keys(profile.services).forEach(visit);
   return order;
 }
-export async function resolve(rig: Rig, reserved = new Set<number>(), checkPorts = true, ownedPorts = new Set<number>()): Promise<Plan> {
+export async function resolve(rig: Rig, reserved: ReadonlySet<number> | ReadonlyMap<number, string> = new Set(), checkPorts = true, ownedPorts = new Set<number>()): Promise<Plan> {
   const profile: Profile = JSON.parse(await fs.readFile(rig.profile, 'utf8'));
   const order = validate(profile);
   check(Object.keys(rig.checkouts).sort().join() === [...profile.repos].sort().join(), 'Select exactly one concrete checkout per repo slot');
@@ -119,12 +119,16 @@ export async function resolve(rig: Rig, reserved = new Set<number>(), checkPorts
   const fingerprint = createHash('sha256').update(JSON.stringify(canonical({profile, checkouts, id:rig.id}))).digest('hex');
   const approved = rig.approval?.fingerprint === fingerprint;
   const setup = profile.setup ? {...profile.setup, approved, decisions: approved ? {...profile.setup.decisions, ...rig.approval!.decisions} : profile.setup.decisions} : undefined;
-  const endpoints: Record<string, Endpoint> = {}, used = new Set(reserved);
+  const endpoints: Record<string, Endpoint> = {}, used = new Set(reserved.keys());
   for (const [id, service] of Object.entries(profile.services)) {
     for (const [name, endpoint] of Object.entries(service.endpoints ?? {})) {
       const key = `${id}.${name}`, preferred = rig.ports[key] ?? endpoint.port;
       let port = preferred;
-      if (preferred !== undefined) check(!used.has(preferred) && (!checkPorts || ownedPorts.has(preferred) || await available(preferred)), `${key}: preferred port ${preferred} is occupied; stop its owner or choose another port`);
+      if (preferred !== undefined) {
+        const owner = reserved instanceof Map ? reserved.get(preferred) : undefined;
+        if (owner) throw new Error(`${key}: preferred port ${preferred} is occupied by rig ${owner}`);
+        check(!used.has(preferred) && (!checkPorts || ownedPorts.has(preferred) || await available(preferred)), `${key}: preferred port ${preferred} is occupied; stop its owner or choose another port`);
+      }
       else {
         const [lo, hi] = endpoint.range ?? [3000, 4999];
         for (let p = lo; p <= hi; p++) if (!used.has(p) && (!checkPorts || ownedPorts.has(p) || await available(p))) { port = p; break; }

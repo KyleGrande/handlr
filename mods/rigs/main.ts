@@ -141,10 +141,11 @@ export default class Rigs extends View {
   renderMenu() {
     const t = theme() as { [K in keyof ReturnType<typeof theme>]: `#${string}` };
     const item = (id:string,label:string,icon:string,action:(cx:AsyncContext)=>void) =>
-      h_flex().id(id).h(34).px(9).gap(9).rounded(6).items_center().cursor_pointer().text_size(13).text_color(t.foreground)
+      h_flex().id(id).h(34).flex_none().px(9).gap(9).rounded(6).items_center().cursor_pointer().text_size(13).text_color(t.foreground)
         .hover(style => style.bg(t.hover)).child(svg(`mods/workspace-chrome/${icon}.svg`).size(14).flex_none().text_color(t.muted))
         .child(div().flex_1().truncate().child(label)).on_click((_event,cx) => action(cx));
-    const root = v_flex().id('rig-new-menu').size_full().min_h(0).p(6).gap(3).bg(t.popover).text_color(t.foreground);
+    const height = Math.min(420, 140 + Math.max(1, this.profiles.length) * 36 + (this.actionError ? 28 : 0));
+    const root = v_flex().id('rig-new-menu').w_full().h(height).min_h(0).p(6).gap(3).bg(t.popover).text_color(t.foreground);
     root.child(item('menu-copy-setup','Agent Setup Prompt','files',cx => {
       cx.write_to_clipboard(setupPrompt({checkout:this.setupCheckout,guide:this.guide})); closeOverlay(String(props().overlay));
     }));

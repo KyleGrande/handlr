@@ -1,5 +1,11 @@
 # Current verification — 2026-11-10
 
+## Profile popup and port ownership
+
+- Reproduced an empty profile list in Herdr while the CLI returned six saved profile paths. Set the popup's content height explicitly and preserved row heights. Reopened the installed popup and visually confirmed that all six profiles were visible.
+- `test-full-unit` was the only claimed rig. Local listeners occupied its allocated ports 3320, 4320 and 5320. The three stopped examples had overlapping preferred ports. Preview and start now use the same registry reservation lookup. Verified that the active rig's plan still resolves and that each stopped example's conflicting plan names `test-full-unit` as the owner.
+- Synced the installed mod. The investigation used read-only port and rig queries, with no service lifecycle actions or test suite runs.
+
 ## Hide metrics and port-only endpoint icons
 
 - Removed the metrics icon from the sidebar through mod presentation rules: TCP endpoints and endpoints named metrics are kept in Preview rather than rendered as service-row shortcuts. Live HTTP app/API shortcuts remain beside the status dot. Profile endpoints and running services are unchanged.
