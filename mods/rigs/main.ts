@@ -171,7 +171,6 @@ export default class Rigs extends View {
   }
   endpointIcons(rig: Rig, service: Service) {
     const endpoints = Object.entries(service.endpoints);
-    if (!endpoints.length) return null;
     const t = theme() as { [K in keyof ReturnType<typeof theme>]: `#${string}` };
     return h_flex().gap(1).items_center().flex_none().children(endpoints.map(([name,endpoint]) => {
       const browser = endpoint.protocol === 'http' || endpoint.protocol === 'https';
@@ -307,9 +306,9 @@ export default class Rigs extends View {
         .on_click((_e,cx) => { if (!this.busy) action(cx); })
         .child(svg(`mods/workspace-chrome/${file}.svg`).size(14));
     const root = v_flex().id('rigs-root').size_full().min_h(0).bg(t.chrome).border_t(1).border_color(t.border).text_color(t.foreground).text_size(13);
-    root.child(h_flex().px(16).h(41).pt(14).pb(5).flex_none().items_center().justify_between()
-      .child(div().text_size(11.5).font_medium().text_color(t.dim).child('Rigs'))
-      .child(h_flex().gap(2)
+    root.child(h_flex().h(31).pl(16).pr(10).flex_none().items_center().justify_between().text_size(11.5).text_color(t.dim)
+      .child('Rigs')
+      .child(h_flex().gap(2).items_center().flex_none()
         .child(icon('options', 'settings', 'Rig options', cx => { this.tools = !this.tools; cx.notify(); }))
         .child(icon('new', 'plus', 'New rig', cx => { this.creating = !this.creating; this.setupCopied = false; this.setupOptions = false; this.setupCheckout = localCheckout() ?? ''; cx.notify(); }))));
     if (this.tools) content.child(v_flex().gap(2)
@@ -391,7 +390,7 @@ export default class Rigs extends View {
           .child(h_flex().id(serviceKey).flex_1().min_w(0).gap(8).items_center()
             .child(svg('mods/workspace-chrome/server.svg').size(14).text_color(t.muted))
             .child(div().flex_1().truncate().text_color(t.muted).child(service.id)))
-          .child(this.endpointIcons(rig,service))
+          .when(Object.keys(service.endpoints).length > 0, el => el.child(this.endpointIcons(rig,service)))
           .child(this.controls(rig,service))
           .child(this.statusIcon(this.operationIndicator(serviceKey,this.serviceIndicator(service)))));
         for (const external of service.external_dependencies ?? []) row.child(div().text_size(11).text_color(external.readiness === 'failed' ? t.blocked : t.dim).child(`${external.key} · external · ${external.readiness}`));

@@ -1,5 +1,11 @@
 # Current verification — 2026-11-10
 
+## Portless-service render fix and Spaces header styling
+
+- The reported runtime error at installed main.js line 538 came from `.child(endpointIcons(...))` receiving null for compiler/worker services without endpoints. The helper now always returns an element, and endpoint icons are only attached when endpoints exist. Added a portless-service state to the native harness for future runs.
+- Matched the shipped Spaces header: 31px height, 16px left/10px right padding, regular 11.5px dim text and right-aligned icon controls.
+- Generated and synced the fix without running checks, continuing the user’s preference. The source cause is identified; an actual native re-render has not been verified in this update.
+
 ## Full-row clicks and endpoint icons
 
 - Set explicit full widths on cards and rig/service headers. Moved output/preview click handling to the full header bars, including whitespace and status; removed the narrower service-name click target. Lifecycle and disclosure controls stop propagation.

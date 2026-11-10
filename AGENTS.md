@@ -58,6 +58,8 @@ Profiles without `setup` remain usable through explicit `up` for existing manual
 
 ## Profile rules
 
+Match the Spaces section header: 31px height, 16px left/10px right padding, regular 11.5px dim text, and right-aligned 26px icon controls. Native `.child(...)` requires an actual element, string or entity; never pass null for missing endpoints. Use conditional `.when(...)` children for portless services.
+
 Profiles declare service commands, endpoints, ports and bindings; the mod enforces all row layout, icons, controls and click behavior. Do not add presentation fields or ask setup agents to format URLs as UI elements. Declaring endpoints is sufficient for the mod to render their icons.
 
 - Commands are foreground argument arrays (`argv`), never shell command strings. Do not add shell wrappers, backgrounding or daemonization to work around lifecycle handling.
