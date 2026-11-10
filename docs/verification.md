@@ -1,5 +1,11 @@
 # Current verification — 2026-11-10
 
+## Quiet dependency state for stopped services
+
+- Diagnosis of test-full-stack found API, worker and web all stopped. Status still populated degraded_dependencies for stopped consumers because their API readiness was unavailable.
+- Dependency degradation now applies only to running consumers. External health probes are not checked for stopped consumers, so an intentionally stopped rig does not look unhealthy solely because providers are stopped. Genuine running-consumer dependency failures remain reported.
+- Generated and installed without running test/native-check suites, continuing the user’s preference.
+
 ## Connected rigs, component context, profile menu and full-unit example
 
 - Added derived cross-rig connection metadata to status. Structured external bindings match uniquely reserved endpoint authorities in peer rigs; same-rig links, ambiguous providers and unowned URL targets do not invent ownership. URL matching never authorizes lifecycle actions. New metadata is outside launch fingerprints to preserve existing configuration identities. Existing allocations with external probes can supply a compatibility fallback.

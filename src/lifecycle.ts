@@ -271,12 +271,15 @@ export class Rigs {
         try { terminal = launch && owned(launch, terminals); } catch (e) { error = (e as Error).message; }
         const state = !launch || launch.state === 'exited' ? 'stopped' : core !== 'available' ? 'unknown' : terminal?.state === 'finished' ? 'exited' : terminal?.state === 'live' ? terminal.reason === 'spawn_pending' ? 'starting' : 'running' : 'unknown';
         readiness[id] = state !== 'running' ? 'unavailable' : spec.readiness ? await probe(spec) ? 'ready' : 'failed' : 'not configured';
-        const external_observations = await Promise.all((spec.external_checks ?? []).map(async ext => ({ key: ext.key, url: ext.url, readiness: core !== 'available' ? 'unavailable' : await probeURL(ext.url, ext.kind) ? 'ready' : 'failed', ownership: 'external' })));
+        const external_observations = await Promise.all((spec.external_checks ?? []).map(async ext => ({ key: ext.key, url: ext.url, readiness: state !== 'running' ? 'not checked' : core !== 'available' ? 'unavailable' : await probeURL(ext.url, ext.kind) ? 'ready' : 'failed', ownership: 'external' })));
         services[id] = { external_dependencies: external_observations, id, repo: spec.repo, cwd: spec.cwd, env: spec.env, data_scope: spec.data_scope, state, readiness: readiness[id],
           terminal: terminal?.address ?? launch?.terminal, launch_id: launch?.id, endpoints: spec.endpoints, assignments: state === 'unknown' ? 'last known' : rig.claimed ? 'allocated' : rig.allocation ? 'preferred' : 'proposed, unreserved',
           checkout_match: selected?.root === rig.checkouts[spec.repo], observed_at: now(), error, exit_code: terminal?.exit_code };
       }
-      for (const [id, spec] of Object.entries(display?.services ?? {})) (services[id] as Record<string,unknown>).degraded_dependencies = spec.depends_on.filter(dep => readiness[dep] !== 'ready');
+      for (const [id, spec] of Object.entries(display?.services ?? {})) {
+        const observation = services[id] as {state:string;degraded_dependencies?:string[]};
+        observation.degraded_dependencies = observation.state === 'running' ? spec.depends_on.filter(dep => readiness[dep] !== 'ready') : [];
+      }
       catalog.push({id:rig.id,name:rig.name,claimed:rig.claimed,services:Object.fromEntries(Object.entries(display?.services ?? {}).map(([id,spec]) => [id,{
         state:(services[id] as {state:string}).state,
         endpoints:spec.endpoints,
