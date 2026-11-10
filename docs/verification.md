@@ -1,5 +1,11 @@
 # Current verification — 2026-11-10
 
+## Full-row clicks and endpoint icons
+
+- Set explicit full widths on cards and rig/service headers. Moved output/preview click handling to the full header bars, including whitespace and status; removed the narrower service-name click target. Lifecycle and disclosure controls stop propagation.
+- Replaced endpoint URL lines with compact service-bar icons. Running allocated HTTP endpoints open their URLs; TCP icons expose port information only. Endpoint controls also stop propagation. Raw environment URL lines are removed from the sidebar and remain in Preview.
+- Presentation is enforced by the mod. Profiles only declare endpoints/ports/bindings; the agent guide documents this boundary. Generated/installed without checks under the user’s continuing instruction.
+
 ## Stopped-rig filter cleanup
 
 - Removed the duplicate Show/Hide stopped definitions shortcut below the rig list. The filter remains available in the Rigs options menu.

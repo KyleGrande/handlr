@@ -169,6 +169,20 @@ export default class Rigs extends View {
       .child(control('down','Stop','■',active))
       .child(control('restart','Restart','↻',active && !unknown));
   }
+  endpointIcons(rig: Rig, service: Service) {
+    const endpoints = Object.entries(service.endpoints);
+    if (!endpoints.length) return null;
+    const t = theme() as { [K in keyof ReturnType<typeof theme>]: `#${string}` };
+    return h_flex().gap(1).items_center().flex_none().children(endpoints.map(([name,endpoint]) => {
+      const browser = endpoint.protocol === 'http' || endpoint.protocol === 'https';
+      const enabled = browser && service.state === 'running' && service.assignments === 'allocated';
+      return div().id(`endpoint-${rig.id}-${service.id}-${name}`).size(22).rounded(5).flex().items_center().justify_center()
+        .text_color(t.dim).text_size(15).tooltip(`${name}: ${endpoint.url} (${service.assignments})`)
+        .when(enabled, el => el.cursor_pointer().hover(style => style.bg(t.hover).text_color(t.foreground)))
+        .child(browser ? div().child('↗') : svg('mods/workspace-chrome/server.svg').size(12))
+        .on_click((_event,cx) => { cx.stop_propagation(); if (enabled) cx.open_url(endpoint.url); });
+    }));
+  }
   operationIndicator(key: string, fallback: Indicator): Indicator {
     return this.controlKey === key ? {kind:'working',label:this.controlOperation === 'down' ? 'Stopping…' : this.controlOperation === 'restart' ? 'Restarting…' : 'Starting…'} : fallback;
   }
@@ -343,9 +357,11 @@ export default class Rigs extends View {
     }
     const rigs = this.data.rigs.filter(r => r.claimed || r.review_required || this.showStopped);
     for (const rig of rigs) {
-      const card = v_flex().gap(2).rounded(8);
+      const card = v_flex().w_full().gap(2).rounded(8);
       const rigKey = `rig-${rig.id}`;
-      card.child(h_flex().id(`rig-row-${rig.id}`).px(8).py(4).gap(6).rounded(6).items_center()
+      card.child(h_flex().id(`rig-row-${rig.id}`).w_full().px(8).py(4).gap(6).rounded(6).items_center().cursor_pointer()
+        .hover(style => style.bg(t.hover))
+        .on_click((_event,cx) => { this.selected = rig.id; localStorage.setItem('selected',rig.id); this.openPreview(undefined,rig.id,rig.name); cx.notify(); })
         .on_hover((hovered,cx) => this.hoverRow(rigKey,hovered,cx))
         .when(rig.id === this.selected, el => el.bg(t.raised))
         .child(div().id(`collapse-${rig.id}`).w(18).h(22).flex_none().flex().items_center().justify_center().rounded(4).cursor_pointer()
@@ -360,30 +376,26 @@ export default class Rigs extends View {
           .tooltip(Object.entries(rig.checkouts).map(([slot,checkout]) => `${slot}: ${checkout.root} (${checkout.branch ?? 'missing'})`).join('\n'))
           .hover(style => style.text_color(t.foreground))
           .child(div().text_size(12).font_semibold().text_color(t.muted).truncate().child(rig.name))
-          .child(div().flex_1().min_w(0).text_size(11).text_color(t.dim).truncate().child(this.checkoutDescription(rig)))
-          .on_click((_event,cx) => { this.selected = rig.id; localStorage.setItem('selected',rig.id); this.openPreview(undefined,rig.id,rig.name); cx.notify(); }))
+          .child(div().flex_1().min_w(0).text_size(11).text_color(t.dim).truncate().child(this.checkoutDescription(rig))))
         .child(this.controls(rig))
         .child(this.statusIcon(this.operationIndicator(rigKey,this.rigIndicator(rig)))));
       if (rig.error) card.child(div().pl(20).text_color(t.blocked).child(rig.error));
       for (const service of this.collapsed.has(rig.id) ? [] : Object.values(rig.services)) {
-        const row = v_flex().gap(2).pl(20).pr(8).py(3).rounded(8).when(Boolean(service.checkout_match), el => el.bg(t.selected));
+        const row = v_flex().w_full().gap(2).pl(20).pr(8).py(3).rounded(8).when(Boolean(service.checkout_match), el => el.bg(t.selected));
         const serviceKey = `service-${rig.id}-${service.id}`;
-        row.child(h_flex().id(`service-row-${rig.id}-${service.id}`).h(26).gap(6).rounded(6).items_center()
+        row.child(h_flex().id(`service-row-${rig.id}-${service.id}`).w_full().h(26).gap(6).rounded(6).items_center()
+          .tooltip(service.terminal ? 'Open live output' : 'No output yet · start this service first')
+          .hover(style => style.bg(t.hover))
+          .when(Boolean(service.terminal), el => el.cursor_pointer().on_click(() => run('terminal.peek', {terminal:service.terminal})))
           .on_hover((hovered,cx) => this.hoverRow(serviceKey,hovered,cx))
           .child(h_flex().id(serviceKey).flex_1().min_w(0).gap(8).items_center()
-            .tooltip(service.terminal ? 'Open live output' : 'No output yet · start this service first')
-            .when(Boolean(service.terminal), el => el.cursor_pointer().hover(style => style.bg(t.hover))
-              .on_click(() => run('terminal.peek', {terminal:service.terminal})))
             .child(svg('mods/workspace-chrome/server.svg').size(14).text_color(t.muted))
             .child(div().flex_1().truncate().text_color(t.muted).child(service.id)))
+          .child(this.endpointIcons(rig,service))
           .child(this.controls(rig,service))
           .child(this.statusIcon(this.operationIndicator(serviceKey,this.serviceIndicator(service)))));
         for (const external of service.external_dependencies ?? []) row.child(div().text_size(11).text_color(external.readiness === 'failed' ? t.blocked : t.dim).child(`${external.key} · external · ${external.readiness}`));
         if (service.degraded_dependencies.length) row.child(div().text_color(t.blocked).child(`Dependency degraded: ${service.degraded_dependencies.join(', ')}`));
-        for (const [name, endpoint] of Object.entries(service.endpoints)) row.child(endpoint.protocol === 'tcp'
-          ? div().child(`${name}: ${endpoint.port} (${service.assignments})`)
-          : this.button(`url-${rig.id}-${name}`, `${name}: ${endpoint.url} (${service.assignments})`, cx => cx.open_url(endpoint.url)));
-        for (const [key, value] of Object.entries(service.env)) if (value.includes('://')) row.child(div().text_color(t.muted).child(`${key} → ${value}`));
         card.child(row);
       }
       content.child(card);
