@@ -25,7 +25,7 @@ Rig names open a centered native preview popup; there is no separate Preview but
 
 Use static theme-colored dots: green for running, warm-colored for transitions/attention and gray rings for stopped/draft. No animated status spinner. Status tooltips retain readiness/health distinctions. Keep the rig name prominent with a gray single-checkout/worktree/branch description; use a compact count for multiple checkouts. Full slot mappings belong in the preview and tooltip. A rig instance owns its service processes; the profile is reusable configuration, and `app` is only a logical repo slot. Distinct worktrees may use separate rig instances of the same profile.
 
-Review decisions are notes about the displayed configuration, not executable configuration edits. Change commands, bindings, ports and data scope in the profile, then refresh the preview. Approval is bound to the profile, rig identity and concrete checkout/branch metadata. Material changes invalidate it. Port ranges are reviewed configuration; exact free-port observations are proposals until allocation. Secret source references are reviewed; secret values are never part of approval or previews.
+Review decisions are notes about the displayed configuration, not executable configuration edits. Change commands, bindings, ports and data scope in the profile, then close and reopen the preview. Approval is bound to the profile, rig identity and concrete checkout/branch metadata. Material changes invalidate it. Port ranges are reviewed configuration; exact free-port observations are proposals until allocation. Secret source references are reviewed; secret values are never part of approval or previews.
 
 ## Commands
 

@@ -1,5 +1,9 @@
 # Current verification — 2026-11-10
 
+## Remove manual refresh controls
+
+- Removed the sidebar refresh icon and the preview Refresh button. Sidebar polling and refresh after actions remain automatic. Reopening a preview loads its current plan. Updated popup recovery text accordingly. Generated and synced without tests/native checks at the user’s request.
+
 ## Static status and scoped hover controls — latest update
 
 - Replaced animated running status with theme-green static dots. Added hover-only Start/Stop/Restart controls to rig and service rows and removed the separate stop-services line. Clicking names still opens preview/output independently of the controls. Rig names use prominent text with a gray single-worktree/branch label or a compact checkout count.

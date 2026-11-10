@@ -350,7 +350,6 @@ export default class Rigs extends View {
             .child(v_flex().flex_1().gap(3)
             .child(div().text_size(11).text_color(t.dim).child('Rig preview'))
             .child(div().text_size(16).font_medium().child(this.preview?.name ?? String(props()?.label ?? 'Loading…'))))
-            .child(this.button('refresh-preview', 'Refresh', cx => this.action('plan', this.previewName, cx)))
             .child(div().id('close-preview').px(8).py(4).rounded(6).cursor_pointer().text_color(t.muted)
             .hover(s => s.bg(t.hover)).child('Close').on_click(() => closeOverlay(String(props().overlay)))));
         if (this.actionError)
@@ -390,14 +389,14 @@ export default class Rigs extends View {
                     review.child(v_flex().gap(3)
                         .child(div().text_size(11).text_color(t.dim).child(question.replace(/_/g, ' ')))
                         .child(Input.new(this.decisionInputs[question]).h(32).px(8).bg(t.background).border(1).border_color(t.input)));
-                review.child(div().text_size(11).text_color(t.dim).child('Edit any proposed choice. Every listed choice needs a decision. Changes to commands, bindings or data scope belong in the profile; refresh Preview afterward. Approval applies to this configuration and checkout.'));
+                review.child(div().text_size(11).text_color(t.dim).child('Edit any proposed choice. Every listed choice needs a decision. Changes to commands, bindings or data scope belong in the profile; close and reopen this preview afterward. Approval applies to this configuration and checkout.'));
             }
             root.child(review);
             root.child(h_flex().px(20).py(12).justify_end().border_t(1).border_color(t.border)
                 .child(this.button('apply-plan', this.busy ? 'Working…' : preview.setup || !preview.review.approved ? 'Approve and start' : 'Start this rig', cx => this.approveAndStart(cx))));
         }
         else
-            root.child(div().flex_1().p(20).text_color(t.dim).child(this.actionError ? 'Refresh to load the current plan.' : 'Loading preview…'));
+            root.child(div().flex_1().p(20).text_color(t.dim).child(this.actionError ? 'Close and reopen this preview to load the current plan.' : 'Loading preview…'));
         return root;
     }
     render(_cx) {
@@ -414,7 +413,6 @@ export default class Rigs extends View {
         root.child(h_flex().px(16).h(41).pt(14).pb(5).flex_none().items_center().justify_between()
             .child(div().text_size(11.5).font_medium().text_color(t.dim).child('Rigs'))
             .child(h_flex().gap(2)
-            .child(icon('refresh', 'spinner', 'Refresh rigs', cx => this.refresh(cx)))
             .child(icon('options', 'settings', 'Rig options', cx => { this.tools = !this.tools; cx.notify(); }))
             .child(icon('new', 'plus', 'New rig', cx => { this.creating = !this.creating; this.setupCopied = false; this.setupOptions = false; this.setupCheckout = localCheckout() ?? ''; cx.notify(); }))));
         if (this.tools)
