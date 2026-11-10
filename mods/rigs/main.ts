@@ -389,7 +389,6 @@ export default class Rigs extends View {
       content.child(card);
     }
     if (!rigs.length) content.child(div().px(8).text_size(12).text_color(t.dim).child('No active rigs. Use + to create one.'));
-    if (this.data.rigs.some(r => !r.claimed)) content.child(this.button('stopped', this.showStopped ? 'Hide stopped definitions' : 'Show stopped definitions', cx => { this.showStopped = !this.showStopped; cx.notify(); }));
     root.child(content); return root;
   }
 }

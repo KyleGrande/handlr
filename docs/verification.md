@@ -1,5 +1,10 @@
 # Current verification — 2026-11-10
 
+## Stopped-rig filter cleanup
+
+- Removed the duplicate Show/Hide stopped definitions shortcut below the rig list. The filter remains available in the Rigs options menu.
+- Generated and installed without tests/native checks as requested.
+
 ## Collapsible rigs
 
 - Added an independent disclosure chevron to each rig header. Collapsing hides all service rows, endpoints and bindings, while the rig name, aggregate status, errors and whole-rig hover controls remain visible. Rig-name clicks still open Preview.
