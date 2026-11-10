@@ -39,6 +39,7 @@ export default class Rigs extends View {
     hoveredRow = '';
     controlKey = '';
     controlOperation = '';
+    collapsed = new Set();
     init(_props, cx) {
         this.cli = String(props()?.cli ?? 'rig');
         this.cliArgs = []; // Installer supplies the absolute CLI module.
@@ -54,6 +55,12 @@ export default class Rigs extends View {
             return;
         }
         this.selected = localStorage.getItem('selected') ?? '';
+        try {
+            const saved = JSON.parse(localStorage.getItem('collapsed') ?? '[]');
+            if (Array.isArray(saved))
+                this.collapsed = new Set(saved.filter((id) => typeof id === 'string'));
+        }
+        catch { /* Ignore malformed view preferences; rig definitions are unaffected. */ }
         this.name = InputState.new({ placeholder: 'Rig name' });
         this.profile = InputState.new({ placeholder: 'Absolute profile.json path' });
         cx.timer.every(5000, cx => { if (!this.paused && this.visible())
@@ -478,6 +485,18 @@ export default class Rigs extends View {
             card.child(h_flex().id(`rig-row-${rig.id}`).px(8).py(4).gap(6).rounded(6).items_center()
                 .on_hover((hovered, cx) => this.hoverRow(rigKey, hovered, cx))
                 .when(rig.id === this.selected, el => el.bg(t.raised))
+                .child(div().id(`collapse-${rig.id}`).w(18).h(22).flex_none().flex().items_center().justify_center().rounded(4).cursor_pointer()
+                .text_color(t.dim).tooltip(this.collapsed.has(rig.id) ? 'Expand services' : 'Collapse services').hover(style => style.bg(t.hover).text_color(t.foreground))
+                .child(svg(`mods/workspace-chrome/chevron-${this.collapsed.has(rig.id) ? 'right' : 'down'}.svg`).size(12))
+                .on_click((_event, cx) => {
+                cx.stop_propagation();
+                if (this.collapsed.has(rig.id))
+                    this.collapsed.delete(rig.id);
+                else
+                    this.collapsed.add(rig.id);
+                localStorage.setItem('collapsed', JSON.stringify([...this.collapsed]));
+                cx.notify();
+            }))
                 .child(h_flex().id(`select-${rig.id}`).flex_1().min_w(0).gap(5).items_center().cursor_pointer()
                 .tooltip(Object.entries(rig.checkouts).map(([slot, checkout]) => `${slot}: ${checkout.root} (${checkout.branch ?? 'missing'})`).join('\n'))
                 .hover(style => style.text_color(t.foreground))
@@ -488,7 +507,7 @@ export default class Rigs extends View {
                 .child(this.statusIcon(this.operationIndicator(rigKey, this.rigIndicator(rig)))));
             if (rig.error)
                 card.child(div().pl(20).text_color(t.blocked).child(rig.error));
-            for (const service of Object.values(rig.services)) {
+            for (const service of this.collapsed.has(rig.id) ? [] : Object.values(rig.services)) {
                 const row = v_flex().gap(2).pl(20).pr(8).py(3).rounded(8).when(Boolean(service.checkout_match), el => el.bg(t.selected));
                 const serviceKey = `service-${rig.id}-${service.id}`;
                 row.child(h_flex().id(`service-row-${rig.id}-${service.id}`).h(26).gap(6).rounded(6).items_center()

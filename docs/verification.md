@@ -1,5 +1,11 @@
 # Current verification — 2026-11-10
 
+## Collapsible rigs
+
+- Added an independent disclosure chevron to each rig header. Collapsing hides all service rows, endpoints and bindings, while the rig name, aggregate status, errors and whole-rig hover controls remain visible. Rig-name clicks still open Preview.
+- Collapse preferences are saved by immutable rig ID in mod-local storage, so polling, filtering and mod reloads preserve them. Folding has no CLI or lifecycle action.
+- Generated and installed without tests, type/native checks or interactive verification, continuing the user’s request to skip checks.
+
 ## Remove manual refresh controls
 
 - Removed the sidebar refresh icon and the preview Refresh button. Sidebar polling and refresh after actions remain automatic. Reopening a preview loads its current plan. Updated popup recovery text accordingly. Generated and synced without tests/native checks at the user’s request.
