@@ -86,14 +86,32 @@ export class Rigs {
   ownedPorts(rig: Rig) {
     return new Set(Object.entries(rig.launches).filter(([,launch]) => launch.state === 'running').flatMap(([id]) => Object.values(rig.allocation?.services[id]?.endpoints ?? {}).map(endpoint => endpoint.port)));
   }
-  async up(name: string, reviewedFingerprint?: string) {
+  async up(name: string, reviewedFingerprint?: string, serviceId?: string) {
+    const initial = await this.get(name);
+    return this.store.lock(initial.id, async () => this.upLocked(await this.get(initial.id),reviewedFingerprint,serviceId));
+  }
+  async restart(name: string, reviewedFingerprint?: string, serviceId?: string) {
     const initial = await this.get(name);
     return this.store.lock(initial.id, async () => {
-      const rig = await this.get(initial.id), operation = randomUUID();
+      const rig = await this.get(initial.id), plan = await resolve(rig,new Set(),false);
+      if (serviceId) check(Object.hasOwn(plan.services,serviceId), `Unknown service ${serviceId}`);
+      if (reviewedFingerprint) check(reviewedFingerprint === plan.review.fingerprint,'Preview changed; review the current configuration before restarting');
+      if (plan.setup || rig.approval) check(plan.review.approved,'Setup review incomplete or stale: approve the current configuration before restarting');
+      const selected = new Set<string>();
+      const include = (id: string) => { if (selected.has(id)) return; selected.add(id); for (const dependency of plan.services[id].depends_on) include(dependency); };
+      if (serviceId) include(serviceId); else plan.order.forEach(include);
+      for (const id of selected) await launchEnv(plan.services[id]);
+      // Hold the same rig lease throughout stop/start and retain reservations until replacement or explicit down.
+      await this.downLocked(rig,serviceId,true);
+      return this.upLocked(await this.get(rig.id),reviewedFingerprint,serviceId);
+    });
+  }
+  async upLocked(rig: Rig, reviewedFingerprint?: string, serviceId?: string) {
+      const operation = randomUUID();
       reconcile(rig, await this.core.terminals());
       await this.write(rig);
       check(!Object.values(rig.launches).some(l => l.state === 'unknown' || l.state === 'intent'), 'Unresolved launch; run down to reconcile, then up');
-      let plan: Plan;
+      let plan: Plan, order: string[] = [];
       // Cross-rig worktree and port claims are committed together, before any launch.
       await this.store.lock('registry', async () => {
         const data = await this.store.load(), reserved = new Set<number>();
@@ -101,6 +119,15 @@ export class Rigs {
           for (const endpoint of Object.values(other.allocation?.endpoints ?? {})) reserved.add(endpoint.port);
         }
         plan = await resolve(rig, reserved, true, this.ownedPorts(rig));
+        const selected = new Set<string>();
+        const include = (id: string) => {
+          check(Object.hasOwn(plan.services,id), `Unknown service ${id}`);
+          if (selected.has(id)) return;
+          selected.add(id);
+          for (const dependency of plan.services[id].depends_on) include(dependency);
+        };
+        if (serviceId) include(serviceId); else plan.order.forEach(include);
+        order = plan.order.filter(id => selected.has(id));
         if (reviewedFingerprint) check(reviewedFingerprint === plan.review.fingerprint, 'Preview changed; run plan again before starting');
         if (plan.setup || rig.approval) check(plan.review.approved, 'Setup review incomplete or stale: review rig plan, then run rig approve with its review fingerprint');
         for (const other of Object.values(data.rigs)) if (other.id !== rig.id && other.claimed) {
@@ -110,13 +137,13 @@ export class Rigs {
         for (const [id, launch] of Object.entries(rig.launches)) if (launch.state === 'running')
           check(plan.services[id]?.fingerprint === launch.fingerprint, `${id}: configuration drift; down then up to apply changes`);
         // Resolve all secrets before claiming or starting any process.
-        for (const service of Object.values(plan.services)) await launchEnv(service);
+        for (const id of order) await launchEnv(plan.services[id]);
         rig.allocation = plan; rig.allocation.assignments = 'allocated'; rig.claimed = true; rig.error = undefined;
         rig.ports = Object.fromEntries(Object.entries(plan.endpoints).map(([id,e]) => [id,e.port]));
         data.rigs[rig.id] = rig; await this.store.save(data);
       });
       try {
-        for (const id of rig.allocation!.order) {
+        for (const id of order) {
           const service = rig.allocation!.services[id];
           for (const external of service.external_checks ?? []) await waitExternal(external);
           let launch = rig.launches[id];
@@ -161,7 +188,6 @@ export class Rigs {
         rig.claimed = Object.values(rig.launches).some(l => l.state !== 'exited');
         await this.write(rig); throw new Error(rig.error);
       }
-    });
   }
   async waitReady(service: ResolvedService, launch: Launch) {
     const deadline = Date.now() + (service.readiness?.timeout ?? 1) * 1000;
@@ -186,24 +212,29 @@ export class Rigs {
     check(!stopped || stopped.state === 'finished', `${launch.service}: stop not confirmed; reservations retained`);
     launch.state = 'exited'; launch.error = undefined;
   }
-  async down(name: string) {
+  async down(name: string, serviceId?: string) {
     const initial = await this.get(name);
-    return this.store.lock(initial.id, async () => {
-      const rig = await this.get(initial.id);
+    return this.store.lock(initial.id, async () => this.downLocked(await this.get(initial.id),serviceId));
+  }
+  async downLocked(rig: Rig, serviceId?: string, retainClaims = false) {
+      if (serviceId && !Object.hasOwn(rig.launches,serviceId) && !Object.hasOwn(rig.allocation?.services ?? {},serviceId)) {
+        const current = await resolve(rig,new Set(),false);
+        check(Object.hasOwn(current.services,serviceId), `Unknown service ${serviceId}`);
+      }
       const errors: string[] = [];
       for (const id of [...(rig.allocation?.order ?? Object.keys(rig.launches))].reverse()) {
+        if (serviceId && id !== serviceId) continue;
         const launch = rig.launches[id]; if (!launch || launch.state === 'exited') continue;
         try { await this.stopLaunch(launch); } catch (error) { launch.state = 'unknown'; errors.push((error as Error).message); }
         await this.write(rig);
       }
-      rig.claimed = Object.values(rig.launches).some(l => l.state !== 'exited');
+      rig.claimed = (retainClaims && rig.claimed) || Object.values(rig.launches).some(l => l.state !== 'exited');
       const listeners = [];
-      for (const endpoint of Object.values(rig.allocation?.endpoints ?? {})) if (!await available(endpoint.port)) listeners.push(endpoint.port);
+      for (const endpoint of Object.values(serviceId ? rig.allocation?.services[serviceId]?.endpoints ?? {} : rig.allocation?.endpoints ?? {})) if (!await available(endpoint.port)) listeners.push(endpoint.port);
       rig.error = errors.length ? errors.join('; ') : undefined;
       await this.write(rig);
       check(!errors.length, errors.join('; '));
       return { ...(await this.status(rig.id)), listeners_still_present: listeners };
-    });
   }
   async logs(name: string, service: string) {
     const rig = await this.get(name), launch = rig.launches[service]; check(launch, 'Service has no launch history');

@@ -12,7 +12,7 @@ function localCheckout() {
 }
 type LayoutNode = { id?:string; type?:string; hidden?:boolean; active?:string; children?:LayoutNode[] };
 type Service = { id: string; repo: string; state: string; readiness: string; terminal?: string; error?: string; exit_code?: number; endpoints: Record<string,{url:string; protocol:string; port:number}>; env: Record<string,string>; assignments: string; external_dependencies?: {key:string;url:string;readiness:string}[]; degraded_dependencies: string[]; checkout_match?: boolean };
-type Rig = { id: string; name: string; claimed: boolean; review_required?: boolean; error?: string; checkouts: Record<string,{root:string; branch?:string; unborn?:boolean; stale?:boolean}>; services: Record<string,Service> };
+type Rig = { id: string; name: string; claimed: boolean; review_required?: boolean; error?: string; checkouts: Record<string,{root:string; repository?:string; branch?:string; unborn?:boolean; stale?:boolean}>; services: Record<string,Service> };
 type Status = { core: string; rigs: Rig[]; observed_at: string };
 type Indicator = {kind:'working' | 'idle' | 'done' | 'blocked'; label:string};
 export default class Rigs extends View {
@@ -24,6 +24,7 @@ export default class Rigs extends View {
   name!: InputState; profile!: InputState;
   cli = ''; cliArgs: string[] = []; previewName = ''; showStopped = false;
   previewMode = false; modName = 'rigs';
+  hoveredRow = ''; controlKey = ''; controlOperation = '';
   init(_props: unknown, cx: AsyncContext) {
     this.cli = String(props()?.cli ?? 'rig');
     this.cliArgs = []; // Installer supplies the absolute CLI module.
@@ -119,6 +120,60 @@ export default class Rigs extends View {
       if (started && this.previewMode) closeOverlay(String(props().overlay));
     });
   }
+  control(command: 'up' | 'down' | 'restart', rig: Rig, service: Service | undefined, cx: AsyncContext) {
+    if (this.busy) return;
+    const scope = service ? ['--service',service.id] : [];
+    this.busy = true; this.actionError = '';
+    this.controlKey = service ? `service-${rig.id}-${service.id}` : `rig-${rig.id}`;
+    this.controlOperation = command;
+    cx.spawn(async cx => {
+      try {
+        if (command === 'down') await this.call(['down',rig.id,...scope]);
+        else {
+          // The explicit Start/Restart click authorizes the saved configuration; preview is optional.
+          const plan: Preview = await this.call(['plan',rig.id]);
+          if (service && !Object.hasOwn(plan.services,service.id)) throw new Error(`Unknown service ${service.id}`);
+          await this.call(['approve',rig.id,'--review',plan.review.fingerprint]);
+          await this.call([command,rig.id,'--review',plan.review.fingerprint,...scope]);
+        }
+      } catch (error) { this.actionError = String(error); }
+      finally {
+        this.busy = false; this.controlKey = ''; this.controlOperation = '';
+        this.refresh(cx); cx.notify();
+      }
+    });
+  }
+  hoverRow(key: string, hovered: boolean, cx: Context) {
+    const next = hovered ? key : this.hoveredRow === key ? '' : this.hoveredRow;
+    if (next !== this.hoveredRow) { this.hoveredRow = next; cx.notify(); }
+  }
+  controls(rig: Rig, service?: Service) {
+    const t = theme() as { [K in keyof ReturnType<typeof theme>]: `#${string}` };
+    const key = service ? `service-${rig.id}-${service.id}` : `rig-${rig.id}`;
+    const services = service ? [service] : Object.values(rig.services);
+    const active = service ? ['running','starting','unknown'].includes(service.state) : rig.claimed;
+    const unknown = services.some(item => item.state === 'unknown');
+    const canStart = !unknown && services.some(item => !['running','starting'].includes(item.state));
+    const control = (command: 'up' | 'down' | 'restart', label: string, glyph: string, enabled: boolean) =>
+      div().id(`${key}-${command}`).size(22).rounded(5).flex().items_center().justify_center().text_size(12)
+        .text_color(t.muted).opacity(enabled && !this.busy ? 1 : 0.3).tooltip(`${label} ${service ? service.id : 'rig'}`)
+        .when(enabled && !this.busy, el => el.cursor_pointer().hover(style => style.bg(t.hover).text_color(t.foreground)))
+        .child(glyph).on_click((_event,cx) => { cx.stop_propagation(); if (enabled && !this.busy) this.control(command,rig,service,cx); });
+    return h_flex().gap(1).items_center().flex_none().opacity(this.hoveredRow === key || this.controlKey === key ? 1 : 0)
+      .child(control('up','Start','▶',canStart))
+      .child(control('down','Stop','■',active))
+      .child(control('restart','Restart','↻',active && !unknown));
+  }
+  operationIndicator(key: string, fallback: Indicator): Indicator {
+    return this.controlKey === key ? {kind:'working',label:this.controlOperation === 'down' ? 'Stopping…' : this.controlOperation === 'restart' ? 'Restarting…' : 'Starting…'} : fallback;
+  }
+  checkoutDescription(rig: Rig) {
+    const checkouts = Object.values(rig.checkouts);
+    if (checkouts.length !== 1) return `${checkouts.length} checkouts`;
+    const checkout = checkouts[0];
+    const worktree = checkout.root.split('/').filter(Boolean).pop() ?? checkout.root;
+    return `${worktree} · ${checkout.branch ?? 'missing checkout'}${checkout.unborn ? ' · no commits' : ''}`;
+  }
   button(id: string, label: string, action: (cx: AsyncContext) => void) {
     const t = theme() as { [K in keyof ReturnType<typeof theme>]: `#${string}` };
     return div().id(id).px(8).py(4).rounded(6).text_size(12).text_color(t.muted).child(label)
@@ -143,11 +198,12 @@ export default class Rigs extends View {
   }
   statusIcon(status: Indicator) {
     const t = theme() as { [K in keyof ReturnType<typeof theme>]: `#${string}` };
-    // Match the shipped Agents mod's spinner, compact warning, idle ring and done dot.
-    const glyph = status.kind === 'working' ? svg('mods/workspace-chrome/spinner.svg').size(12).mx(1).flex_none().text_color(t.working).spin(900)
-      : status.kind === 'blocked' ? div().size(14).flex_none().rounded(4).bg(`${t.blocked}26`).text_size(10.5).font_bold().text_color(t.blocked).flex().items_center().justify_center().child('!')
-      : status.kind === 'idle' ? div().size(7).mx(3).flex_none().rounded(4).border(1.5).border_color(t.idle ?? t.dim)
-      : div().size(7).mx(3).flex_none().rounded(4).bg(t.done ?? t.dim);
+    // Quiet theme-colored indicators; running processes do not animate the sidebar.
+    const color = status.kind === 'working' ? (status.label.endsWith('…') || status.label === 'Starting' ? t.working : t.ansi2)
+      : status.kind === 'blocked' ? t.blocked : status.kind === 'done' ? t.done : t.dim;
+    const glyph = div().size(7).mx(3).flex_none().rounded(4)
+      .when(status.kind === 'idle', el => el.border(1.5).border_color(color))
+      .when(status.kind !== 'idle', el => el.bg(color));
     return h_flex().w(14).flex_none().items_center().justify_center().tooltip(status.label).child(glyph);
   }
   loadProfile(cx: AsyncContext) {
@@ -285,23 +341,32 @@ export default class Rigs extends View {
     const rigs = this.data.rigs.filter(r => r.claimed || r.review_required || this.showStopped);
     for (const rig of rigs) {
       const card = v_flex().gap(2).rounded(8);
-      card.child(h_flex().id(`select-${rig.id}`).px(8).py(4).gap(8).rounded(6).items_center().cursor_pointer()
-        .text_size(12).text_color(t.muted).tooltip('Open rig preview').hover(s => s.bg(t.hover))
+      const rigKey = `rig-${rig.id}`;
+      card.child(h_flex().id(`rig-row-${rig.id}`).px(8).py(4).gap(6).rounded(6).items_center()
+        .on_hover((hovered,cx) => this.hoverRow(rigKey,hovered,cx))
         .when(rig.id === this.selected, el => el.bg(t.raised))
-        .child(div().flex_1().truncate().child(rig.name)).child(this.statusIcon(this.rigIndicator(rig)))
-        .on_click((_event,cx) => { this.selected = rig.id; localStorage.setItem('selected',rig.id); this.openPreview(undefined,rig.id,rig.name); cx.notify(); }));
-      for (const [repo, checkout] of Object.entries(rig.checkouts)) card.child(div().pl(20).pr(8).text_size(11).text_color(checkout.stale ? t.blocked : t.dim).truncate().tooltip(checkout.root).child(`${repo} · ${checkout.branch ?? 'missing checkout'}${checkout.unborn ? ' · no commits' : ''}`));
-      if (rig.error) card.child(div().text_color(t.blocked).child(rig.error));
-      card.child(this.button(`down-${rig.id}`, 'Stop owned services', cx => this.action('down', rig.id, cx)));
+        .child(h_flex().id(`select-${rig.id}`).flex_1().min_w(0).gap(5).items_center().cursor_pointer()
+          .tooltip(Object.entries(rig.checkouts).map(([slot,checkout]) => `${slot}: ${checkout.root} (${checkout.branch ?? 'missing'})`).join('\n'))
+          .hover(style => style.text_color(t.foreground))
+          .child(div().text_size(12).font_semibold().text_color(t.muted).truncate().child(rig.name))
+          .child(div().flex_1().min_w(0).text_size(11).text_color(t.dim).truncate().child(this.checkoutDescription(rig)))
+          .on_click((_event,cx) => { this.selected = rig.id; localStorage.setItem('selected',rig.id); this.openPreview(undefined,rig.id,rig.name); cx.notify(); }))
+        .child(this.controls(rig))
+        .child(this.statusIcon(this.operationIndicator(rigKey,this.rigIndicator(rig)))));
+      if (rig.error) card.child(div().pl(20).text_color(t.blocked).child(rig.error));
       for (const service of Object.values(rig.services)) {
         const row = v_flex().gap(2).pl(20).pr(8).py(3).rounded(8).when(Boolean(service.checkout_match), el => el.bg(t.selected));
-        row.child(h_flex().id(`service-${rig.id}-${service.id}`).h(26).gap(8).rounded(6).items_center()
-          .tooltip(service.terminal ? 'Open live output' : 'No output yet · start this rig first')
-          .when(Boolean(service.terminal), el => el.cursor_pointer().hover(s => s.bg(t.hover))
-            .on_click(() => run('terminal.peek', {terminal:service.terminal})))
-          .child(svg('mods/workspace-chrome/server.svg').size(14).text_color(t.muted))
-          .child(div().flex_1().truncate().text_color(t.muted).child(service.id))
-          .child(this.statusIcon(this.serviceIndicator(service))));
+        const serviceKey = `service-${rig.id}-${service.id}`;
+        row.child(h_flex().id(`service-row-${rig.id}-${service.id}`).h(26).gap(6).rounded(6).items_center()
+          .on_hover((hovered,cx) => this.hoverRow(serviceKey,hovered,cx))
+          .child(h_flex().id(serviceKey).flex_1().min_w(0).gap(8).items_center()
+            .tooltip(service.terminal ? 'Open live output' : 'No output yet · start this service first')
+            .when(Boolean(service.terminal), el => el.cursor_pointer().hover(style => style.bg(t.hover))
+              .on_click(() => run('terminal.peek', {terminal:service.terminal})))
+            .child(svg('mods/workspace-chrome/server.svg').size(14).text_color(t.muted))
+            .child(div().flex_1().truncate().text_color(t.muted).child(service.id)))
+          .child(this.controls(rig,service))
+          .child(this.statusIcon(this.operationIndicator(serviceKey,this.serviceIndicator(service)))));
         for (const external of service.external_dependencies ?? []) row.child(div().text_size(11).text_color(external.readiness === 'failed' ? t.blocked : t.dim).child(`${external.key} · external · ${external.readiness}`));
         if (service.degraded_dependencies.length) row.child(div().text_color(t.blocked).child(`Dependency degraded: ${service.degraded_dependencies.join(', ')}`));
         for (const [name, endpoint] of Object.entries(service.endpoints)) row.child(endpoint.protocol === 'tcp'

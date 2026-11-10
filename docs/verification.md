@@ -1,5 +1,12 @@
 # Current verification — 2026-11-10
 
+## Static status and scoped hover controls — latest update
+
+- Replaced animated running status with theme-green static dots. Added hover-only Start/Stop/Restart controls to rig and service rows and removed the separate stop-services line. Clicking names still opens preview/output independently of the controls. Rig names use prominent text with a gray single-worktree/branch label or a compact checkout count.
+- Added CLI service targeting (`up|down|restart --service`) and restart support. Service start includes the declared prerequisite closure; service stop leaves other processes running. Restart holds the rig lease across stop/start and retains reservations until replacement or explicit down. Partial launches retain conservative whole-profile reservations. The existing labels/address ownership checks, durable launch intents and rollback filtering remain in use.
+- Explicit sidebar Start/Restart clicks approve the saved configuration and launch without opening Preview. Missing decisions remain errors; no values are fabricated.
+- The user requested speed and skipping checks. This update was generated and installed without running tests, type checks, native checks, or service launch/stop verification. The earlier evidence below does not validate these new lifecycle paths.
+
 ## Rig preview popup and status-icon update
 
 - Rig-name clicks now open a centered native preview popup. Removed the separate Preview action and inline sidebar plan. Save and preview opens the same popup. The popup keeps review decisions, refresh/error handling, a scrollable plan, an explicit launch footer, and independent Close/Escape dismissal. Opening/closing has no service lifecycle action.

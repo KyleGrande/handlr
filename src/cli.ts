@@ -8,7 +8,8 @@ import { requireValue as check } from './types.js';
 const usage = `rig create <name> --profile <file> --repo <slot>=<checkout> [--repo ...]
 rig plan|up|down <name> [--json]
 rig approve <name> --review <fingerprint> [--decision key=value ...]
-rig up <name> [--review <fingerprint>]
+rig up|restart <name> [--review <fingerprint>] [--service <id>]
+rig down <name> [--service <id>]
 rig status [<name>] [--checkout <directory>] [--json]
 rig logs <name> <service> [--json]
 rig configure <name> --repo <slot>=<checkout>
@@ -26,7 +27,7 @@ export async function main(argv = process.argv.slice(2)) {
     if (arg.startsWith('--')) { check(argv[0] && !argv[0].startsWith('--'), `Missing value for ${arg}`); (options[arg] ??= []).push(argv.shift()!); }
     else positional.push(arg);
   }
-  check(Object.keys(options).every(k => ['--profile','--repo','--checkout','--output','--review','--decision'].includes(k)), 'Unknown option; run rig help');
+  check(Object.keys(options).every(k => ['--profile','--repo','--checkout','--output','--review','--decision','--service'].includes(k)), 'Unknown option; run rig help');
   const selections: Record<string,string> = {};
   for (const value of options['--repo'] ?? []) {
     const at = value.indexOf('='); check(at > 0 && at < value.length - 1, 'Use --repo slot=/concrete/worktree');
@@ -49,8 +50,9 @@ export async function main(argv = process.argv.slice(2)) {
       }
       result = await rigs.approve(name, options['--review'][0], decisions); break;
     }
-    case 'up': result = await rigs.up(name, options['--review']?.[0]); break;
-    case 'down': result = await rigs.down(name); break;
+    case 'up': result = await rigs.up(name, options['--review']?.[0], options['--service']?.[0]); break;
+    case 'restart': result = await rigs.restart(name, options['--review']?.[0], options['--service']?.[0]); break;
+    case 'down': result = await rigs.down(name, options['--service']?.[0]); break;
     case 'status': result = await rigs.status(name, options['--checkout']?.[0]); break;
     case 'logs': check(positional[1], 'Select a service'); result = await rigs.logs(name, positional[1]); break;
     case 'init': {
