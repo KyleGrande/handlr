@@ -1,5 +1,10 @@
 # Current verification — 2026-11-10
 
+## Live-only endpoint icons beside status
+
+- Moved service endpoint icons into the status cluster immediately beside the dot, after the hover-only lifecycle controls. Render them only for observed running services with allocated endpoints; stopped, starting and unknown services have no endpoint icons.
+- Generated and installed without checks, continuing the user’s preference.
+
 ## Portless-service render fix and Spaces header styling
 
 - The reported runtime error at installed main.js line 538 came from `.child(endpointIcons(...))` receiving null for compiler/worker services without endpoints. The helper now always returns an element, and endpoint icons are only attached when endpoints exist. Added a portless-service state to the native harness for future runs.

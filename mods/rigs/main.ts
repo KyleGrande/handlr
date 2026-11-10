@@ -390,9 +390,10 @@ export default class Rigs extends View {
           .child(h_flex().id(serviceKey).flex_1().min_w(0).gap(8).items_center()
             .child(svg('mods/workspace-chrome/server.svg').size(14).text_color(t.muted))
             .child(div().flex_1().truncate().text_color(t.muted).child(service.id)))
-          .when(Object.keys(service.endpoints).length > 0, el => el.child(this.endpointIcons(rig,service)))
           .child(this.controls(rig,service))
-          .child(this.statusIcon(this.operationIndicator(serviceKey,this.serviceIndicator(service)))));
+          .child(h_flex().gap(2).items_center().flex_none()
+            .child(this.statusIcon(this.operationIndicator(serviceKey,this.serviceIndicator(service))))
+            .when(service.state === 'running' && service.assignments === 'allocated' && Object.keys(service.endpoints).length > 0, el => el.child(this.endpointIcons(rig,service)))));
         for (const external of service.external_dependencies ?? []) row.child(div().text_size(11).text_color(external.readiness === 'failed' ? t.blocked : t.dim).child(`${external.key} · external · ${external.readiness}`));
         if (service.degraded_dependencies.length) row.child(div().text_color(t.blocked).child(`Dependency degraded: ${service.degraded_dependencies.join(', ')}`));
         card.child(row);
