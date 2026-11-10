@@ -143,6 +143,7 @@ export async function resolve(rig: Rig, reserved = new Set<number>(), checkPorts
     catch { throw new Error(`${id}: service directory missing`); }
     check(cwd === root || cwd.startsWith(root + path.sep), `${id}: service directory escapes checkout`);
     const external_checks: ExternalCheck[] = [];
+    const external_bindings: {key:string;url:string}[] = [];
     const env: Record<string,string> = {}, secrets: ResolvedService['secrets'] = {};
     for (const [key, binding] of Object.entries(spec.env ?? {})) {
       if (typeof binding === 'string') env[key] = expand(binding);
@@ -153,6 +154,7 @@ export async function resolve(rig: Rig, reserved = new Set<number>(), checkPorts
         const parsed = new URL(url);
         if (binding.path) parsed.pathname = parsed.pathname.replace(/\/$/, '') + binding.path;
         env[key] = binding.path ? parsed.toString() : url.replace(/\/$/, '');
+        if (binding.external) external_bindings.push({key,url:env[key]});
         if (binding.probe) {
           const target = new URL(env[key]);
           if (binding.probe.path) { target.pathname = binding.probe.path; target.search = ''; target.hash = ''; }
@@ -163,7 +165,7 @@ export async function resolve(rig: Rig, reserved = new Set<number>(), checkPorts
     const item = { id, repo: spec.repo, cwd, argv: spec.argv.map(expand), env, secrets,
       ...(external_checks.length ? { external_checks } : {}), depends_on: spec.depends_on ?? [], readiness: spec.readiness, data_scope: spec.data_scope ?? 'Service defaults; review shared infrastructure',
       endpoints: Object.fromEntries(Object.entries(endpoints).filter(([key]) => key.startsWith(id + '.'))) };
-    services[id] = { ...item, fingerprint: createHash('sha256').update(JSON.stringify(item)).digest('hex') };
+    services[id] = { ...item, fingerprint: createHash('sha256').update(JSON.stringify(item)).digest('hex'), ...(external_bindings.length ? {external_bindings} : {}) };
   }
   return { id: rig.id, name: rig.name, checkouts, services, order, endpoints, assignments: 'proposed, unreserved', review:{fingerprint, approved}, ...(setup ? {setup} : {}) };
 }

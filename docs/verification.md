@@ -1,5 +1,13 @@
 # Current verification — 2026-11-10
 
+## Connected rigs, component context, profile menu and full-unit example
+
+- Added derived cross-rig connection metadata to status. Structured external bindings match uniquely reserved endpoint authorities in peer rigs; same-rig links, ambiguous providers and unowned URL targets do not invent ownership. URL matching never authorizes lifecycle actions. New metadata is outside launch fingerprints to preserve existing configuration identities. Existing allocations with external probes can supply a compatibility fallback.
+- The sidebar shows grouped ↔ peer rows on both rigs, with service/address/state tooltips and preview navigation. Raw API_URL/external/readiness lines are removed. Component rows now show repo/worktree, branch and app-directory context; rig headings show compact service/checkout counts.
+- Replaced the inline + onboarding form with a native popup containing Agent Setup Prompt, unique saved-profile paths and Import profile…. Profile selection opens a New rig dialog with an unused-name suggestion and editable checkout mappings. Saving remains stopped and opens Preview. Saved profiles are those referenced by registry definitions; arbitrary undiscovered JSON files are not scanned.
+- Prepared `test-full-unit` as a stopped example using `rigs-test-backend/rig.full-unit.json`: API in apps/api, two workers in apps/worker, and web in the sibling frontend's apps/web. Added and committed those example app entry points in the two separate fixture repos. No services were launched for this update.
+- Updated native fixture states for the new menu/form, but did not run them. Generated and installed the update without tests, type/native checks or interactive verification, continuing the user's request to skip checks. Earlier test evidence below does not validate this batch.
+
 ## Live-only endpoint icons beside status
 
 - Moved service endpoint icons into the status cluster immediately beside the dot, after the hover-only lifecycle controls. Render them only for observed running services with allocated endpoints; stopped, starting and unknown services have no endpoint icons.

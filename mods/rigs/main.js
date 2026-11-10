@@ -12,15 +12,15 @@ function localCheckout() {
 export default class Rigs extends View {
     data = { core: 'loading', rigs: [], observed_at: '' };
     setupCheckout = '';
-    setupCopied = false;
-    setupOptions = false;
-    importProfile = false;
     guide = '';
+    menuMode = false;
+    createMode = false;
+    menuLoaded = false;
+    profiles = [];
     tools = false;
     refreshError = '';
     actionError = '';
     busy = false;
-    creating = false;
     checkoutOnly = false;
     paused = false;
     preview = null;
@@ -44,6 +44,10 @@ export default class Rigs extends View {
         this.cli = String(props()?.cli ?? 'rig');
         this.cliArgs = []; // Installer supplies the absolute CLI module.
         this.guide = ''; // Installer supplies the agent guide.
+        if (typeof props()?.guide === 'string')
+            this.guide = props().guide;
+        if (Array.isArray(props()?.cliArgs))
+            this.cliArgs = props().cliArgs.map(String);
         if (props()?.view === 'preview') {
             this.previewMode = true;
             this.cliArgs = Array.isArray(props()?.cliArgs) ? props().cliArgs.map(String) : this.cliArgs;
@@ -54,6 +58,23 @@ export default class Rigs extends View {
                 this.action('plan', this.previewName, cx);
             return;
         }
+        this.name = InputState.new({ placeholder: 'Rig name' });
+        this.profile = InputState.new({ placeholder: 'Absolute profile.json path' });
+        if (props()?.view === 'new-menu') {
+            this.menuMode = true;
+            this.setupCheckout = String(props()?.checkout ?? '');
+            this.loadProfiles(cx);
+            return;
+        }
+        if (props()?.view === 'create') {
+            this.createMode = true;
+            this.name.set_value(String(props()?.suggestedName ?? ''));
+            this.profile.set_value(String(props()?.profilePath ?? ''));
+            this.selections = props()?.selections ?? {};
+            if (this.profile.value())
+                this.loadProfile(cx, true);
+            return;
+        }
         this.selected = localStorage.getItem('selected') ?? '';
         try {
             const saved = JSON.parse(localStorage.getItem('collapsed') ?? '[]');
@@ -61,8 +82,6 @@ export default class Rigs extends View {
                 this.collapsed = new Set(saved.filter((id) => typeof id === 'string'));
         }
         catch { /* Ignore malformed view preferences; rig definitions are unaffected. */ }
-        this.name = InputState.new({ placeholder: 'Rig name' });
-        this.profile = InputState.new({ placeholder: 'Absolute profile.json path' });
         cx.timer.every(5000, cx => { if (!this.paused && this.visible())
             this.refresh(cx); });
         this.refresh(cx);
@@ -145,11 +164,101 @@ export default class Rigs extends View {
             }
             finally {
                 this.busy = false;
-                if (!this.previewMode)
+                if (!this.previewMode && !this.createMode && !this.menuMode)
                     this.refresh(cx);
                 cx.notify();
             }
         });
+    }
+    openNewMenu() {
+        openOverlay({ mod: this.modName, kind: 'popup', width: 340, height: 380,
+            props: { view: 'new-menu', cli: this.cli, cliArgs: this.cliArgs, guide: this.guide, checkout: localCheckout() ?? '' } });
+    }
+    loadProfiles(cx) {
+        cx.spawn(async (cx) => {
+            try {
+                this.data = await this.call(['status']);
+                const profiles = new Map();
+                for (const rig of this.data.rigs)
+                    if (rig.profile && !profiles.has(rig.profile)) {
+                        const label = (rig.profile.split('/').pop() ?? rig.profile).replace(/\.json$/i, '').replace(/^rig[.-]/, '');
+                        profiles.set(rig.profile, { path: rig.profile, label, selections: Object.fromEntries(Object.entries(rig.checkouts).map(([slot, checkout]) => [slot, checkout.root])), services: Object.keys(rig.services).length });
+                    }
+                this.profiles = [...profiles.values()].sort((a, b) => a.label.localeCompare(b.label));
+            }
+            catch (error) {
+                this.actionError = String(error);
+            }
+            finally {
+                this.menuLoaded = true;
+                cx.notify();
+            }
+        });
+    }
+    openCreate(choice) {
+        const base = (choice?.label ?? 'new-rig').replace(/[^a-zA-Z0-9_-]+/g, '-').replace(/^-+|-+$/g, '') || 'new-rig';
+        const names = new Set(this.data.rigs.map(rig => rig.name));
+        let name = `${base}-dev`, suffix = 2;
+        while (names.has(name))
+            name = `${base}-dev-${suffix++}`;
+        openOverlay({ mod: this.modName, kind: 'dialog', width: 640, height: 580,
+            props: { view: 'create', cli: this.cli, cliArgs: this.cliArgs, guide: this.guide, profilePath: choice?.path ?? '', suggestedName: name, selections: choice?.selections ?? {} } });
+    }
+    renderMenu() {
+        const t = theme();
+        const item = (id, label, icon, action) => h_flex().id(id).h(34).px(9).gap(9).rounded(6).items_center().cursor_pointer().text_size(13).text_color(t.foreground)
+            .hover(style => style.bg(t.hover)).child(svg(`mods/workspace-chrome/${icon}.svg`).size(14).flex_none().text_color(t.muted))
+            .child(div().flex_1().truncate().child(label)).on_click((_event, cx) => action(cx));
+        const root = v_flex().id('rig-new-menu').size_full().min_h(0).p(6).gap(3).bg(t.popover).text_color(t.foreground);
+        root.child(item('menu-copy-setup', 'Agent Setup Prompt', 'files', cx => {
+            cx.write_to_clipboard(setupPrompt({ checkout: this.setupCheckout, guide: this.guide }));
+            closeOverlay(String(props().overlay));
+        }));
+        root.child(div().h(1).my(4).bg(t.border));
+        root.child(div().px(9).py(4).text_size(11).text_color(t.dim).child('Profiles'));
+        const list = v_flex().id('profile-list').flex_1().min_h(0).gap(2).overflow_y_scrollbar().mode('always');
+        for (const choice of this.profiles)
+            list.child(item(`profile-${choice.path}`, choice.label, 'file-text', () => {
+                const overlay = String(props().overlay);
+                this.openCreate(choice);
+                closeOverlay(overlay);
+            }).tooltip(`${choice.path}\n${Object.keys(choice.selections).length} repo slots · ${choice.services} services`));
+        if (!this.profiles.length)
+            list.child(div().px(9).py(8).text_size(12).text_color(t.dim).child(this.menuLoaded ? 'No saved profiles yet' : 'Loading profiles…'));
+        root.child(list);
+        if (this.actionError)
+            root.child(div().px(9).text_size(11).text_color(t.blocked).whitespace_normal().child(this.actionError));
+        root.child(div().h(1).my(4).bg(t.border));
+        root.child(item('menu-import', 'Import profile…', 'folder', () => { const overlay = String(props().overlay); this.openCreate(); closeOverlay(overlay); }));
+        return root;
+    }
+    renderCreate() {
+        const t = theme();
+        const root = v_flex().id('rig-create').size_full().min_h(0).bg(t.chrome).text_color(t.foreground);
+        root.child(h_flex().px(20).py(14).gap(12).items_center().border_b(1).border_color(t.border)
+            .child(div().flex_1().text_size(16).font_medium().child('New rig'))
+            .child(div().id('close-create').px(8).py(4).cursor_pointer().text_size(12).child('Close').on_click(() => closeOverlay(String(props().overlay)))));
+        const fields = v_flex().flex_1().min_h(0).p(20).gap(9).overflow_y_scrollbar().mode('always');
+        fields.child(div().text_size(11).text_color(t.dim).child('Rig name'))
+            .child(Input.new(this.name).h(32).px(8).bg(t.background).border(1).border_color(t.input))
+            .child(div().text_size(11).text_color(t.dim).child('Profile'))
+            .child(Input.new(this.profile).h(32).px(8).bg(t.background).border(1).border_color(t.input))
+            .child(this.button('load-profile', 'Load repo slots', cx => this.loadProfile(cx)));
+        for (const repo of this.repoSlots)
+            fields.child(v_flex().gap(5).py(6)
+                .child(div().text_size(12).font_medium().child(repo))
+                .child(div().text_size(11).text_color(t.dim).whitespace_normal().child(this.selections[repo] || 'Choose a worktree'))
+                .child(h_flex().gap(6)
+                .child(this.button(`suggest-${repo}`, 'Use focused checkout', cx => { const directory = localCheckout(); if (directory)
+                this.selections[repo] = directory; cx.notify(); }))
+                .child(this.button(`choose-${repo}`, 'Choose folder…', cx => cx.spawn(async (cx) => { const directory = await pickFolder({ prompt: `Choose checkout for ${repo}` }); if (directory)
+                this.selections[repo] = directory; cx.notify(); })))));
+        if (this.actionError)
+            fields.child(div().text_size(12).text_color(t.blocked).whitespace_normal().child(this.actionError));
+        root.child(fields);
+        root.child(h_flex().px(20).py(12).justify_end().border_t(1).border_color(t.border)
+            .child(this.button('save-rig', this.busy ? 'Saving…' : 'Save and preview', cx => this.create(cx))));
+        return root;
     }
     openPreview(preview, name, label = preview?.name ?? name) {
         openOverlay({ mod: this.modName, kind: 'dialog', width: 820, height: 700,
@@ -187,7 +296,7 @@ export default class Rigs extends View {
             }
             finally {
                 this.busy = false;
-                if (!this.previewMode)
+                if (!this.previewMode && !this.createMode && !this.menuMode)
                     this.refresh(cx);
                 cx.notify();
             }
@@ -252,6 +361,35 @@ export default class Rigs extends View {
             .child(control('down', 'Stop', '■', active))
             .child(control('restart', 'Restart', '↻', active && !unknown));
     }
+    connectionRows(rig) {
+        const t = theme();
+        const groups = new Map();
+        for (const link of this.data.connections ?? []) {
+            const peer = link.consumer.rig === rig.id ? link.provider : link.provider.rig === rig.id ? link.consumer : undefined;
+            if (!peer)
+                continue;
+            const group = groups.get(peer.rig) ?? { id: peer.rig, name: peer.name, links: [] };
+            group.links.push(link);
+            groups.set(peer.rig, group);
+        }
+        return [...groups.values()].map(group => h_flex().id(`connection-${rig.id}-${group.id}`).h(22).pl(34).pr(8).gap(5).items_center().cursor_pointer()
+            .tooltip(group.links.map(link => `${link.consumer.name}/${link.consumer.service} → ${link.provider.name}/${link.provider.service}\n${link.consumer.binding}: ${link.url} · ${link.state}`).join('\n\n'))
+            .child(div().w(12).flex_none().border_t(1).border_color(t.border))
+            .child(div().text_size(17).text_color(group.links.some(link => link.state === 'live') ? t.ansi2 : t.dim).child('↔'))
+            .child(div().flex_1().truncate().text_size(11).text_color(t.dim).hover(style => style.text_color(t.foreground)).child(group.name))
+            .on_click((_event, cx) => { cx.stop_propagation(); this.openPreview(undefined, group.id, group.name); }));
+    }
+    serviceSource(rig, service) {
+        const checkout = rig.checkouts[service.repo];
+        if (!checkout)
+            return { label: service.repo, tooltip: `Repo slot: ${service.repo}` };
+        const base = (value) => value.split('/').filter(Boolean).pop() ?? value;
+        const repo = checkout.repository ? base(checkout.repository.replace(/\/\.git$/, '')) : base(checkout.root);
+        const tree = base(checkout.root), branch = checkout.branch ?? 'missing checkout';
+        const app = service.cwd?.startsWith(checkout.root + '/') ? service.cwd.slice(checkout.root.length + 1) : '.';
+        return { label: `${repo}${tree !== repo ? ` / ${tree}` : ''} · ${branch} · ${app === '.' ? 'root' : app}`,
+            tooltip: `Repository: ${repo}\nWorktree: ${checkout.root}\nBranch: ${branch}\nApp: ${app}\nRepo slot: ${service.repo}` };
+    }
     endpointIcons(rig, service) {
         const endpoints = Object.entries(service.endpoints);
         const t = theme();
@@ -270,12 +408,8 @@ export default class Rigs extends View {
         return this.controlKey === key ? { kind: 'working', label: this.controlOperation === 'down' ? 'Stopping…' : this.controlOperation === 'restart' ? 'Restarting…' : 'Starting…' } : fallback;
     }
     checkoutDescription(rig) {
-        const checkouts = Object.values(rig.checkouts);
-        if (checkouts.length !== 1)
-            return `${checkouts.length} checkouts`;
-        const checkout = checkouts[0];
-        const worktree = checkout.root.split('/').filter(Boolean).pop() ?? checkout.root;
-        return `${worktree} · ${checkout.branch ?? 'missing checkout'}${checkout.unborn ? ' · no commits' : ''}`;
+        const services = Object.keys(rig.services).length, checkouts = Object.keys(rig.checkouts).length;
+        return `${services} service${services === 1 ? '' : 's'} · ${checkouts} checkout${checkouts === 1 ? '' : 's'}`;
     }
     button(id, label, action) {
         const t = theme();
@@ -318,7 +452,7 @@ export default class Rigs extends View {
             .when(status.kind !== 'idle', el => el.bg(color));
         return h_flex().w(14).flex_none().items_center().justify_center().tooltip(status.label).child(glyph);
     }
-    loadProfile(cx) {
+    loadProfile(cx, preserveSelections = false) {
         cx.spawn(async (cx) => {
             try {
                 const text = await readTextFile(this.profile.value());
@@ -328,7 +462,7 @@ export default class Rigs extends View {
                 if (profile.version !== 1 || !Array.isArray(profile.repos))
                     throw new Error('Expected version 1 profile with repo slots');
                 this.repoSlots = profile.repos;
-                this.selections = {};
+                this.selections = preserveSelections ? Object.fromEntries(this.repoSlots.filter(repo => this.selections[repo]).map(repo => [repo, this.selections[repo]])) : {};
                 this.actionError = '';
             }
             catch (e) {
@@ -341,7 +475,10 @@ export default class Rigs extends View {
         this.busy = true;
         this.actionError = '';
         cx.spawn(async (cx) => {
+            let created = false;
             try {
+                if (!this.repoSlots.length)
+                    throw new Error('Load a profile before saving');
                 if (this.repoSlots.some(r => !this.selections[r]))
                     throw new Error('Explicitly select a checkout for every repo');
                 const args = ['create', this.name.value(), '--profile', this.profile.value()];
@@ -350,18 +487,20 @@ export default class Rigs extends View {
                 const result = await this.call(args);
                 this.selected = result.id;
                 localStorage.setItem('selected', this.selected);
-                this.creating = false;
                 this.openPreview(result.plan, result.id);
+                created = true;
             }
             catch (e) {
                 this.actionError = String(e);
             }
             finally {
                 this.busy = false;
-                if (!this.previewMode)
+                if (!this.previewMode && !this.createMode && !this.menuMode)
                     this.refresh(cx);
                 cx.notify();
             }
+            if (created && this.createMode)
+                closeOverlay(String(props().overlay));
         });
     }
     renderPreview() {
@@ -421,6 +560,10 @@ export default class Rigs extends View {
         return root;
     }
     render(_cx) {
+        if (this.menuMode)
+            return this.renderMenu();
+        if (this.createMode)
+            return this.renderCreate();
         if (this.previewMode)
             return this.renderPreview();
         const t = theme();
@@ -435,7 +578,7 @@ export default class Rigs extends View {
             .child('Rigs')
             .child(h_flex().gap(2).items_center().flex_none()
             .child(icon('options', 'settings', 'Rig options', cx => { this.tools = !this.tools; cx.notify(); }))
-            .child(icon('new', 'plus', 'New rig', cx => { this.creating = !this.creating; this.setupCopied = false; this.setupOptions = false; this.setupCheckout = localCheckout() ?? ''; cx.notify(); }))));
+            .child(icon('new', 'plus', 'New rig', () => this.openNewMenu()))));
         if (this.tools)
             content.child(v_flex().gap(2)
                 .child(this.button('checkout', this.checkoutOnly ? 'Show all rigs' : 'Show rigs for this checkout', cx => { this.checkoutOnly = !this.checkoutOnly; this.refresh(cx); }))
@@ -445,53 +588,6 @@ export default class Rigs extends View {
             content.child(div().px(8).text_size(12).text_color(t.blocked).child(this.refreshError));
         if (this.actionError)
             content.child(v_flex().gap(2).px(8).child(div().text_size(12).text_color(t.blocked).child(this.actionError)).child(this.button('dismiss-action-error', 'Dismiss', cx => { this.actionError = ''; cx.notify(); })));
-        if (this.creating) {
-            content.child(h_flex().gap(4).px(8).pb(4).items_center()
-                .child(h_flex().id('copy-setup').flex_1().gap(8).px(8).py(6).rounded(6).items_center().text_size(12).text_color(t.muted)
-                .tooltip(this.setupCopied ? 'Prompt copied' : 'Copy the setup prompt for your agent')
-                .hover(s => s.bg(t.hover))
-                .child(div().flex_1().child(this.setupCopied ? 'Copied' : 'Agent Setup Prompt'))
-                .child(svg('mods/workspace-chrome/files.svg').size(14).text_color(t.dim))
-                .on_click((_event, cx) => {
-                if (this.busy)
-                    return;
-                cx.write_to_clipboard(setupPrompt({ checkout: this.setupCheckout, guide: this.guide }));
-                this.setupCopied = true;
-                cx.notify();
-            }))
-                .child(icon('setup-options', 'settings', 'Setup options', cx => { this.setupOptions = !this.setupOptions; cx.notify(); })));
-        }
-        if (this.creating && this.setupOptions) {
-            content.child(v_flex().gap(6).px(8).pb(8)
-                .child(div().text_size(11).text_color(t.dim).truncate().tooltip(this.setupCheckout).child(this.setupCheckout || 'Use your agent’s current checkout'))
-                .child(this.button('setup-folder', 'Choose checkout…', cx => cx.spawn(async (cx) => {
-                const folder = await pickFolder({ prompt: 'Choose checkout to set up' });
-                if (folder) {
-                    this.setupCheckout = folder;
-                    this.setupCopied = false;
-                }
-                cx.notify();
-            })))
-                .child(this.button('copy-demo-setup', 'Try a demo · copy setup prompt', cx => {
-                cx.write_to_clipboard(setupPrompt({ guide: this.guide, demo: true }));
-            }))
-                .child(this.button('import-profile', this.importProfile ? 'Hide existing-profile import' : 'Already have a profile? Import it', cx => { this.importProfile = !this.importProfile; cx.notify(); })));
-        }
-        if (this.creating && this.setupOptions && this.importProfile) {
-            content.child(v_flex().gap(6).child(div().child('Create from a reviewed profile'))
-                .child(Input.new(this.name).h(30).px(8).bg(t.background).border(1).border_color(t.input))
-                .child(Input.new(this.profile).h(30).px(8).bg(t.background).border(1).border_color(t.input))
-                .child(this.button('load-profile', 'Load repo slots', cx => this.loadProfile(cx))));
-            for (const repo of this.repoSlots)
-                content.child(v_flex().gap(4).child(div().child(`${repo}: ${this.selections[repo] ?? 'Choose a worktree'}`))
-                    .child(h_flex().gap(6)
-                    .child(this.button(`suggest-${repo}`, 'Use focused checkout', cx => { const cwd = localCheckout(); if (cwd)
-                    this.selections[repo] = cwd; cx.notify(); }))
-                    .child(this.button(`pick-${repo}`, 'Choose folder', cx => cx.spawn(async (cx) => { const folder = await pickFolder({ prompt: `Choose checkout for ${repo}` }); if (folder)
-                    this.selections[repo] = folder; cx.notify(); })))));
-            if (this.repoSlots.length)
-                content.child(this.button('create', 'Save and preview', cx => this.create(cx)));
-        }
         const rigs = this.data.rigs.filter(r => r.claimed || r.review_required || this.showStopped);
         for (const rig of rigs) {
             const card = v_flex().w_full().gap(2).rounded(8);
@@ -520,25 +616,26 @@ export default class Rigs extends View {
                 .child(div().flex_1().min_w(0).text_size(11).text_color(t.dim).truncate().child(this.checkoutDescription(rig))))
                 .child(this.controls(rig))
                 .child(this.statusIcon(this.operationIndicator(rigKey, this.rigIndicator(rig)))));
+            card.children(this.connectionRows(rig));
             if (rig.error)
                 card.child(div().pl(20).text_color(t.blocked).child(rig.error));
             for (const service of this.collapsed.has(rig.id) ? [] : Object.values(rig.services)) {
                 const row = v_flex().w_full().gap(2).pl(20).pr(8).py(3).rounded(8).when(Boolean(service.checkout_match), el => el.bg(t.selected));
                 const serviceKey = `service-${rig.id}-${service.id}`;
+                const source = this.serviceSource(rig, service);
                 row.child(h_flex().id(`service-row-${rig.id}-${service.id}`).w_full().h(26).gap(6).rounded(6).items_center()
                     .tooltip(service.terminal ? 'Open live output' : 'No output yet · start this service first')
                     .hover(style => style.bg(t.hover))
                     .when(Boolean(service.terminal), el => el.cursor_pointer().on_click(() => run('terminal.peek', { terminal: service.terminal })))
                     .on_hover((hovered, cx) => this.hoverRow(serviceKey, hovered, cx))
-                    .child(h_flex().id(serviceKey).flex_1().min_w(0).gap(8).items_center()
+                    .child(h_flex().id(serviceKey).flex_1().min_w(0).gap(6).items_center().tooltip(source.tooltip)
                     .child(svg('mods/workspace-chrome/server.svg').size(14).text_color(t.muted))
-                    .child(div().flex_1().truncate().text_color(t.muted).child(service.id)))
+                    .child(div().truncate().text_size(12).text_color(t.muted).child(service.id))
+                    .child(div().flex_1().min_w(0).truncate().text_size(11).text_color(t.dim).child(source.label)))
                     .child(this.controls(rig, service))
                     .child(h_flex().gap(2).items_center().flex_none()
                     .child(this.statusIcon(this.operationIndicator(serviceKey, this.serviceIndicator(service))))
                     .when(service.state === 'running' && service.assignments === 'allocated' && Object.keys(service.endpoints).length > 0, el => el.child(this.endpointIcons(rig, service)))));
-                for (const external of service.external_dependencies ?? [])
-                    row.child(div().text_size(11).text_color(external.readiness === 'failed' ? t.blocked : t.dim).child(`${external.key} · external · ${external.readiness}`));
                 if (service.degraded_dependencies.length)
                     row.child(div().text_color(t.blocked).child(`Dependency degraded: ${service.degraded_dependencies.join(', ')}`));
                 card.child(row);

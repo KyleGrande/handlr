@@ -3,6 +3,7 @@ import { probeURL, waitExternal } from './probe.js';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { Store } from './store.js';
 import { Core, type CoreAPI } from './core.js';
+import { rigConnections, type ConnectionRig } from './connections.js';
 import { available, checkout, launchEnv, publicPlan, resolve } from './profile.js';
 import { now, requireValue as check, type Launch, type Rig, type Terminal, type ResolvedService, type Plan } from './types.js';
 
@@ -250,12 +251,12 @@ export class Rigs {
     } catch { return { service, text: launch.excerpt ?? 'Output unavailable; restore Core access', source: 'saved excerpt' }; }
   }
   async status(name?: string, directory?: string) {
-    let rigs = name ? [await this.get(name)] : Object.values((await this.store.load()).rigs);
+    const requested = name ? (await this.get(name)).id : undefined;
+    const rigs = Object.values((await this.store.load()).rigs);
     const selected = directory ? await checkout(directory) : undefined;
-    if (selected) rigs = rigs.filter(r => Object.values(r.checkouts).includes(selected.root));
     let terminals: Terminal[] = [], core = 'available';
     try { terminals = await this.core.terminals(); } catch { core = 'unavailable'; }
-    const results = [];
+    const results = [], catalog: ConnectionRig[] = [];
     for (const rig of rigs.sort((a,b) => Number(b.claimed) - Number(a.claimed) || a.name.localeCompare(b.name))) {
       const checkouts: Record<string, unknown> = {};
       for (const [repo, root] of Object.entries(rig.checkouts)) {
@@ -276,8 +277,16 @@ export class Rigs {
           checkout_match: selected?.root === rig.checkouts[spec.repo], observed_at: now(), error, exit_code: terminal?.exit_code };
       }
       for (const [id, spec] of Object.entries(display?.services ?? {})) (services[id] as Record<string,unknown>).degraded_dependencies = spec.depends_on.filter(dep => readiness[dep] !== 'ready');
+      catalog.push({id:rig.id,name:rig.name,claimed:rig.claimed,services:Object.fromEntries(Object.entries(display?.services ?? {}).map(([id,spec]) => [id,{
+        state:(services[id] as {state:string}).state,
+        endpoints:spec.endpoints,
+        external_bindings:spec.external_bindings ?? (spec.external_checks ?? []).map(item => ({key:item.key,url:spec.env[item.key] ?? item.url})),
+        external_dependencies:(services[id] as {external_dependencies:{key:string;readiness:string}[]}).external_dependencies,
+      }]))});
       results.push({ id: rig.id, name: rig.name, profile: rig.profile, claimed: rig.claimed, review_required: !!display?.setup && !display.review?.approved, checkouts, services, error: rig.error });
     }
-    return { core, observed_at: now(), rigs: results };
+    const visible = results.filter(rig => (!requested || rig.id === requested) && (!selected || Object.values(rig.checkouts).some(checkout => (checkout as {root:string}).root === selected.root)));
+    const visibleIds = new Set(visible.map(rig => rig.id));
+    return { core, observed_at: now(), rigs:visible, connections:rigConnections(catalog).filter(link => visibleIds.has(link.consumer.rig) || visibleIds.has(link.provider.rig)) };
   }
 }

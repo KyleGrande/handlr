@@ -6,6 +6,12 @@ Rigs manages named, restartable development stacks. This repository contains the
 
 This is a tooling project. It has no application server, database, cache or queue. `fixtures/` contains disposable demos, not services needed to develop Rigs. A compiler watcher is optional and has no managed port or browser URL.
 
+## Sidebar creation and connected rigs
+
+The **+** icon opens a native popup like Herdr's terminal menu. It contains **Agent Setup Prompt**, the unique profile files referenced by saved rigs, and **Import profile…**. Copying the prompt only copies the guide pointer and current checkout. Selecting a profile opens a New rig dialog with a suggested unused name and editable worktree mappings; saving creates a stopped definition and opens its preview. Reusing a profile creates a distinct rig instance with its own launches and rig-scoped data. Import another profile by its absolute path; files not referenced by saved rigs do not appear in the saved-profile list yet.
+
+Cross-rig links appear as **↔ peer-name** rows on both rigs, including when their services are collapsed. They group matching service connections per peer, expose binding/address/state in a tooltip and open the peer's preview on click. Matching uses a structured `external` binding's URL authority and a unique endpoint reserved by another rig. Unmatched/ambiguous providers receive no invented rig link. A live link means both services are observed running and no configured external probe has failed; it does not prove traffic. Stopped peers without reservations are not guessed from proposed ports. Connections never transfer ownership or grant permission to stop providers. Checkout-filtered results retain connection metadata for peer rigs.
+
 ## Start here
 
 - Read `README.md` for the version 1 profile format and lifecycle behavior. In an installed copy, use the absolute source checkout and README link in the installation context above.
@@ -27,7 +33,7 @@ A disclosure chevron beside each rig expands/collapses its services and endpoint
 
 Rig names open a centered native preview popup; there is no separate Preview button or inline sidebar preview. The full service header bar (name, whitespace and status) opens its output peek when a terminal exists. The full rig header bar opens Preview. Disclosure and lifecycle/endpoint controls stop click propagation so their actions do not also open a peek/preview. Each row has hover-only Start/Stop/Restart controls alongside a quiet status indicator. Rig controls act on the whole stack; service controls act only on that service. Service start also starts declared readiness prerequisites, while stopping a service leaves consumers running with degraded dependency status. Restart holds the rig lease across stop/start and retains reservations until replacement or explicit stop/reconciliation. Partial stacks conservatively reserve the full profile's ports/checkouts until their last owned launch stops. These controls never stop external providers.
 
-Use static theme-colored dots: green for running, warm-colored for transitions/attention and gray rings for stopped/draft. No animated status spinner. Status tooltips retain readiness/health distinctions. Keep the rig name prominent with a gray single-checkout/worktree/branch description; use a compact count for multiple checkouts. Full slot mappings belong in the preview and tooltip. A rig instance owns its service processes; the profile is reusable configuration, and `app` is only a logical repo slot. Distinct worktrees may use separate rig instances of the same profile.
+Use static theme-colored dots: green for running, warm-colored for transitions/attention and gray rings for stopped/draft. No animated status spinner. Status tooltips retain readiness/health distinctions. Keep the rig name prominent with a compact service/checkout count. Each component row carries its repo/worktree, branch and app-directory context in gray, with full paths in its tooltip. Full slot mappings belong in the preview and tooltip. A rig instance owns its service processes; the profile is reusable configuration, and `app` is only a logical repo slot. Distinct worktrees may use separate rig instances of the same profile.
 
 Review decisions are notes about the displayed configuration, not executable configuration edits. Change commands, bindings, ports and data scope in the profile, then close and reopen the preview. Approval is bound to the profile, rig identity and concrete checkout/branch metadata. Material changes invalidate it. Port ranges are reviewed configuration; exact free-port observations are proposals until allocation. Secret source references are reviewed; secret values are never part of approval or previews.
 
@@ -84,7 +90,7 @@ Profiles declare service commands, endpoints, ports and bindings; the mod enforc
 
 ## Try a disposable demo
 
-Use this path only when the user explicitly requests a demo or when running authorized fixture tests. The panel offers a separate **Setup options → Try a demo · copy setup prompt** action.
+Use this path only when the user explicitly requests a demo or when running authorized fixture tests. Disposable examples can be prepared with the command below; do not substitute them for services discovered in an ordinary project.
 
 From the source checkout, run `npm run prepare:desktop`. It prepares temp Git checkouts, profiles and a manifest with unique names; it does not register or launch rigs. Use the manifest's exact paths to create and preview its mono or split rig. Obtain approval before interactive demo launch. Fixture Git commits are confined to those new temp repositories; never modify the user's checkout history. Follow `docs/DESKTOP_ACCEPTANCE.md` for actual desktop checks and stop only the named fixture rigs you started.
 
@@ -94,9 +100,9 @@ From the source checkout, run `npm run prepare:desktop`. It prepares temp Git ch
 | --- | --- |
 | `src/types.ts`, `src/profile.ts` | Profile contract, Git context, validation, resolution, review identity, secret references |
 | `src/init.ts`, `mods/rigs/setup.ts` | Evidence discovery and the copied setup prompt |
-| `src/lifecycle.ts`, `src/store.ts`, `src/core.ts` | Approval, ownership, locks, durable registry, Core transport and recovery |
+| `src/lifecycle.ts`, `src/connections.ts`, `src/store.ts`, `src/core.ts` | Approval, ownership, locks, durable registry, Core transport and recovery |
 | `src/cli.ts` | Shared versioned command interface for agents, shell and panel |
-| `mods/rigs/main.ts` | Native GPUI sidebar; no DOM, browser framework or Node APIs |
+| `mods/rigs/main.ts` | Native GPUI sidebar, creation menu and dialogs; no DOM, browser framework or Node APIs |
 | `scripts/` | Builds, installation, guarded syncing and disposable acceptance preparation |
 | `tests/`, `fixtures/` | Resolver/lifecycle regressions and disposable Core/demo services |
 
