@@ -1,5 +1,11 @@
 # Current verification — 2026-11-10
 
+## Match individual rig entries to Space entries
+
+- Compared the shipped Spaces row builder with the rig row. The rig name was still 12px semibold/muted, unlike Space entries using inherited regular 13px foreground text. The earlier styling update changed only the section heading.
+- Matched the individual row: 30px height, 8px horizontal padding and corners, 9px icon gap, regular 13px foreground name, max-width/truncation behavior, selected fill, and right-aligned 11.5px dim summary. Lifecycle controls/status remain on the right.
+- Generated and installed without tests/native checks as requested; no screenshot comparison was performed for this update.
+
 ## Quiet dependency state for stopped services
 
 - Diagnosis of test-full-stack found API, worker and web all stopped. Status still populated degraded_dependencies for stopped consumers because their API readiness was unavailable.

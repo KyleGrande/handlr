@@ -440,11 +440,12 @@ export default class Rigs extends View {
     for (const rig of rigs) {
       const card = v_flex().w_full().gap(2).rounded(8);
       const rigKey = `rig-${rig.id}`;
-      card.child(h_flex().id(`rig-row-${rig.id}`).w_full().px(8).py(4).gap(6).rounded(6).items_center().cursor_pointer()
-        .hover(style => style.bg(t.hover))
+      card.child(h_flex().id(`rig-row-${rig.id}`).w_full().h(30).flex_none().px(8).gap(9).rounded(8).items_center().cursor_pointer()
+        .text_size(13).text_color(t.foreground)
+        .when(rig.id !== this.selected, el => el.hover(style => style.bg(t.hover)))
         .on_click((_event,cx) => { this.selected = rig.id; localStorage.setItem('selected',rig.id); this.openPreview(undefined,rig.id,rig.name); cx.notify(); })
         .on_hover((hovered,cx) => this.hoverRow(rigKey,hovered,cx))
-        .when(rig.id === this.selected, el => el.bg(t.raised))
+        .when(rig.id === this.selected, el => el.bg(t.selected))
         .child(div().id(`collapse-${rig.id}`).w(18).h(22).flex_none().flex().items_center().justify_center().rounded(4).cursor_pointer()
           .text_color(t.dim).tooltip(this.collapsed.has(rig.id) ? 'Expand services' : 'Collapse services').hover(style => style.bg(t.hover).text_color(t.foreground))
           .child(svg(`mods/workspace-chrome/chevron-${this.collapsed.has(rig.id) ? 'right' : 'down'}.svg`).size(12))
@@ -456,8 +457,9 @@ export default class Rigs extends View {
         .child(h_flex().id(`select-${rig.id}`).flex_1().min_w(0).gap(5).items_center().cursor_pointer()
           .tooltip(Object.entries(rig.checkouts).map(([slot,checkout]) => `${slot}: ${checkout.root} (${checkout.branch ?? 'missing'})`).join('\n'))
           .hover(style => style.text_color(t.foreground))
-          .child(div().text_size(12).font_semibold().text_color(t.muted).truncate().child(rig.name))
-          .child(div().flex_1().min_w(0).text_size(11).text_color(t.dim).truncate().child(this.checkoutDescription(rig))))
+          .child(div().flex_shrink(0).max_w(150).truncate().text_color(t.foreground).child(rig.name))
+          .child(h_flex().flex_1().min_w(0).justify_end().items_center()
+            .child(div().min_w(0).text_size(11.5).text_color(t.dim).truncate().child(this.checkoutDescription(rig)))))
         .child(this.controls(rig))
         .child(this.statusIcon(this.operationIndicator(rigKey,this.rigIndicator(rig)))));
       card.children(this.connectionRows(rig));
