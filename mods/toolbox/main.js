@@ -1,17 +1,15 @@
 import { View, div } from 'gpui-kit';
 import { h_flex, v_flex, InputState, Input } from 'gpui-base';
-import { spaces, agents, terminals, focused, theme, shared, setShared, exec, run, props, layout } from 'herdr';
+import { spaces, theme, shared, setShared, exec, run, props, layout } from 'herdr';
 import { parameters, expand, saveEntry } from './model.js';
 const KEY = 'toolbox.v1';
 export default class Toolbox extends View {
-  init(_, cx) { this.scope = 'workspace'; this.identity = {}; this.pending = {}; this.error = ''; }
+  init(_, cx) { this.identity = {}; this.pending = {}; this.error = ''; }
   context(cx) {
     const s = spaces().find(s => s.active);
     if (!s) return null;
-    const a = agents().find(a => a.space === s.id && a.focused) ?? agents().find(a => a.space === s.id && a.address === focused()?.agent);
-    const terminal = terminals().find(t => t.address === a?.address);
     const cwd = s.folder;
-    const signature = JSON.stringify([s.id, s.machine, cwd, a?.address, terminal?.created_ms, terminal?.foreground?.pid]);
+    const signature = JSON.stringify([s.id, s.machine, cwd]);
     if (!this.identity[signature] && !this.pending[signature]) {
       this.pending[signature] = true;
       cx.spawn(async cx => {
@@ -20,18 +18,13 @@ export default class Toolbox extends View {
           if (result.code) throw new Error('Core identity unavailable');
           const data = JSON.parse(result.stdout), machine = data.core?.id ?? data.id;
           if (!machine) throw new Error('Core identity unavailable');
-          const git = await exec('git', ['rev-parse', '--show-toplevel'], { cwd, on: s.machine });
-          let agent = null;
-          if (a && terminal?.created_ms && terminal?.foreground?.pid) {
-            const ps = await exec('ps', ['-p', String(terminal.foreground.pid), '-o', 'lstart='], { on: s.machine });
-            if (!ps.code && ps.stdout.trim()) agent = JSON.stringify([machine, a.address, terminal.created_ms, terminal.foreground.pid, ps.stdout.trim()]);
-          }
-          this.identity[signature] = { workspace: JSON.stringify([machine, 'space', s.id.replace(s.machine ? s.machine + '/' : /^$/, '')]), worktree: git.code ? null : JSON.stringify([machine, 'worktree', git.stdout.trim()]), agent };
+          const id = s.machine && s.id.startsWith(s.machine + '/') ? s.id.slice(s.machine.length + 1) : s.id;
+          this.identity[signature] = JSON.stringify([machine, 'space', id]);
         } catch (e) { this.error = String(e.message ?? e); }
         cx.notify();
       });
     }
-    return { s, cwd, owner: this.identity[signature]?.[this.scope], signature };
+    return { s, cwd, owner: this.identity[signature], signature };
   }
   input(value) { return InputState.new({ value }); }
   edit(entry, context) {
@@ -61,11 +54,16 @@ export default class Toolbox extends View {
     });
     const c = this.context(cx);
     const field = (name, input) => h_flex().gap(8).items_center().child(div().w(80).child(name)).child(Input.new(input).flex_1().h(30).px(8).bg(t.background).border_1().border_color(t.input).rounded(5));
-    const root = v_flex().size_full().min_h(0).bg(t.surface).text_color(t.foreground).text_size(12).p(10).gap(8).overflow_y_scrollbar();
-    root.child(h_flex().gap(6).items_center().child(div().font_semibold().child('Toolbox')).children(['workspace', 'agent', 'worktree'].map(scope => button('scope-' + scope, (scope === this.scope ? '• ' : '') + scope, () => { this.scope = scope; this.editor = null; this.launch = null; }))).child(div().flex_1()).child(button('close', '×', () => { setShared('toolbox.open', false); run('layout.hide', { id: 'toolbox-tray' }); })));
+    const shell = v_flex().id('toolbox').size_full().min_h(0).rounded(10).overflow_hidden()
+      .bg(t.background).border_1().border_color(t.border).text_color(t.foreground).text_size(13)
+      .child(h_flex().h(42).flex_none().px(14).items_center().border_b(1).border_color(t.border)
+        .child(div().flex_1().font_semibold().child('Toolbox'))
+        .child(div().id('toolbox-close').size(24).flex().items_center().justify_center().rounded(6)
+          .text_color(t.muted).hover(s => s.bg(t.hover)).on_click(() => run('layout.hide', { id: 'toolbox-tray' })).child('×')));
+    const root = v_flex().flex_1().min_h(0).p(12).gap(10).overflow_y_scrollbar();
     if (this.error) root.child(button('error', this.error + ' · Dismiss', () => { this.error = ''; this.pending = {}; }));
-    if (!c?.owner) return root.child(div().text_color(t.muted).child(this.scope === 'agent' ? 'Select a live agent to open its toolbox.' : 'Resolving workspace… Worktree scope requires a Git checkout.'));
-    root.child(div().text_color(t.dim).child(c.s.name + ' · ' + c.cwd));
+    if (!c?.owner) return shell.child(root.child(div().text_color(t.muted).child(c ? 'Loading Space toolbox…' : 'Select a Space to open its toolbox.')));
+    root.child(div().text_size(12).child(c.s.name));
     if (this.editor) {
       const e = this.editor;
       root.child(field('Label', e.label)).child(field('Icon / text', e.icon)).child(field('Command', e.command)).child(div().text_color(t.muted).child('Parameters: pnpm build --mode {{mode}} · values are shell quoted'));
@@ -79,6 +77,6 @@ export default class Toolbox extends View {
       if (!entries.length) root.child(div().text_color(t.muted).child('Pin builds, scripts, and everyday commands here.'));
       root.child(button('add', '+ Add command', () => this.edit(null, c)));
     }
-    return root;
+    return shell.child(root);
   }
 }
