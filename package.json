@@ -1,1 +1,12 @@
-{"name":"herdr-toolbox","version":"0.1.0","private":true,"type":"module","scripts":{"test":"node --test tests/*.test.mjs","check:native":"herdr-app check mods/toolbox","prepare-install":"node scripts/prepare-install.mjs"}}
+{
+  "name": "herdr-toolbox",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test tests/*.test.mjs",
+    "check:native": "herdr-app check mods/toolbox",
+    "prepare-install": "node scripts/prepare-install.mjs",
+    "install:local": "node scripts/install.mjs"
+  }
+}
