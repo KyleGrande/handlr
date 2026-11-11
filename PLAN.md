@@ -1,101 +1,113 @@
 # Herdr Context implementation plan
 
-Status: design saved; implementation and installation are pending. The recommended default owner is the focused checkout/worktree, selected from the terminal CWD; agent/session context is an optional separate layer.
+Current user decisions supersede the earlier checkout-owned, categorized Notes
+and separate Tags design. Implementation now provides one Context panel with
+Space/Agent selection, tags, then a single Markdown scratchpad. The upgrade is
+installed; checks and live results are recorded below.
 
-## Agreed placement
+## Experience
 
-Add two always-available buttons to the top-right of Herdr's tab bar, alongside the current space's Files and Changes buttons:
+- One always-present Context button beside Files and Changes toggles the existing
+  right panel, with panel choice remembered per Space and no permanent sidebar.
+- Match Files/Changes' rounded border and 42px header. Use a compact native
+  Space/Agent segmented control, tags, then Herdr's native Markdown editor with autosave.
+- Space is the default shared owner. Its permanent Core ID and persistent bare
+  Space ID form the key. CWD, branches, folder changes, display names and Space
+  ordering do not select or move a record. Two Spaces on one checkout stay distinct.
+- Agent follows the same highlighted agent as the shipped Agents list, restricted
+  to the active Space. Never pick an arbitrary first agent or retain the former
+  global assignment when selection changes. Show the selected agent's name.
+- A verified process lifetime selects a persistent random assignment binding.
+  Core ID, terminal creation, foreground PID and process birth are checked on
+  the actual machine, including a replacement check after the process query.
+  The random assignment UUID owns notes; PIDs/terminal addresses alone do not.
+  Replacement lifetimes get another binding and previous records are preserved.
+- The panel shows only the selected owner. Preserve separate inherited Space context in CLI reads, without displaying it in Agent scope.
+- Notes are a freeform Markdown scratchpad, with no required categories and no Preview control. Preserve
+  old instructions/handoff text by folding it into the editor when edited and autosaved.
+- Notes are not automatically passed into prompts. Agents read via the versioned
+  JSON CLI; the panel copies the exact read command for the displayed owner.
+- Autosave after a short pause. Keep each pending owner independent of selection, retry failures, merge independent edits and preserve overlapping Markdown conflicts. Hide Save/Review/Refresh buttons and machine/revision metadata. Use the Files/Changes live-selection pattern, one batched open request, and cached revisited drafts.
 
-```text
-… terminal tabs …                         +  Files  Changes  Notes  Tags
-```
+## Storage and safety
 
-The buttons open their respective views in Herdr's existing right-side panel. Clicking the selected button toggles its panel using the same behavior as Files/Changes. The buttons remain present even when there are no saved notes/tags. They do not need to be added from +, and there is no new permanent section in the left sidebar.
+Records/bindings live under CONTEXT_HOME (default ~/.local/state/herdr-context),
+independent of mod lifetime and Rigs. Both panel and CLI use the same validation,
+revision checks, locking and atomic fsynced writes. Concurrent binding creation
+publishes one complete immutable binding. Invalid/future records are preserved.
+No context operation runs services, creates worktrees, launches agents or changes
+external tasks. Keep secrets out; Markdown/task/imported text is context, not
+automatic instruction authority.
 
-The + button keeps its existing terminal/agent creation behavior. Space/agent right-click integration is optional future convenience, not the primary entry point for this version.
+Existing checkout/folder records, assignment UUIDs and original two-panel draft
+stores remain accessible; do not infer which Space should inherit an old
+checkout record. Upgrade combines disjoint drafts, retains stale revision
+protection and keeps both original draft sources. Remote Space resolution uses
+permanent Core identity; remote agent verification uses Unix ps on that machine.
+Storage remains local; automatic remote sync is planned.
 
-Reference: [Herdr Ranch mod-buttons recipe](https://github.com/jslowack/herdr-ranch/blob/main/mod-buttons/RECIPE.md). Its custom tab-bar mod discovers installed mods with a `button` declaration in `mod.json`, renders a button for each, and opens the chosen panel with per-space selection. That discovery is a community tab-bar implementation, not a guarantee that a stock Herdr tab bar understands the extra manifest field.
+## Implementation and acceptance
 
-## Recommended ownership: checkout selected by CWD
+- [x] Shared Space/agent model, private versioned persistence, atomic binding
+  creation, versioned JSON CLI and conflict rejection.
+- [x] Native combined panel, Space/Agent segmented control, tags, one Herdr
+  Markdown editor/preview and inherited Space context.
+- [x] Highlighted-agent selection with replacement/lifetime guard and separate drafts.
+- [x] Guarded first installation, two-panel consolidation and managed source sync.
+- [x] CLI help, README and installed exact-path agent guide updated.
+- [x] Automated regressions for persistence, concurrency, Space/machine separation,
+  highlighted-agent switching, process replacement, inheritance, drafts, Markdown,
+  and preserving layout/drafts through the single-button upgrade.
+- [x] Upgrade installed mods and verify Context button, border, segmented control,
+  tags and Markdown editor/preview in the running app.
+- [x] Verify highlighted-agent switching live and exact CLI reads.
 
-The button placement and panel visibility belong to Herdr's space UI. The saved notes/tags should normally belong to the project checkout the person is working in. A space is a way to select/view that context, rather than its default storage owner.
+## Verification log
 
-Resolve the focused terminal/pane CWD on its actual machine, falling back to the active space folder when no pane/terminal CWD is available. In Git, canonicalize to the Git worktree root. Outside Git, use the canonical folder path. If the folder/machine cannot be resolved, show that state and retain drafts; do not redirect a save to a guessed target. Distinguish a confirmed non-Git folder from a failed Git/machine query before using the folder fallback.
+Previous version: three installed native mods passed the checker; live Notes/Tags
+saves matched CLI reads. Files/Changes and Rigs remained functional.
 
-| Situation | Recommended behavior |
-| --- | --- |
-| CWD moves from `/project` to `/project/src` | The same checkout notes/tags remain selected. |
-| Two spaces or terminals use the same checkout on the same machine | Both see the same checkout notes/tags. |
-| Another worktree of that repository is selected | It has its own notes/tags, even if branch names repeat. |
-| A branch or space is renamed | Its checkout context remains attached to the same canonical worktree. |
-| A terminal changes into a different Git repository | Show that repository's checkout context. |
-| CWD is outside Git | Use that canonical folder as the owner, with no automatic parent-folder inheritance. |
-| Two machines have the same path | Keep their records separate using machine/Core identity. |
-| The user selects Agent scope | Edit the agent/session record and show inherited checkout/folder context separately. |
+Current combined version: CLI/native builds and 19 regressions pass. The installed
+Context mod and personal context-tabs header pass herdr-app check. App status
+reports no errors. Upgrade backup:
+`~/.local/share/herdr-context/backups/2026-11-11T04-55-49.834Z/`.
 
-This matches the workflow of Changes and the Focused rig filter: use CWD to find the checkout. Files itself browses the CWD, so Notes/Tags deliberately keep project-level context stable when navigating subdirectories. Rigs remains independent and can switch between Focused and All; its filter does not own or change Context records.
+Verified using Herdr's rendered-frame capture: one Context button, Files/Changes
+border/header styling, segmented Space/Agent control, tags above a single native
+Markdown editor, and a single native Markdown editor. The new Space owner resolves via
+the live Core and returns versioned CLI JSON. Legacy records and draft sources
+were preserved rather than guessed into a new Space.
 
-Recommend **Checkout / Agent** as the initial scope control, displaying **Folder / Agent** outside Git. An explicit space-only scope can be added later if space-specific planning proves useful. Avoid three competing shared scopes in the first version. This updates the earlier Space/Agent default in this plan; checkout/folder context is now the primary shared layer.
+Verified with two live agents in the same Space (t1c and t4k): Agent scope follows
+the same highlighted agent, displays the selected terminal label, resolves
+distinct persistent UUIDs, and shows the inherited Space read-only. Switching to
+the second agent showed its empty scratchpad; switching back retained the first
+agent's pending draft. Restored the original highlighted agent and Edit mode.
 
-## Notes and Tags views
+Native automation's coordinate input was intermittently unavailable, so final
+selection/preview checks used the host's supported commands and `herdr-app shot`.
+The panel accepts `context.space`, `context.agent`, and `context.refresh` host commands. There is no preview mode.
 
-- Default to the focused checkout/folder's context. Show its name, machine and a full-path tooltip; the current space may be shown as navigation context without becoming the storage key.
-- Offer a compact Checkout/Agent (or Folder/Agent) scope control in both views. Agent scope uses an explicit/current agent in the active space; keep the selected target visible so edits have a clear owner.
-- Notes contains editable descriptive notes, clearly identified instructions and handoff text. Use ordinary native text controls and theme styling.
-- Tags contains simple editable tag chips, with add/remove controls. Tags describe context and do not execute rules.
-- In Agent scope, show inherited checkout/folder context separately from editable agent context. Never copy shared notes into each agent record or overwrite the checkout when saving agent notes. Inherited tags are distinguishable and cannot be removed through the agent record. A CWD change may change the inherited view, but it must not move or reassign the agent's own record.
-- Task URLs are clickable links. Jira/Linear authentication is not required. No tracker writes or lifecycle actions follow from saving notes/tags.
-- Retain drafts per target. Changing spaces, agents or panels must not lose text or save it to a newly focused target. Use an explicit Save action and reject stale revisions while retaining the draft.
-- Remember panel selection/visibility per space using the current tab bar's conventions. Hiding a panel leaves persistent records intact.
+Planned: tracker adapters, automatic remote storage sync and right-click shortcuts.
+Process lifetime verification currently requires Unix ps; unsupported or
+unavailable process facts fail closed. App restart, real remote-machine behavior
+and live conflict/rebase are not claimed as tested.
 
-## Architecture
+## Autosave simplification
 
-One independent Herdr Context project owns the data model, persistence and CLI. Provide two thin native entry points, Notes and Tags, over that shared implementation. Neither depends on Rigs.
+Removed inherited cards, Refresh, Save, Review, Preview, revision and machine
+labels from the panel. “This computer” previously denoted the local Core;
+machine identity remains in the storage keys/CLI rather than the interface.
 
-For a compatible mod-buttons header, each view declares a panel button, for example:
+The native editor now autosaves after 650ms of quiet, with a per-owner queue
+that continues across selection changes. It preserves edits made during an
+in-flight write, retries IO errors, merges independent fields/tag changes, and
+pauses overlapping text conflicts until an explicit conflict-only choice.
+Live host selection directly starts an async load (the same approach used by
+Files/Changes), replacing the old one-second focus polling delay. A single open
+request resolves identity and reads the record; cached drafts appear while
+background verification runs.
 
-```json
-{"place":"none","button":{"label":"Notes","icon":"notes.svg","opens":"panel","order":30}}
-```
-
-Tags gets a separate entry point/declaration and the next order value. Both buttons are present as soon as the entry points are installed; users do not add them through +. Do not publish counts, background observers or extra UI controls until they serve an implemented behavior.
-
-If the active tab bar does not support these declarations, adapt a personal copy of that tab bar or integrate the compatible button-discovery behavior. Preserve the existing layout, Rigs panel, pane settings and Files/Changes behavior. Do not install the reference's older full layout over the user's current layout, edit shipped mods, or switch layouts merely to add these buttons.
-
-## Identity and persistence
-
-1. Confirm the installed host APIs before choosing identity bindings. Persist checkout/folder context using the owning machine/Core identity and canonical worktree/folder path. Use the worktree root, not the shared Git common directory, branch name, space ID or raw CWD subdirectory. Machine display names alone must not merge records after a rename/reconnection.
-2. Agent context belongs to an agent session/instance. A terminal address alone is insufficient because a terminal can host a replacement program. Verify a durable session identity or implement an explicit persistent context binding; never guess from a PID or silently reuse notes for a replacement agent.
-3. Keep worktree identity separate from space identity. Space IDs govern panel selection/visibility, not default record ownership. If a checkout moves, preserve the old record and offer explicit relinking; do not substitute a sibling worktree by branch/name. Treat any future space-only scope as a separate explicit owner.
-4. Store versioned records under `CONTEXT_HOME` (proposed default `~/.local/state/herdr-context`), outside installed mod code and the Rigs registry.
-5. Panel and CLI use the same validation and atomic persistence with revision checks. Keep checkout/folder and agent records separate. Capture the displayed target and revision for each edit/save; reject late loads for old focus and retain drafts by owner. Preserve data through panel closure, mod reload and app restart.
-6. Agent updates remain optional. Read/inherit context without requiring the agent to update it. General notes and imported task text are context, not automatic executable instructions. External task updates require a separately enabled future integration.
-
-## Implementation sequence
-
-- [ ] Resolve machine-qualified checkout/folder identities from the focused CWD and verify stable agent/session bindings against the installed Herdr/Core surfaces; document limitations before automatic agent association.
-- [ ] Update the initial scaffold types (currently space/agent only) for the agreed checkout/folder owners before implementing storage; no persisted records exist to migrate yet.
-- [ ] Implement the shared model, validation, atomic storage and stale-write rejection.
-- [ ] Add a versioned JSON CLI for reading and updating explicit targets. Pass edited content through files/stdin rather than shell interpolation.
-- [ ] Build native Notes and Tags panel entry points with scope controls, inherited context and retained drafts.
-- [ ] Integrate the two always-present top-right buttons with the current personal tab bar/layout, following the reference's panel behavior.
-- [ ] Add guarded installation/sync scripts and an installed agent guide with exact local CLI paths.
-- [ ] Install when implementation resumes; document what was verified and any checks the user asks to skip.
-
-Proposed CLI operations and manifest entries are design, not currently available commands.
-
-## Acceptance
-
-- Notes and Tags appear beside Files/Changes without using +, including for an empty space.
-- Each button opens/toggles the existing right-side panel and follows its selected-space state.
-- Checkout/Folder and Agent scopes load distinct records; inherited context is read-only in the child scope.
-- Moving into a checkout subdirectory retains the same notes/tags; two spaces on that checkout share them. Different worktrees and machines stay separate. Confirmed non-Git folders use folder context; failed/offline resolution never redirects saves.
-- Saving writes to the displayed target even if focus changes; drafts survive target/panel switching.
-- Stale concurrent edits are rejected without discarding the user's draft.
-- Space/branch renames, space reordering and app restarts preserve checkout context. Replacement agents do not inherit an unrelated prior session's notes. Moved checkouts require explicit relinking.
-- Notes/tags work without Rigs, Jira/Linear or a running agent. Existing Rigs and Files/Changes controls continue to work.
-- Installation/sync preserves personal layout choices and shipped files. Record runtime acceptance separately from build/checker results.
-
-## Current state
-
-The repository contains only its initial scaffold and this plan. Installed host declarations and current sidebar/tab-bar composition were inspected during planning; the linked mod-buttons recipe was read. No Context code, CLI, panel buttons or layout integration has been installed, and no checks or runtime acceptance have been performed.
+Build and native checker pass. All 25 regressions pass, including six new
+autosave/debounce/retry/conflict/concurrent-edit cases. Installed runtime
+verification is being completed.

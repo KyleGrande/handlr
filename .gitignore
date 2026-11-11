@@ -1,5 +1,8 @@
 node_modules/
 dist/
+build/
+.host/
+.artifacts/
 .DS_Store
 .env
 .env.*

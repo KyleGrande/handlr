@@ -2,12 +2,19 @@
   "name": "herdr-context",
   "version": "0.1.0",
   "private": true,
-  "description": "Persistent tags and notes for Herdr spaces and agents",
+  "description": "Space and agent Markdown scratchpads and tags for Herdr",
   "type": "module",
   "scripts": {
-    "build": "tsc -p tsconfig.json"
+    "build": "node scripts/build.mjs",
+    "build:cli": "tsc -p tsconfig.json",
+    "test": "npm run build:cli && node --test tests/*.test.mjs",
+    "check:native": "herdr-app check build/mods/context",
+    "prepare-install": "node scripts/prepare-install.mjs",
+    "install:local": "node scripts/install.mjs",
+    "sync:local": "node scripts/sync.mjs"
   },
   "devDependencies": {
+    "@types/node": "^26.6.6",
     "typescript": "^5.9.0"
   }
 }
