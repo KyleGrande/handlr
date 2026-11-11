@@ -464,7 +464,7 @@ export default class Rigs extends View {
             .child(div().min_w(0).text_size(11.5).text_color(t.dim).truncate().child(this.checkoutDescription(rig)))))
         .child(this.controls(rig))
         .child(this.statusIcon(this.operationIndicator(rigKey,this.rigIndicator(rig)))));
-      card.children(this.connectionRows(rig));
+      if (!this.collapsed.has(rig.id)) card.children(this.connectionRows(rig));
       if (rig.error) card.child(div().pl(20).text_color(t.blocked).child(rig.error));
       for (const service of this.collapsed.has(rig.id) ? [] : Object.values(rig.services)) {
         const row = v_flex().w_full().gap(2).pl(20).pr(8).py(3).rounded(8).when(Boolean(service.checkout_match), el => el.bg(t.selected));

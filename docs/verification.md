@@ -1,5 +1,9 @@
 # Current verification — 2026-11-10
 
+## Collapse cross-rig links with services
+
+- Link rows use the same per-rig collapse state as service rows. Updated the guide and installed the mod. Checks were skipped under the user’s continuing preference.
+
 ## Profile popup and port ownership
 
 - Reproduced an empty profile list in Herdr while the CLI returned six saved profile paths. Set the popup's content height explicitly and preserved row heights. Reopened the installed popup and visually confirmed that all six profiles were visible.
