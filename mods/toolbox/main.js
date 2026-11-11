@@ -63,7 +63,6 @@ export default class Toolbox extends View {
     const root = v_flex().flex_1().min_h(0).p(12).gap(10).overflow_y_scrollbar();
     if (this.error) root.child(button('error', this.error + ' · Dismiss', () => { this.error = ''; this.pending = {}; }));
     if (!c?.owner) return shell.child(root.child(div().text_color(t.muted).child(c ? 'Loading Space toolbox…' : 'Select a Space to open its toolbox.')));
-    root.child(div().text_size(12).child(c.s.name));
     if (this.editor) {
       const e = this.editor;
       root.child(field('Label', e.label)).child(field('Icon / text', e.icon)).child(field('Command', e.command)).child(div().text_color(t.muted).child('Parameters: pnpm build --mode {{mode}} · values are shell quoted'));
