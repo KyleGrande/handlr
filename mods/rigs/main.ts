@@ -142,22 +142,26 @@ export default class Rigs extends View {
       props:{view:'delete',target,...(target === 'rig' ? {rig:value} : {profilePath:value}),label,cli:this.cli,cliArgs:this.cliArgs,parent:this.previewMode || this.profileMode ? props().overlay : undefined}});
   }
   openContext(target: 'rig' | 'profile', value: string, label: string) {
-    openOverlay({mod:this.modName,kind:'popup',width:230,height:target === 'rig' ? 130 : 90,
+    openOverlay({mod:this.modName,kind:'popup',width:200,height:target === 'rig' ? 104 : 73,
       props:{view:`${target}-menu`,...(target === 'rig' ? {rig:value} : {profilePath:value}),label,cli:this.cli,cliArgs:this.cliArgs,guide:this.guide}});
   }
   renderContext() {
     const t = theme() as { [K in keyof ReturnType<typeof theme>]: `#${string}` };
     const rig = this.contextMode === 'rig-menu', id = String(props().rig ?? ''), file = String(props().profilePath ?? '');
-    const root = v_flex().w_full().h(rig ? 130 : 90).p(6).gap(2).bg(t.popover).text_color(t.foreground);
+    const root = v_flex().w_full().min_h(0).p(5).bg(t.popover).text_size(12.8).text_color(t.foreground);
     const choose = (action: () => void) => { action(); closeOverlay(String(props().overlay)); };
+    const item = (id: string, label: string, action: () => void) => div().id(id).h(31).flex_none().px(8).rounded(7)
+      .flex().items_center().cursor_pointer().hover(style => style.bg(t.hover)).child(label)
+      .on_click(() => choose(action));
     if (rig) {
-      root.child(this.button('edit-rig','Edit rig…',() => choose(() => this.openEditRig(id))));
-      if (this.definition) root.child(this.button('edit-rig-profile','Edit profile…',() => choose(() => this.openProfileEditor(this.definition!.profile))));
-      else root.child(div().px(8).py(4).text_size(12).text_color(t.dim).child(this.actionError || 'Loading profile…'));
-      root.child(this.button('delete-rig','Delete rig…',() => choose(() => this.openDelete('rig',id,String(props().label)))));
+      root.child(item('edit-rig','Edit rig…',() => this.openEditRig(id)));
+      if (this.definition) root.child(item('edit-rig-profile','Edit profile…',() => this.openProfileEditor(this.definition!.profile)));
+      else root.child(div().h(31).flex_none().px(8).flex().items_center().text_color(t.dim).tooltip(this.actionError || 'Loading profile…')
+        .child(div().truncate().child(this.actionError || 'Loading profile…')));
+      root.child(item('delete-rig','Delete rig…',() => this.openDelete('rig',id,String(props().label))));
     } else {
-      root.child(this.button('edit-profile','Edit profile…',() => choose(() => this.openProfileEditor(file))));
-      root.child(this.button('delete-profile','Delete profile…',() => choose(() => this.openDelete('profile',file,String(props().label)))));
+      root.child(item('edit-profile','Edit profile…',() => this.openProfileEditor(file)));
+      root.child(item('delete-profile','Delete profile…',() => this.openDelete('profile',file,String(props().label))));
     }
     return root;
   }

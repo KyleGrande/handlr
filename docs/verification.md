@@ -1,5 +1,10 @@
 # Current verification — 2026-11-10
 
+## Context menu sizing
+
+- Removed the fixed content height that left blank space below rig/profile context menu items. Matched Herdr's native context-menu width (200px), padding (5px), row height (31px), corners (7px) and text size (12.8px), with intrinsic content height and bounded popup limits. Loading/error placeholders retain the same row height.
+- Generated and installed without tests/native checks or live UI verification, continuing the user's request to skip checks.
+
 ## Rig and profile management
 
 - Added right-click rig menus and Preview Edit/Delete actions, an instance editor for name/profile/worktree mappings, a native profile JSON editor, and explicit deletion dialogs. Renaming retains identity/launches while running; material rig edits and definition deletion require stopped/reconciled ownership. Profile edits require stopped referencing rigs and reject incompatible mappings/stale revisions. Profile deletion refuses every canonical-file reference, including symlinks. Rig deletion keeps profile/worktree/data; profile deletion removes its file separately.
