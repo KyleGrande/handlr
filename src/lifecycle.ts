@@ -4,6 +4,7 @@ import { setTimeout as sleep } from 'node:timers/promises';
 import { Store } from './store.js';
 import { Core, type CoreAPI } from './core.js';
 import { rigConnections, type ConnectionRig } from './connections.js';
+import { ProcessObserver } from './observe.js';
 import { available, checkout, launchEnv, publicPlan, resolve } from './profile.js';
 import { now, requireValue as check, type Launch, type Registry, type Rig, type Terminal, type ResolvedService, type Plan } from './types.js';
 
@@ -45,7 +46,7 @@ export async function probe(service: ResolvedService, timeout = 1000): Promise<b
   return probeURL(endpoint.url + (p.path ?? '/'), p.kind ?? 'http', timeout);
 }
 export class Rigs {
-  constructor(readonly store = new Store(), readonly core: CoreAPI = new Core()) {}
+  constructor(readonly store = new Store(), readonly core: CoreAPI = new Core(), readonly observer = new ProcessObserver()) {}
   async get(name: string) {
     const registry = await this.store.load();
     const rig = (Object.hasOwn(registry.rigs, name) ? registry.rigs[name] : undefined) ?? Object.values(registry.rigs).find(r => r.name === name);
@@ -105,6 +106,7 @@ export class Rigs {
     const initial = await this.get(name);
     return this.store.lock(initial.id, async () => {
       const rig = await this.get(initial.id), plan = await resolve(rig,new Set(),false);
+      check(plan.order.length, 'This rig only observes external apps; there are no managed services to restart');
       if (serviceId) check(Object.hasOwn(plan.services,serviceId), `Unknown service ${serviceId}`);
       if (reviewedFingerprint) check(reviewedFingerprint === plan.review.fingerprint,'Preview changed; review the current configuration before restarting');
       if (plan.setup || rig.approval) check(plan.review.approved,'Setup review incomplete or stale: approve the current configuration before restarting');
@@ -128,6 +130,7 @@ export class Rigs {
         const data = await this.store.load();
         const reserved = reservedPorts(data, rig.id);
         plan = await resolve(rig, reserved, true, this.ownedPorts(rig));
+        check(plan.order.length, 'This rig only observes external apps; there are no managed services to start');
         const selected = new Set<string>();
         const include = (id: string) => {
           check(Object.hasOwn(plan.services,id), `Unknown service ${id}`);
@@ -265,6 +268,14 @@ export class Rigs {
     let terminals: Terminal[] = [], core = 'available';
     try { terminals = await this.core.terminals(); } catch { core = 'unavailable'; }
     const results = [], catalog: ConnectionRig[] = [];
+    // Observers use current definitions independently of a managed service's saved launch allocation.
+    const definitions = new Map<string, Plan>();
+    await Promise.all(rigs.map(async rig => {
+      try { definitions.set(rig.id, await resolve(rig, new Set(), false)); }
+      catch { if (rig.allocation) definitions.set(rig.id, rig.allocation); }
+    }));
+    const allApps = [...definitions.values()].flatMap(plan => Object.values(plan.observed_apps ?? {}));
+    const observe = this.observer.session();
     for (const rig of rigs.sort((a,b) => Number(b.claimed) - Number(a.claimed) || a.name.localeCompare(b.name))) {
       const checkouts: Record<string, unknown> = {};
       for (const [repo, root] of Object.entries(rig.checkouts)) {
@@ -272,7 +283,8 @@ export class Rigs {
         catch { checkouts[repo] = { ...rig.checkout_bindings?.[repo], root, stale: true, error: 'Checkout missing; stop and explicitly repair mapping' }; }
       }
       let display = rig.allocation;
-      if (!display || !rig.claimed) { try { display = await resolve(rig, new Set(), false); } catch {} }
+      if (!display || !rig.claimed) display = definitions.get(rig.id) ?? display;
+      const observed_apps = await observe(definitions.get(rig.id)?.observed_apps ?? {}, allApps);
       const services: Record<string, unknown> = {}, readiness: Record<string,string> = {};
       for (const [id, spec] of Object.entries(display?.services ?? {})) {
         const launch = rig.launches[id]; let terminal: Terminal | undefined, error = launch?.error;
@@ -294,7 +306,7 @@ export class Rigs {
         external_bindings:spec.external_bindings ?? (spec.external_checks ?? []).map(item => ({key:item.key,url:spec.env[item.key] ?? item.url})),
         external_dependencies:(services[id] as {external_dependencies:{key:string;readiness:string}[]}).external_dependencies,
       }]))});
-      results.push({ id: rig.id, name: rig.name, profile: rig.profile, claimed: rig.claimed, review_required: !!display?.setup && !display.review?.approved, checkouts, services, error: rig.error });
+      results.push({ id: rig.id, name: rig.name, profile: rig.profile, claimed: rig.claimed, review_required: !!display?.setup && !display.review?.approved, checkouts, services, observed_apps, error: rig.error });
     }
     const visible = results.filter(rig => (!requested || rig.id === requested) && (!selected || Object.values(rig.checkouts).some(checkout => (checkout as {root:string}).root === selected.root)));
     const visibleIds = new Set(visible.map(rig => rig.id));

@@ -89,6 +89,44 @@ Review the evidence files with an agent and put proposed choices in `setup.decis
 
 For CLI review, `plan` returns `review.fingerprint`. After user approval, run `rig approve <name> --review <fingerprint>`, supplying any missing/corrected notes with repeated `--decision key=value`, then `rig up <name> --review <same-fingerprint>`. Approval saves to the registry without starting services or rewriting the profile. Changes to the profile or selected checkout/branch invalidate approval; `up --review` also rejects an outdated preview. Port ranges are reviewed settings, while free-port proposals can change at allocation. Secret values never enter the review hash. Setting `setup.approved` alone no longer satisfies draft review. Existing manual profiles without `setup` still support explicit `up`; once an approval is recorded, later launches require it to remain current.
 
+## Observe native apps and emulator processes
+
+Add an optional top-level `observed_apps` map to show an app launched outside Rigs, for example a React Native Windows app launched from Visual Studio. This is process monitoring: it reports running, stopped or unknown, not app readiness, Metro connectivity, emulator identity or boot completion. There is no native-app setup question for ordinary web/API rigs.
+
+```json
+{
+  "version": 1,
+  "repos": ["app"],
+  "services": {},
+  "observed_apps": {
+    "desktop": {
+      "repo": "app",
+      "process_name": "MyApp.exe",
+      "platform": "win32",
+      "machine": "windows-dev",
+      "executable": "C:\\work\\my-app\\windows\\build\\MyApp.exe"
+    }
+  }
+}
+```
+
+Replace the example executable and machine with your actual values. `machine` is an existing connected Herdr machine (`hc machine ls`); remote observations currently support Windows and use its built-in Windows PowerShell/CIM process query through Core's `machine.exec`. No separate observer daemon is needed. When Rigs itself runs on Windows, omit `machine`. Local macOS/Linux processes are also supported; omit `platform` to use the local OS.
+
+`process_name` is an exact executable name (case-insensitive on Windows), not a substring, window title or wildcard. Optional `executable` narrows matches to one build/worktree; local relative paths resolve against the selected repo checkout, and remote paths must be absolute Windows paths. Omitting it shows every instance with that name, including builds from other worktrees. Status and Preview expose each matching PID, start time and available executable path so relaunches and multiple instances remain distinguishable. Missing tools, unreachable machines and unverifiable required paths report unknown rather than stopped. Command lines and environments are not collected.
+
+Observed app rows use the existing status dots and five-second polling, remain visible when managed services are stopped, and collapse with their rig. Click an app row to open Preview; its live observation details update there too. There are no app lifecycle or terminal-output controls because the process was launched externally. Whole-rig Start/Stop/Restart still affect only managed services. Monitoring never adopts a process or reserves a port/worktree. Monitor-only profiles use `"services": {}` and need no Start action or launch approval. You can also add `observed_apps` alongside an existing Metro/API service configuration.
+
+For an agent or shell, inspect a single snapshot without saving a profile:
+
+```sh
+./bin/rig observe --process-name MyApp.exe --platform win32 --machine windows-dev
+./bin/rig observe --process-name MyApp.exe --platform win32 --machine windows-dev --executable 'C:\work\my-app\MyApp.exe'
+# On Windows, from a compiled copy:
+node dist/src/cli.js observe --process-name MyApp.exe
+```
+
+`rig status` returns the configured observations under each rig's `observed_apps`. Observations are read-only and continue even when that rig is stopped. Do not use process names as authority to terminate apps or emulators.
+
 ## Developing Rigs
 
 This project has no app server or database. `npm run watch:cli` is an optional compiler watcher writing to `dist/`; it has no port or HTTP readiness check. It does not rebuild the native panel because the main TypeScript project excludes `mods/rigs`.

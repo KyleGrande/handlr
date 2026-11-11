@@ -5,6 +5,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { createHash } from 'node:crypto';
 import net from 'node:net';
+import { resolveObservedApp, validateObservedApp } from './observe.js';
 import { requireValue as check, type Profile, type Checkout, type Rig, type Plan, type Endpoint, type ResolvedService, type ExternalCheck } from './types.js';
 const exec = promisify(execFile);
 export const expandHome = (p: string) => p.startsWith('~/') ? path.join(os.homedir(), p.slice(2)) : p;
@@ -43,9 +44,16 @@ export async function available(port: number): Promise<boolean> {
 export function validate(profile: Profile): string[] {
   check(profile.version === 1, 'Profile version must be 1');
   check(Array.isArray(profile.repos) && profile.repos.length && new Set(profile.repos).size === profile.repos.length, 'Declare unique repo IDs');
-  check(profile.services && Object.keys(profile.services).length, 'Declare services');
+  check(profile.services && typeof profile.services === 'object' && !Array.isArray(profile.services), 'Declare services as an object');
+  check(profile.observed_apps === undefined || profile.observed_apps && typeof profile.observed_apps === 'object' && !Array.isArray(profile.observed_apps), 'Invalid observed_apps');
+  check(Object.keys(profile.services).length || Object.keys(profile.observed_apps ?? {}).length, 'Declare services or observed_apps');
   const ids = /^[a-zA-Z0-9_-]+$/;
-  for (const id of [...profile.repos, ...Object.keys(profile.services)]) check(typeof id === 'string' && ids.test(id) && !['__proto__','constructor','prototype'].includes(id), `Invalid ID ${id}`);
+  for (const id of [...profile.repos, ...Object.keys(profile.services), ...Object.keys(profile.observed_apps ?? {})]) check(typeof id === 'string' && ids.test(id) && !['__proto__','constructor','prototype'].includes(id), `Invalid ID ${id}`);
+  for (const [id, app] of Object.entries(profile.observed_apps ?? {})) {
+    validateObservedApp(app, id);
+    check(profile.repos.includes(app.repo), `${id}: unknown observed app repo`);
+    check(!Object.hasOwn(profile.services, id), `${id}: observed app ID conflicts with a managed service`);
+  }
   const endpoints = new Set<string>();
   for (const [id, service] of Object.entries(profile.services)) {
     check(profile.repos.includes(service.repo), `${id}: unknown repo`);
@@ -171,7 +179,8 @@ export async function resolve(rig: Rig, reserved: ReadonlySet<number> | Readonly
       endpoints: Object.fromEntries(Object.entries(endpoints).filter(([key]) => key.startsWith(id + '.'))) };
     services[id] = { ...item, fingerprint: createHash('sha256').update(JSON.stringify(item)).digest('hex'), ...(external_bindings.length ? {external_bindings} : {}) };
   }
-  return { id: rig.id, name: rig.name, checkouts, services, order, endpoints, assignments: 'proposed, unreserved', review:{fingerprint, approved}, ...(setup ? {setup} : {}) };
+  const observed_apps = Object.fromEntries(Object.entries(profile.observed_apps ?? {}).map(([id, app]) => [id, resolveObservedApp(app, checkouts[app.repo].root)]));
+  return { id: rig.id, name: rig.name, checkouts, services, ...(Object.keys(observed_apps).length ? {observed_apps} : {}), order, endpoints, assignments: 'proposed, unreserved', review:{fingerprint, approved}, ...(setup ? {setup} : {}) };
 }
 export async function launchEnv(service: ResolvedService): Promise<Record<string,string>> {
   const env = { ...service.env };

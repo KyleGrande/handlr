@@ -1,5 +1,12 @@
 # Current verification — 2026-11-10
 
+## Observed native app processes
+
+- Added optional profile `observed_apps`, versioned `rig observe` snapshots and per-rig process observations in `status`. Local Windows uses PowerShell/CIM; local macOS/Linux uses process inspection. Remote Windows uses the installed Core `machine.exec` API with an existing connected machine. Executable names and optional paths select processes; every match retains PID/start-time identity. Queries omit command lines/environment and report unavailable observations as unknown.
+- Added sidebar rows, live Preview details, monitor-only profiles and explicit separation from managed service controls/ownership/reservations. Observed apps have no lifecycle buttons or terminal peeks. Native-app questions apply only to requested/relevant native app setup. Existing web/API rig setup is unaffected.
+- Read the installed `hc exec --help`, `hc schema` and native API declarations to implement against their actual interfaces. Added regression coverage for path selection, PID reuse, multiple instances, unavailable hosts/paths, query batching, encoded Windows inputs and preserving external processes through rig lifecycle actions. Added native render fixtures for observed rows and monitor-only Preview.
+- Generated CLI/native JavaScript with TypeScript transpilation and synced the owned `~/.config/herdr-app/mods/rigs` installation. Layouts and rig services were not changed. Tests, type checks, native render checks and desktop acceptance were skipped at the user's request; added regressions/fixtures have not been run. No Windows machine or actual user app was queried/configured, and Windows/Linux collectors and new native states remain unverified at runtime.
+
 ## Collapse cross-rig links with services
 
 - Link rows use the same per-rig collapse state as service rows. Updated the guide and installed the mod. Checks were skipped under the user’s continuing preference.

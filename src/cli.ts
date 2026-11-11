@@ -4,6 +4,8 @@ import { propose } from './init.js';
 import { Rigs } from './lifecycle.js';
 import { expandHome } from './profile.js';
 import { requireValue as check } from './types.js';
+import { ProcessObserver, resolveObservedApp, validateObservedApp } from './observe.js';
+import type { ObservedApp } from './types.js';
 
 const usage = `rig create <name> --profile <file> --repo <slot>=<checkout> [--repo ...]
 rig plan|up|down <name> [--json]
@@ -14,9 +16,12 @@ rig status [<name>] [--checkout <directory>] [--json]
 rig logs <name> <service> [--json]
 rig configure <name> --repo <slot>=<checkout>
 rig init --checkout <directory> --output <profile.json>
+rig observe --process-name <executable-name> [--executable <path>] [--platform win32|darwin|linux] [--machine <Herdr-Windows-machine>]
 
 Profiles contain executable project configuration. Review rig plan before rig up.
-RIG_HOME selects the durable local registry. Managed endpoints bind to loopback.`;
+RIG_HOME selects the durable local registry. Managed endpoints bind to loopback.
+observed_apps are read-only process matches; they never grant launch/stop ownership.
+observe reports one snapshot without creating a rig or reserving resources.`;
 export async function main(argv = process.argv.slice(2)) {
   const command = argv.shift();
   if (!command || ['help', '--help', '-h'].includes(command)) { console.log(usage); return; }
@@ -27,7 +32,7 @@ export async function main(argv = process.argv.slice(2)) {
     if (arg.startsWith('--')) { check(argv[0] && !argv[0].startsWith('--'), `Missing value for ${arg}`); (options[arg] ??= []).push(argv.shift()!); }
     else positional.push(arg);
   }
-  check(Object.keys(options).every(k => ['--profile','--repo','--checkout','--output','--review','--decision','--service'].includes(k)), 'Unknown option; run rig help');
+  check(Object.keys(options).every(k => ['--profile','--repo','--checkout','--output','--review','--decision','--service','--process-name','--executable','--platform','--machine'].includes(k)), 'Unknown option; run rig help');
   const selections: Record<string,string> = {};
   for (const value of options['--repo'] ?? []) {
     const at = value.indexOf('='); check(at > 0 && at < value.length - 1, 'Use --repo slot=/concrete/worktree');
@@ -35,8 +40,18 @@ export async function main(argv = process.argv.slice(2)) {
   }
   const rigs = new Rigs(); let result: unknown;
   const name = positional[0];
-  if (!['status','init'].includes(command)) check(name, 'Specify a rig name');
+  if (!['status','init','observe'].includes(command)) check(name, 'Specify a rig name');
   switch (command) {
+    case 'observe': {
+      check(options['--process-name']?.length === 1, 'Use observe --process-name <exact executable name>');
+      const app: ObservedApp = {repo:'app', process_name:options['--process-name'][0],
+        ...(options['--executable'] ? {executable:options['--executable'][0]} : {}),
+        ...(options['--platform'] ? {platform:options['--platform'][0] as ObservedApp['platform']} : {}),
+        ...(options['--machine'] ? {machine:options['--machine'][0]} : {})};
+      validateObservedApp(app, 'app');
+      result = {observed_apps:await new ProcessObserver().session()({app:resolveObservedApp(app, process.cwd())})};
+      break;
+    }
     case 'create': check(options['--profile']?.[0], 'Select --profile'); result = await rigs.create(name, path.resolve(expandHome(options['--profile'][0])), selections); break;
     case 'configure': result = await rigs.configure(name, selections); break;
     case 'plan': result = await rigs.plan(name); break;

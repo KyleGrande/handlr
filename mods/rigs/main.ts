@@ -1,4 +1,4 @@
-import type { Plan, ResolvedService, RigConnection } from '../../src/types.js';
+import type { AppObservation, Plan, ResolvedService, RigConnection } from '../../src/types.js';
 import { setupPrompt } from './setup.js';
 import { View, div, svg, type AsyncContext, type Context } from 'gpui-kit';
 import { v_flex, h_flex, Input, InputState } from 'gpui-base';
@@ -12,7 +12,7 @@ function localCheckout() {
 }
 type LayoutNode = { id?:string; type?:string; hidden?:boolean; active?:string; children?:LayoutNode[] };
 type Service = { id: string; repo: string; cwd?: string; state: string; readiness: string; terminal?: string; error?: string; exit_code?: number; endpoints: Record<string,{url:string; protocol:string; port:number}>; env: Record<string,string>; assignments: string; external_dependencies?: {key:string;url:string;readiness:string}[]; degraded_dependencies: string[]; checkout_match?: boolean };
-type Rig = { id: string; name: string; profile?: string; claimed: boolean; review_required?: boolean; error?: string; checkouts: Record<string,{root:string; repository?:string; branch?:string; unborn?:boolean; stale?:boolean}>; services: Record<string,Service> };
+type Rig = { id: string; name: string; profile?: string; claimed: boolean; review_required?: boolean; error?: string; checkouts: Record<string,{root:string; repository?:string; branch?:string; unborn?:boolean; stale?:boolean}>; services: Record<string,Service>; observed_apps?: Record<string,AppObservation> };
 type Status = { core: string; rigs: Rig[]; observed_at: string; connections?: RigConnection[] };
 type Indicator = {kind:'working' | 'idle' | 'done' | 'blocked'; label:string};
 type ProfileChoice = {path:string;label:string;selections:Record<string,string>;services:number};
@@ -27,6 +27,7 @@ export default class Rigs extends View {
   cli = ''; cliArgs: string[] = []; previewName = ''; showStopped = false;
   previewMode = false; modName = 'rigs';
   hoveredRow = ''; controlKey = ''; controlOperation = '';
+  observing = false; observationError = '';
   collapsed = new Set<string>();
   init(_props: unknown, cx: AsyncContext) {
     this.cli = String(props()?.cli ?? 'rig');
@@ -38,8 +39,9 @@ export default class Rigs extends View {
       this.previewMode = true;
       this.cliArgs = Array.isArray(props()?.cliArgs) ? props().cliArgs.map(String) : this.cliArgs;
       this.previewName = String(props().rig);
-      if (props().plan) this.setPreview(props().plan, this.previewName);
+      if (props().plan) { this.setPreview(props().plan, this.previewName); this.refreshPreviewApps(cx); }
       else this.action('plan', this.previewName, cx);
+      cx.timer.every(5000, cx => this.refreshPreviewApps(cx));
       return;
     }
     this.name = InputState.new({ placeholder: 'Rig name' });
@@ -98,13 +100,22 @@ export default class Rigs extends View {
       finally { this.busy = false; cx.notify(); }
     });
   }
+  refreshPreviewApps(cx: AsyncContext) {
+    if (this.observing || !Object.keys(this.preview?.observed_apps ?? {}).length) return;
+    this.observing = true;
+    cx.spawn(async cx => {
+      try { this.data = await this.call(['status', this.previewName]); this.observationError = ''; }
+      catch { this.observationError = 'App observation unavailable'; }
+      finally { this.observing = false; cx.notify(); }
+    });
+  }
   action(command: string, name: string, cx: AsyncContext) {
     if (this.busy) return; this.busy = true; this.actionError = '';
     cx.spawn(async cx => {
       try {
         const result = await this.call([command, name, ...(command === 'up' && this.preview ? ['--review', this.preview.review.fingerprint] : [])]);
         if (command === 'plan') {
-          if (this.previewMode) this.setPreview(result, name);
+          if (this.previewMode) { this.setPreview(result, name); this.refreshPreviewApps(cx); }
           else this.openPreview(result, name);
         }
         else { this.preview = null; this.previewName = ''; }
@@ -275,7 +286,7 @@ export default class Rigs extends View {
       .child(div().flex_1().truncate().text_size(11).text_color(t.dim).hover(style => style.text_color(t.foreground)).child(group.name))
       .on_click((_event,cx) => { cx.stop_propagation(); this.openPreview(undefined,group.id,group.name); }));
   }
-  serviceSource(rig: Rig, service: Service) {
+  serviceSource(rig: Rig, service: Pick<Service, 'repo' | 'cwd'>) {
     const checkout = rig.checkouts[service.repo];
     if (!checkout) return {label:service.repo,tooltip:`Repo slot: ${service.repo}`};
     const base = (value: string) => value.split('/').filter(Boolean).pop() ?? value;
@@ -304,7 +315,8 @@ export default class Rigs extends View {
   }
   checkoutDescription(rig: Rig) {
     const services = Object.keys(rig.services).length, checkouts = Object.keys(rig.checkouts).length;
-    return `${services} service${services === 1 ? '' : 's'} · ${checkouts} checkout${checkouts === 1 ? '' : 's'}`;
+    const apps = Object.keys(rig.observed_apps ?? {}).length;
+    return `${services ? `${services} service${services === 1 ? '' : 's'} · ` : ''}${apps ? `${apps} app${apps === 1 ? '' : 's'} · ` : ''}${checkouts} checkout${checkouts === 1 ? '' : 's'}`;
   }
   button(id: string, label: string, action: (cx: AsyncContext) => void) {
     const t = theme() as { [K in keyof ReturnType<typeof theme>]: `#${string}` };
@@ -321,12 +333,17 @@ export default class Rigs extends View {
     return {kind:'idle',label:'Stopped'};
   }
   rigIndicator(rig: Rig): Indicator {
-    const services = Object.values(rig.services), indicators = services.map(service => this.serviceIndicator(service));
+    const services = Object.values(rig.services), indicators = [...services.map(service => this.serviceIndicator(service)), ...Object.values(rig.observed_apps ?? {}).map(app => this.appIndicator(app))];
     if (rig.error || indicators.some(status => status.kind === 'blocked')) return {kind:'blocked',label:rig.error ?? 'Rig needs attention · inspect its services'};
     if (indicators.some(status => status.kind === 'working')) return {kind:'working',label:'Running'};
     if (rig.claimed) return {kind:'blocked',label:'Reservations retained · inspect and reconcile stopped services'};
     if (indicators.length && indicators.every(status => status.kind === 'done')) return {kind:'done',label:'Finished'};
     return {kind:'idle',label:rig.review_required ? 'Draft · awaiting approval' : 'Stopped'};
+  }
+  appIndicator(app: AppObservation): Indicator {
+    if (app.state === 'unknown') return {kind:'blocked',label:app.error ?? 'App observation unavailable'};
+    if (app.state === 'running') return {kind:'working',label:`Observed running · ${app.matches.length} process${app.matches.length === 1 ? '' : 'es'} · readiness not checked`};
+    return {kind:'idle',label:'Not running · externally launched app'};
   }
   statusIcon(status: Indicator) {
     const t = theme() as { [K in keyof ReturnType<typeof theme>]: `#${string}` };
@@ -381,12 +398,12 @@ export default class Rigs extends View {
     if (this.preview) {
       const preview = this.preview;
       const review = v_flex().id('rig-preview-scroll').flex_1().min_h(0).p(20).gap(12).overflow_y_scrollbar().mode('always')
-        .child(div().text_size(11).text_color(t.dim).child('Ports are proposals until Start reserves them.'));
+        .child(div().text_size(11).text_color(t.dim).child(preview.order.length ? 'Ports are proposals until Start reserves them.' : 'Read-only process monitoring · no launch or reservations.'));
       const field = (label: string, value: string) => v_flex().gap(2)
         .child(div().text_size(11).text_color(t.dim).child(label))
         .child(div().text_size(12).text_color(t.muted).whitespace_normal().child(value));
       for (const [repo, checkout] of Object.entries(preview.checkouts)) review.child(field(`${repo} · ${checkout.branch}${checkout.unborn ? ' · no commits' : ''}`, checkout.root));
-      review.child(field('Startup order', preview.order.join(' → ')));
+      if (preview.order.length) review.child(field('Startup order', preview.order.join(' → ')));
       for (const id of preview.order) {
         const service = preview.services[id];
         const block = v_flex().gap(6).py(6).border_t(1).border_color(t.border)
@@ -402,6 +419,19 @@ export default class Rigs extends View {
         for (const external of service.external_checks ?? []) block.child(field(`External check · ${external.key}`, `${external.url} · ${external.timeout}s deadline`));
         review.child(block);
       }
+      for (const [id, app] of Object.entries(preview.observed_apps ?? {})) {
+        const observation = this.observationError ? undefined : this.data.rigs.find(rig => rig.id === preview.id)?.observed_apps?.[id];
+        const block = v_flex().gap(6).py(6).border_t(1).border_color(t.border)
+          .child(div().text_size(12).font_medium().child(`${id} · observed app`))
+          .child(field('Process name', app.process_name))
+          .child(field('Executable', app.executable ?? 'Any path with this exact executable name'))
+          .child(field('Machine', `${app.machine ?? 'This computer'} · ${app.platform}`))
+          .child(field('Repo slot', app.repo))
+          .child(field('Status', observation ? this.appIndicator(observation).label : this.observationError || 'Checking…'))
+          .child(field('Ownership', 'External · monitored only. Rig controls do not start, stop or restart this app. Process presence does not prove readiness or a Metro connection.'));
+        for (const match of observation?.matches ?? []) block.child(field(`PID ${match.pid} · started ${match.started_at}`, match.executable ?? 'Executable path unavailable'));
+        review.child(block);
+      }
       if (preview.setup) {
         review.child(div().text_size(12).font_medium().child('Review proposed choices'));
         for (const question of preview.setup.questions) review.child(v_flex().gap(3)
@@ -411,7 +441,8 @@ export default class Rigs extends View {
       }
       root.child(review);
       root.child(h_flex().px(20).py(12).justify_end().border_t(1).border_color(t.border)
-        .child(this.button('apply-plan',this.busy ? 'Working…' : preview.setup || !preview.review.approved ? 'Approve and start' : 'Start this rig',cx => this.approveAndStart(cx))));
+        .when(preview.order.length > 0, el => el.child(this.button('apply-plan',this.busy ? 'Working…' : preview.setup || !preview.review.approved ? 'Approve and start' : 'Start this rig',cx => this.approveAndStart(cx))))
+        .when(!preview.order.length, el => el.child(div().text_size(12).text_color(t.dim).child('Monitoring automatically · no managed services to start'))));
     } else root.child(div().flex_1().p(20).text_color(t.dim).child(this.actionError ? 'Close and reopen this preview to load the current plan.' : 'Loading preview…'));
     return root;
   }
@@ -438,7 +469,7 @@ export default class Rigs extends View {
       .child(this.button('stopped', this.showStopped ? 'Hide stopped definitions' : 'Show stopped definitions', cx => { this.showStopped = !this.showStopped; cx.notify(); })));
     if (this.refreshError) content.child(div().px(8).text_size(12).text_color(t.blocked).child(this.refreshError));
     if (this.actionError) content.child(v_flex().gap(2).px(8).child(div().text_size(12).text_color(t.blocked).child(this.actionError)).child(this.button('dismiss-action-error', 'Dismiss', cx => {this.actionError = '';cx.notify();})));
-    const rigs = this.data.rigs.filter(r => r.claimed || r.review_required || this.showStopped);
+    const rigs = this.data.rigs.filter(r => r.claimed || r.review_required || Object.keys(r.observed_apps ?? {}).length || this.showStopped);
     for (const rig of rigs) {
       const card = v_flex().w_full().gap(2).rounded(8);
       const rigKey = `rig-${rig.id}`;
@@ -462,7 +493,7 @@ export default class Rigs extends View {
           .child(div().flex_shrink(0).max_w(150).truncate().text_color(t.foreground).child(rig.name))
           .child(h_flex().flex_1().min_w(0).justify_end().items_center()
             .child(div().min_w(0).text_size(11.5).text_color(t.dim).truncate().child(this.checkoutDescription(rig)))))
-        .child(this.controls(rig))
+        .when(Object.keys(rig.services).length > 0, el => el.child(this.controls(rig)))
         .child(this.statusIcon(this.operationIndicator(rigKey,this.rigIndicator(rig)))));
       if (!this.collapsed.has(rig.id)) card.children(this.connectionRows(rig));
       if (rig.error) card.child(div().pl(20).text_color(t.blocked).child(rig.error));
@@ -485,6 +516,17 @@ export default class Rigs extends View {
             .child(this.statusIcon(this.operationIndicator(serviceKey,this.serviceIndicator(service))))));
         if (service.degraded_dependencies.length) row.child(div().text_color(t.blocked).child(`Dependency degraded: ${service.degraded_dependencies.join(', ')}`));
         card.child(row);
+      }
+      for (const app of this.collapsed.has(rig.id) ? [] : Object.values(rig.observed_apps ?? {})) {
+        const source = this.serviceSource(rig, app);
+        const details = `${source.tooltip}\nObserved app: ${app.process_name}\nMachine: ${app.machine ?? 'this computer'} (${app.platform})\n${app.executable ?? 'Any executable path'}\nExternal · rig controls do not manage this app\n${app.matches.map(match => `PID ${match.pid} · ${match.started_at}\n${match.executable ?? 'Path unavailable'}`).join('\n')}`;
+        card.child(h_flex().id(`observed-app-${rig.id}-${app.id}`).w_full().h(32).pl(20).pr(8).gap(6).rounded(6).items_center().cursor_pointer()
+          .hover(style => style.bg(t.hover)).tooltip(details)
+          .on_click(() => this.openPreview(undefined, rig.id, rig.name))
+          .child(svg('mods/workspace-chrome/server.svg').size(14).text_color(t.muted))
+          .child(div().truncate().text_size(12).text_color(t.muted).child(app.id))
+          .child(div().flex_1().min_w(0).truncate().text_size(11).text_color(t.dim).child(`${source.label} · observed`))
+          .child(this.statusIcon(this.appIndicator(app))));
       }
       content.child(card);
     }

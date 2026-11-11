@@ -9,6 +9,7 @@ import { Store } from '../src/store.js';
 import { checkout, resolve, validate } from '../src/profile.js';
 import type { CoreAPI } from '../src/core.js';
 import type { Profile, Terminal } from '../src/types.js';
+import { ProcessObserver } from '../src/observe.js';
 
 class FakeCore implements CoreAPI {
   list: Terminal[] = []; starts = 0; failAt = 0; crashAfterAccept = false; unavailable = false; killed: string[] = [];
@@ -36,6 +37,27 @@ async function fixture(t: test.TestContext, count = 1) {
   const core = new FakeCore(), rigs = new Rigs(new Store(path.join(directory, 'state')), core);
   return { directory, roots, profile, profilePath, save, core, rigs };
 }
+test('externally observed apps update without launching, claiming or stopping their processes', async t => {
+  const f = await fixture(t);
+  f.profile.services = {};
+  f.profile.observed_apps = {desktop:{repo:'app',process_name:'MyApp.exe',platform:'win32',machine:'windows-dev'}};
+  await f.save();
+  let running = true;
+  const observer = new ProcessObserver(async () => running ? [{pid:77,name:'MyApp.exe',started_at:'2026-11-10T12:00:00.000Z'}] : []);
+  const rigs = new Rigs(f.rigs.store, f.core, observer);
+  await rigs.create('desktop', f.profilePath, {app:f.roots[0]});
+  f.core.unavailable = true;
+  assert.equal((await rigs.status('desktop')).rigs[0].observed_apps.desktop.state, 'running', 'external observation works while managed Core terminals are unavailable');
+  f.core.unavailable = false;
+  await assert.rejects(rigs.up('desktop'), /no managed services/);
+  assert.equal((await rigs.get('desktop')).claimed, false);
+  assert.equal(f.core.starts, 0);
+  await rigs.down('desktop');
+  assert.deepEqual(f.core.killed, []);
+  assert.equal((await rigs.status('desktop')).rigs[0].observed_apps.desktop.state, 'running', 'rig down does not stop the observed app');
+  running = false;
+  assert.equal((await rigs.status('desktop')).rigs[0].observed_apps.desktop.state, 'stopped');
+});
 test('deterministic previews do not reserve; canonical lookup, repeated branch labels and detached contexts', async t => {
   const f = await fixture(t, 2);
   f.profile.repos.push('other'); f.profile.services.web = { repo: 'other', argv: ['web'], endpoints: { http: { range: [23120,23129] } } }; await f.save();

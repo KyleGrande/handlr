@@ -11,10 +11,15 @@ export interface RigConnection {
   url: string;
   state: 'live' | 'unavailable' | 'unknown';
 }
-export interface Profile { version: 1; repos: string[]; services: Record<string, Service>; setup?: SetupReview }
+export type ProcessPlatform = 'win32' | 'darwin' | 'linux';
+export interface ObservedApp { repo: string; process_name: string; executable?: string; platform?: ProcessPlatform; machine?: string }
+export interface ResolvedObservedApp extends ObservedApp { platform: ProcessPlatform }
+export interface ObservedProcess { pid: number; started_at: string; name: string; executable?: string }
+export interface AppObservation extends ResolvedObservedApp { id: string; ownership: 'external'; state: 'running' | 'stopped' | 'unknown'; observed_at: string; matches: ObservedProcess[]; error?: string }
+export interface Profile { version: 1; repos: string[]; services: Record<string, Service>; observed_apps?: Record<string, ObservedApp>; setup?: SetupReview }
 export interface Checkout { root: string; repository: string; branch: string; unborn?: boolean }
 export interface ResolvedService { id: string; repo: string; cwd: string; argv: string[]; env: Record<string, string>; secrets: Record<string, Binding>; endpoints: Record<string, Endpoint>; depends_on: string[]; readiness?: Probe; data_scope: string; fingerprint: string; external_checks?: ExternalCheck[]; external_bindings?: {key:string;url:string}[] }
-export interface Plan { id: string; name: string; checkouts: Record<string, Checkout>; services: Record<string, ResolvedService>; order: string[]; endpoints: Record<string, Endpoint>; assignments: string; setup?: SetupReview; review: {fingerprint: string; approved: boolean} }
+export interface Plan { id: string; name: string; checkouts: Record<string, Checkout>; services: Record<string, ResolvedService>; observed_apps?: Record<string, ResolvedObservedApp>; order: string[]; endpoints: Record<string, Endpoint>; assignments: string; setup?: SetupReview; review: {fingerprint: string; approved: boolean} }
 export interface Launch { id: string; operation: string; service: string; fingerprint: string; labels: Record<string, string>; terminal?: string; state: 'intent' | 'running' | 'exited' | 'unknown'; created: string; error?: string; excerpt?: string }
 export interface Rig { id: string; name: string; profile: string; checkouts: Record<string, string>; ports: Record<string, number>; launches: Record<string, Launch>; checkout_bindings?: Record<string,Checkout>; allocation?: Plan; claimed: boolean; error?: string; approval?: {fingerprint: string; decisions: Record<string,string>} }
 export interface Registry { version: 1; rigs: Record<string, Rig> }
