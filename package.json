@@ -1,0 +1,13 @@
+{
+  "name": "herdr-context",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Persistent tags and notes for Herdr spaces and agents",
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.0"
+  }
+}
