@@ -17,3 +17,12 @@ test('scope isolation and revision checks preserve concurrent edits', () => {
   assert.throws(() => saveEntry(second, 'workspace-a', entry, 0), /another view/);
   assert.equal(saveEntry(second, 'workspace-a', { ...entry, command: 'pnpm build' }, 1).owners['workspace-a'].entries.length, 1);
 });
+
+test('repo tools reject malformed records and preserve commands as data', async () => {
+  const { repoTools } = await import('../mods/toolbox/model.js');
+  assert.deepEqual(repoTools(null), []);
+  for (const invalid of [null, {}, { version: 2, tools: [] }, { version: 1, tools: [null] }, { version: 1, tools: [{ label: 'Build', command: '' }] }]) assert.throws(() => repoTools(JSON.stringify(invalid)));
+  const tools = repoTools(JSON.stringify({ version: 1, tools: [{ label: 'Build', command: 'pnpm run build' }] }));
+  assert.equal(tools[0].command, 'pnpm run build');
+  assert.equal(tools[0].id, 'repo:pnpm run build');
+});

@@ -14,3 +14,8 @@ export function saveEntry(state, owner, entry, expected) {
   entries.push(entry);
   return { version: 1, owners: { ...state?.owners, [owner]: { revision: current.revision + 1, entries } } };
 }
+export function repoTools(text) {
+  const data = text ? JSON.parse(text) : { version: 1, tools: [] };
+  if (data?.version !== 1 || !Array.isArray(data.tools) || data.tools.some(t => !t || typeof t.label !== 'string' || !t.label.trim() || typeof t.command !== 'string' || !t.command.trim() || (t.icon !== undefined && typeof t.icon !== 'string'))) throw new Error('Invalid .herdr/toolbox.json');
+  return data.tools.map(t => ({ label: t.label, command: t.command, icon: t.icon || '▶', id: 'repo:' + t.command }));
+}
