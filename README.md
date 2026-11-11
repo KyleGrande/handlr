@@ -89,6 +89,29 @@ Review the evidence files with an agent and put proposed choices in `setup.decis
 
 For CLI review, `plan` returns `review.fingerprint`. After user approval, run `rig approve <name> --review <fingerprint>`, supplying any missing/corrected notes with repeated `--decision key=value`, then `rig up <name> --review <same-fingerprint>`. Approval saves to the registry without starting services or rewriting the profile. Changes to the profile or selected checkout/branch invalidate approval; `up --review` also rejects an outdated preview. Port ranges are reviewed settings, while free-port proposals can change at allocation. Secret values never enter the review hash. Setting `setup.approved` alone no longer satisfies draft review. Existing manual profiles without `setup` still support explicit `up`; once an approval is recorded, later launches require it to remain current.
 
+## Edit and delete rigs and profiles
+
+Right-click a rig for **Edit rig…**, **Edit profile…** and **Delete rig…**. Its Preview also has Edit/Delete rig controls and Edit/Delete profile controls beside the profile path. **Edit rig** changes its name, profile or concrete worktree mappings. Renaming keeps the same rig ID and running processes. Stop and reconcile the rig before changing profiles/worktrees or deleting its definition. Saving edits does not start services; configuration changes need a new launch review. Mapping/profile changes discard obsolete allocation, approval and finished launch references. Deleting a rig preserves its profile, worktrees and service data.
+
+Right-click a profile in the **+** menu to edit or delete it. **Edit profile** opens a native JSON editor showing which rigs share the file. Save validates the configuration against those rigs' mappings and requires them to be stopped/reconciled. An incompatible repo-slot change requires assigning another profile to the affected rigs first. Concurrent edits are rejected using the revision loaded by the editor. Changed fixed ports/ranges replace incompatible saved preferences on the next plan/start.
+
+Deleting a profile deletes its actual file and saved-list entry, so it is blocked while any rig references it, including through symlinks. Delete those rig definitions or assign another profile first. Both deletion dialogs state the scope before the final Delete click. Profiles imported or used by a rig stay in the saved list after the last rig is removed, ready to reuse, edit or delete. Ordinary background polling picks up changes in other windows.
+
+```sh
+./bin/rig show shop
+./bin/rig configure shop --name shop-feature
+# After stopping; provide all new profile slots when changing profiles:
+./bin/rig configure shop-feature --profile /absolute/other.json --repo app=/absolute/checkout
+./bin/rig delete shop-feature
+./bin/rig profile list
+./bin/rig profile show --profile /absolute/shop/rig.json
+./bin/rig profile import --profile /absolute/shop/rig.json
+./bin/rig profile update --profile /absolute/shop/rig.json --input /absolute/edited.json --revision <from-profile-show>
+./bin/rig profile delete --profile /absolute/shop/rig.json --revision <from-profile-show>
+```
+
+`show` returns a rig revision; pass it as `--revision` to `configure`/`delete` to reject stale instance edits. Profile update/delete always require the file revision from `profile show`. These commands use the same registry/lifecycle protections as the panel and never stop services implicitly.
+
 ## Observe native apps and emulator processes
 
 Add an optional top-level `observed_apps` map to show an app launched outside Rigs, for example a React Native Windows app launched from Visual Studio. This is process monitoring: it reports running, stopped or unknown, not app readiness, Metro connectivity, emulator identity or boot completion. There is no native-app setup question for ordinary web/API rigs.

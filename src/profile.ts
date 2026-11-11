@@ -118,8 +118,8 @@ export function validate(profile: Profile): string[] {
   Object.keys(profile.services).forEach(visit);
   return order;
 }
-export async function resolve(rig: Rig, reserved: ReadonlySet<number> | ReadonlyMap<number, string> = new Set(), checkPorts = true, ownedPorts = new Set<number>()): Promise<Plan> {
-  const profile: Profile = JSON.parse(await fs.readFile(rig.profile, 'utf8'));
+export async function resolve(rig: Rig, reserved: ReadonlySet<number> | ReadonlyMap<number, string> = new Set(), checkPorts = true, ownedPorts = new Set<number>(), override?: Profile): Promise<Plan> {
+  const profile: Profile = override ?? JSON.parse(await fs.readFile(rig.profile, 'utf8'));
   const order = validate(profile);
   check(Object.keys(rig.checkouts).sort().join() === [...profile.repos].sort().join(), 'Select exactly one concrete checkout per repo slot');
   const checkouts: Record<string, Checkout> = {};
@@ -130,7 +130,9 @@ export async function resolve(rig: Rig, reserved: ReadonlySet<number> | Readonly
   const endpoints: Record<string, Endpoint> = {}, used = new Set(reserved.keys());
   for (const [id, service] of Object.entries(profile.services)) {
     for (const [name, endpoint] of Object.entries(service.endpoints ?? {})) {
-      const key = `${id}.${name}`, preferred = rig.ports[key] ?? endpoint.port;
+      const key = `${id}.${name}`, saved = rig.ports[key];
+      const range = endpoint.range ?? [3000,4999];
+      const preferred = endpoint.port ?? (saved !== undefined && saved >= range[0] && saved <= range[1] ? saved : undefined);
       let port = preferred;
       if (preferred !== undefined) {
         const owner = reserved instanceof Map ? reserved.get(preferred) : undefined;

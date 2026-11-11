@@ -5,6 +5,7 @@ import { Store } from './store.js';
 import { Core, type CoreAPI } from './core.js';
 import { rigConnections, type ConnectionRig } from './connections.js';
 import { ProcessObserver } from './observe.js';
+import { isActive, profilePath, rememberProfile, rigRevision } from './profiles.js';
 import { available, checkout, launchEnv, publicPlan, resolve } from './profile.js';
 import { now, requireValue as check, type Launch, type Registry, type Rig, type Terminal, type ResolvedService, type Plan } from './types.js';
 
@@ -55,26 +56,59 @@ export class Rigs {
   async write(rig: Rig) { await this.store.lock('registry', async () => { const data = await this.store.load(); data.rigs[rig.id] = rig; await this.store.save(data); }); }
   async create(name: string, profile: string, selections: Record<string,string>) {
     check(typeof name === 'string' && name.trim().length > 0, 'Choose a nonempty rig name');
-    const rig: Rig = { id: randomUUID(), name, profile, checkouts: selections, ports: {}, launches: {}, claimed: false };
-    const plan = await resolve(rig, new Set(), false);
-    rig.checkouts = Object.fromEntries(Object.entries(plan.checkouts).map(([id,c]) => [id,c.root]));
-    rig.checkout_bindings = plan.checkouts;
-    await this.store.lock('registry', async () => {
+    const rig: Rig = { id: randomUUID(), name, profile:await profilePath(profile), checkouts: selections, ports: {}, launches: {}, claimed: false };
+    return this.store.lock('registry', async () => {
       const data = await this.store.load(); check(!Object.values(data.rigs).some(r => r.name === name), `Rig ${name} already exists`);
-      data.rigs[rig.id] = rig; await this.store.save(data);
-    });
-    return { id: rig.id, name: rig.name, plan: publicPlan(plan) };
-  }
-  async configure(name: string, selections: Record<string,string>) {
-    const initial = await this.get(name);
-    return this.store.lock(initial.id, async () => {
-      const rig = await this.get(initial.id); check(!rig.claimed, 'Stop the rig before changing worktrees');
-      rig.checkouts = { ...rig.checkouts, ...selections };
       const plan = await resolve(rig, new Set(), false);
       rig.checkouts = Object.fromEntries(Object.entries(plan.checkouts).map(([id,c]) => [id,c.root]));
       rig.checkout_bindings = plan.checkouts;
-      await this.write(rig); return publicPlan(plan);
+      rememberProfile(data,rig.profile);
+      data.rigs[rig.id] = rig; await this.store.save(data);
+      return { id: rig.id, name: rig.name, plan: publicPlan(plan) };
     });
+  }
+  async definition(name: string) {
+    const rig = await this.get(name);
+    return {id:rig.id,name:rig.name,profile:rig.profile,checkouts:rig.checkouts,active:isActive(rig),revision:rigRevision(rig)};
+  }
+  async delete(name: string, expected?: string) {
+    const initial = await this.get(name);
+    return this.store.lock(initial.id, async () => this.store.lock('registry', async () => {
+      const data = await this.store.load(), rig = data.rigs[initial.id];
+      check(rig, 'Rig already deleted');
+      check(!expected || expected === rigRevision(rig), 'Rig changed; reopen it before deleting');
+      check(!isActive(rig), 'Stop and reconcile this rig before deleting it');
+      rememberProfile(data,await profilePath(rig.profile));
+      delete data.rigs[rig.id]; await this.store.save(data);
+      return {deleted:true,id:rig.id,name:rig.name,profile:rig.profile};
+    }));
+  }
+  async configure(name: string, selections: Record<string,string>, options: {name?:string;profile?:string;revision?:string} = {}) {
+    const initial = await this.get(name);
+    return this.store.lock(initial.id, async () => this.store.lock('registry', async () => {
+      const data = await this.store.load(), rig = data.rigs[initial.id]; check(rig, 'Rig already deleted');
+      check(!options.revision || options.revision === rigRevision(rig), 'Rig changed; reopen it before saving');
+      const nextName = options.name ?? rig.name;
+      check(typeof nextName === 'string' && nextName.trim(), 'Choose a nonempty rig name');
+      check(!Object.values(data.rigs).some(other => other.id !== rig.id && other.name === nextName), `Rig ${nextName} already exists`);
+      const nextProfile = options.profile ? await profilePath(options.profile) : rig.profile;
+      const mappings = options.profile ? selections : {...rig.checkouts,...selections};
+      const material = nextProfile !== rig.profile || JSON.stringify(Object.entries(mappings).sort()) !== JSON.stringify(Object.entries(rig.checkouts).sort());
+      check(!material || !isActive(rig), 'Stop and reconcile the rig before changing its profile or worktrees; renaming is allowed while running');
+      const oldProfile = rig.profile;
+      rig.name = nextName; rig.profile = nextProfile; rig.checkouts = mappings;
+      if (material) {
+        rig.ports = {}; delete rig.allocation; rig.launches = {}; delete rig.error;
+        // Keep the fact that approval is required even for a previously approved manual profile.
+        if (rig.approval) rig.approval = {fingerprint:'',decisions:{}};
+      }
+      const plan = await resolve(rig, new Set(), false);
+      rig.checkouts = Object.fromEntries(Object.entries(plan.checkouts).map(([id,c]) => [id,c.root]));
+      rig.checkout_bindings = plan.checkouts;
+      if (rig.allocation) rig.allocation.name = nextName;
+      rememberProfile(data,await profilePath(oldProfile)); rememberProfile(data,rig.profile);
+      data.rigs[rig.id] = rig; await this.store.save(data); return publicPlan(plan);
+    }));
   }
   async plan(name: string) {
     const rig = await this.get(name);

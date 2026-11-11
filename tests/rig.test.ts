@@ -10,6 +10,7 @@ import { checkout, resolve, validate } from '../src/profile.js';
 import type { CoreAPI } from '../src/core.js';
 import type { Profile, Terminal } from '../src/types.js';
 import { ProcessObserver } from '../src/observe.js';
+import { Profiles } from '../src/profiles.js';
 
 class FakeCore implements CoreAPI {
   list: Terminal[] = []; starts = 0; failAt = 0; crashAfterAccept = false; unavailable = false; killed: string[] = [];
@@ -37,6 +38,76 @@ async function fixture(t: test.TestContext, count = 1) {
   const core = new FakeCore(), rigs = new Rigs(new Store(path.join(directory, 'state')), core);
   return { directory, roots, profile, profilePath, save, core, rigs };
 }
+test('rename preserves running ownership while profile and worktree edits require a stopped rig', async t => {
+  const f = await fixture(t,2);
+  const created = await f.rigs.create('before',f.profilePath,{app:f.roots[0]});
+  await f.rigs.up('before');
+  const launch = (await f.rigs.get('before')).launches.worker;
+  const definition = await f.rigs.definition('before');
+  const plan = await f.rigs.configure(created.id,{}, {name:'after',revision:definition.revision});
+  assert.equal(plan.id,created.id); assert.equal(plan.name,'after');
+  assert.deepEqual((await f.rigs.get('after')).launches.worker,launch);
+  assert.equal(f.core.starts,1); assert.deepEqual(f.core.killed,[]);
+  await assert.rejects(f.rigs.configure('after',{app:f.roots[1]}),/Stop and reconcile/);
+  await assert.rejects(f.rigs.delete('after'),/Stop and reconcile/);
+  await assert.rejects(f.rigs.configure('after',{}, {name:'again',revision:definition.revision}),/Rig changed/);
+  await f.rigs.down('after');
+  await f.rigs.approve('after',(await f.rigs.plan('after')).review.fingerprint);
+  const configured = await f.rigs.configure('after',{app:f.roots[1]});
+  assert.equal(configured.checkouts.app.root,await fs.realpath(f.roots[1]));
+  assert.equal((await f.rigs.get('after')).claimed,false);
+  await assert.rejects(f.rigs.up('after'),/Setup review incomplete or stale/);
+});
+test('rig deletion preserves files and reusable profiles and cannot remove an unresolved launch', async t => {
+  const f = await fixture(t);
+  const created = await f.rigs.create('temporary',f.profilePath,{app:f.roots[0]});
+  await f.rigs.up('temporary'); f.core.unavailable = true;
+  await assert.rejects(f.rigs.delete('temporary'),/Stop and reconcile/);
+  f.core.unavailable = false; await f.rigs.down('temporary');
+  const definition = await f.rigs.definition('temporary');
+  await f.rigs.delete('temporary',definition.revision);
+  await assert.rejects(f.rigs.get(created.id),/Unknown rig/);
+  assert.ok(await fs.stat(f.roots[0])); assert.ok(await fs.stat(f.profilePath));
+  const profiles = new Profiles(f.rigs.store);
+  assert.equal((await profiles.list()).profiles[0].path,await fs.realpath(f.profilePath));
+  assert.deepEqual((await profiles.describe(f.profilePath)).rigs,[]);
+  const replacement = await f.rigs.create('temporary',f.profilePath,{app:f.roots[0]});
+  assert.notEqual(replacement.id,created.id);
+});
+test('profile management checks shared references, revisions and candidate mappings before atomic saves', async t => {
+  const f = await fixture(t,2), profiles = new Profiles(f.rigs.store);
+  const alias = path.join(f.directory,'alias.json'); await fs.symlink(f.profilePath,alias);
+  await f.rigs.create('one',f.profilePath,{app:f.roots[0]});
+  await f.rigs.create('two',alias,{app:f.roots[1]});
+  const original = await profiles.describe(alias);
+  assert.equal(original.rigs.length,2);
+  await assert.rejects(profiles.delete(alias,original.revision),/used by rigs/);
+  const changed = JSON.stringify({...f.profile,services:{worker:{repo:'app',argv:['updated-worker']}}});
+  await f.rigs.up('one');
+  await assert.rejects(profiles.update(alias,changed,original.revision),/Stop rigs/);
+  await f.rigs.down('one');
+  const updated = await profiles.update(alias,changed,original.revision);
+  assert.equal(updated.path,await fs.realpath(f.profilePath));
+  assert.equal((await fs.lstat(alias)).isSymbolicLink(),true);
+  assert.equal(JSON.parse(await fs.readFile(f.profilePath,'utf8')).services.worker.argv[0],'updated-worker');
+  await assert.rejects(profiles.update(alias,original.content!,original.revision),/Profile changed/);
+  const incompatible = JSON.stringify({version:1,repos:['other'],services:{worker:{repo:'other',argv:['worker']}}});
+  await assert.rejects(profiles.update(alias,incompatible,updated.revision),/repo slots compatible/);
+  await f.rigs.delete('one'); await f.rigs.delete('two');
+  await profiles.delete(alias,updated.revision);
+  await assert.rejects(fs.stat(f.profilePath),{code:'ENOENT'});
+  assert.deepEqual((await profiles.list()).profiles,[]);
+});
+test('edited port configuration replaces incompatible saved port preferences', async t => {
+  const f = await fixture(t);
+  f.profile.services.worker.endpoints = {http:{port:24560}}; await f.save();
+  await f.rigs.create('ports',f.profilePath,{app:f.roots[0]});
+  const rig = await f.rigs.get('ports'); rig.ports = {'worker.http':24560};
+  f.profile.services.worker.endpoints.http.port = 24561; await f.save();
+  assert.equal((await resolve(rig,new Set(),false)).endpoints['worker.http'].port,24561);
+  f.profile.services.worker.endpoints.http = {range:[24570,24579]}; await f.save();
+  assert.equal((await resolve(rig,new Set(),false)).endpoints['worker.http'].port,24570);
+});
 test('externally observed apps update without launching, claiming or stopping their processes', async t => {
   const f = await fixture(t);
   f.profile.services = {};

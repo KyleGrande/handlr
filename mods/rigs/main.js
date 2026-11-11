@@ -1,8 +1,8 @@
 // Generated from main.ts by npm run build:mod.
 import { setupPrompt } from './setup.js';
 import { View, div, svg } from 'gpui-kit';
-import { v_flex, h_flex, Input, InputState } from 'gpui-base';
-import { exec, focused, theme, run, props, pickFolder, readTextFile, layout, spaces, openOverlay, closeOverlay } from 'herdr';
+import { v_flex, h_flex, Input, InputState, Editor, EditorState } from 'gpui-base';
+import { appHome, exec, focused, theme, run, props, pickFolder, writeTextFile, layout, spaces, openOverlay, closeOverlay } from 'herdr';
 function localCheckout() {
     const context = focused();
     if (context?.terminal?.includes('/') || spaces().find(space => space.id === context?.space)?.machine)
@@ -41,6 +41,16 @@ export default class Rigs extends View {
     controlOperation = '';
     observing = false;
     observationError = '';
+    contextMode = '';
+    deleteMode = false;
+    profileMode = false;
+    editRig = '';
+    definition = null;
+    profileDocument = null;
+    profileEditor;
+    loadedProfile = '';
+    managementLoading = false;
+    profileRigNames = [];
     collapsed = new Set();
     init(_props, cx) {
         this.cli = String(props()?.cli ?? 'rig');
@@ -54,6 +64,7 @@ export default class Rigs extends View {
             this.previewMode = true;
             this.cliArgs = Array.isArray(props()?.cliArgs) ? props().cliArgs.map(String) : this.cliArgs;
             this.previewName = String(props().rig);
+            this.loadDefinition(this.previewName, cx);
             if (props().plan) {
                 this.setPreview(props().plan, this.previewName);
                 this.refreshPreviewApps(cx);
@@ -65,14 +76,39 @@ export default class Rigs extends View {
         }
         this.name = InputState.new({ placeholder: 'Rig name' });
         this.profile = InputState.new({ placeholder: 'Absolute profile.json path' });
+        if (props()?.view === 'rig-menu' || props()?.view === 'profile-menu') {
+            this.contextMode = String(props().view);
+            if (this.contextMode === 'rig-menu')
+                this.loadDefinition(String(props().rig), cx);
+            return;
+        }
+        if (props()?.view === 'delete') {
+            this.deleteMode = true;
+            if (props().target === 'rig')
+                this.loadDefinition(String(props().rig), cx);
+            else
+                this.loadProfileDocument(String(props().profilePath), cx);
+            return;
+        }
+        if (props()?.view === 'profile-editor') {
+            this.profileMode = true;
+            this.profileEditor = EditorState.new({ language: 'json', value: '', readonly: false });
+            this.loadProfileDocument(String(props().profilePath), cx);
+            return;
+        }
         if (props()?.view === 'new-menu') {
             this.menuMode = true;
             this.setupCheckout = String(props()?.checkout ?? '');
             this.loadProfiles(cx);
             return;
         }
-        if (props()?.view === 'create') {
+        if (props()?.view === 'create' || props()?.view === 'edit') {
             this.createMode = true;
+            if (props().view === 'edit') {
+                this.editRig = String(props().rig);
+                this.loadDefinition(this.editRig, cx, true);
+                return;
+            }
             this.name.set_value(String(props()?.suggestedName ?? ''));
             this.profile.set_value(String(props()?.profilePath ?? ''));
             this.selections = props()?.selections ?? {};
@@ -118,6 +154,181 @@ export default class Rigs extends View {
         if (response.schema_version !== 1)
             throw new Error('Unsupported rig schema version');
         return response;
+    }
+    loadDefinition(id, cx, populate = false) {
+        this.managementLoading = true;
+        cx.spawn(async (cx) => {
+            try {
+                this.definition = await this.call(['show', id]);
+                if (populate && this.definition) {
+                    this.name.set_value(this.definition.name);
+                    this.profile.set_value(this.definition.profile);
+                    this.selections = { ...this.definition.checkouts };
+                    this.loadProfile(cx, true);
+                }
+            }
+            catch (error) {
+                this.actionError = String(error);
+            }
+            finally {
+                this.managementLoading = false;
+                cx.notify();
+            }
+        });
+    }
+    loadProfileDocument(file, cx) {
+        this.managementLoading = true;
+        cx.spawn(async (cx) => {
+            try {
+                this.profileDocument = await this.call(['profile', 'show', '--profile', file]);
+                if (this.profileMode && this.profileDocument)
+                    this.profileEditor.set_value(this.profileDocument.content ?? '');
+            }
+            catch (error) {
+                this.actionError = String(error);
+            }
+            finally {
+                this.managementLoading = false;
+                cx.notify();
+            }
+        });
+    }
+    openEditRig(id) {
+        openOverlay({ mod: this.modName, kind: 'dialog', width: 640, height: 620, props: { view: 'edit', rig: id, cli: this.cli, cliArgs: this.cliArgs, guide: this.guide, parent: this.previewMode ? props().overlay : undefined } });
+    }
+    openProfileEditor(file) {
+        openOverlay({ mod: this.modName, kind: 'dialog', width: 860, height: 720, props: { view: 'profile-editor', profilePath: file, cli: this.cli, cliArgs: this.cliArgs, parent: this.previewMode ? props().overlay : undefined } });
+    }
+    openDelete(target, value, label) {
+        openOverlay({ mod: this.modName, kind: 'dialog', width: 550, height: 370,
+            props: { view: 'delete', target, ...(target === 'rig' ? { rig: value } : { profilePath: value }), label, cli: this.cli, cliArgs: this.cliArgs, parent: this.previewMode || this.profileMode ? props().overlay : undefined } });
+    }
+    openContext(target, value, label) {
+        openOverlay({ mod: this.modName, kind: 'popup', width: 230, height: target === 'rig' ? 130 : 90,
+            props: { view: `${target}-menu`, ...(target === 'rig' ? { rig: value } : { profilePath: value }), label, cli: this.cli, cliArgs: this.cliArgs, guide: this.guide } });
+    }
+    renderContext() {
+        const t = theme();
+        const rig = this.contextMode === 'rig-menu', id = String(props().rig ?? ''), file = String(props().profilePath ?? '');
+        const root = v_flex().w_full().h(rig ? 130 : 90).p(6).gap(2).bg(t.popover).text_color(t.foreground);
+        const choose = (action) => { action(); closeOverlay(String(props().overlay)); };
+        if (rig) {
+            root.child(this.button('edit-rig', 'Edit rig…', () => choose(() => this.openEditRig(id))));
+            if (this.definition)
+                root.child(this.button('edit-rig-profile', 'Edit profile…', () => choose(() => this.openProfileEditor(this.definition.profile))));
+            else
+                root.child(div().px(8).py(4).text_size(12).text_color(t.dim).child(this.actionError || 'Loading profile…'));
+            root.child(this.button('delete-rig', 'Delete rig…', () => choose(() => this.openDelete('rig', id, String(props().label)))));
+        }
+        else {
+            root.child(this.button('edit-profile', 'Edit profile…', () => choose(() => this.openProfileEditor(file))));
+            root.child(this.button('delete-profile', 'Delete profile…', () => choose(() => this.openDelete('profile', file, String(props().label)))));
+        }
+        return root;
+    }
+    renderDelete() {
+        const t = theme();
+        const rig = props().target === 'rig', item = rig ? this.definition : this.profileDocument;
+        const blocked = rig ? this.definition?.active : !!this.profileDocument?.rigs.length;
+        const ready = !!item && !this.managementLoading && !blocked;
+        const root = v_flex().size_full().min_h(0).p(20).gap(12).bg(t.chrome).text_color(t.foreground);
+        root.child(div().text_size(16).font_medium().child(`Delete ${rig ? 'rig' : 'profile'}`))
+            .child(div().text_size(13).whitespace_normal().child(rig ? this.definition?.name ?? String(props().label) : this.profileDocument?.path ?? String(props().label)))
+            .child(div().text_size(12).text_color(t.dim).whitespace_normal().child(rig
+            ? 'Removes this rig definition. The profile file, checkouts and service data remain.'
+            : this.profileDocument?.missing ? 'Removes this missing profile from the saved list.' : 'Deletes this profile file and removes it from the saved list.'));
+        if (blocked)
+            root.child(div().text_size(12).text_color(t.blocked).whitespace_normal().child(rig
+                ? 'Stop and reconcile the rig before deleting it.'
+                : `Used by: ${this.profileDocument.rigs.map(item => item.name).join(', ')}. Assign another profile to those rigs or delete the rigs first.`));
+        if (this.managementLoading)
+            root.child(div().text_size(12).text_color(t.dim).child('Loading…'));
+        if (this.actionError)
+            root.child(div().text_size(12).text_color(t.blocked).whitespace_normal().child(this.actionError));
+        root.child(div().flex_1());
+        root.child(h_flex().gap(8).justify_end()
+            .child(this.button('cancel-delete', 'Cancel', () => closeOverlay(String(props().overlay))))
+            .child(this.button('confirm-delete', this.busy ? 'Deleting…' : 'Delete', cx => { if (ready)
+            this.deleteItem(cx); }).opacity(ready ? 1 : 0.35).text_color(t.blocked)));
+        return root;
+    }
+    deleteItem(cx) {
+        if (this.busy || this.managementLoading)
+            return;
+        this.busy = true;
+        this.actionError = '';
+        cx.spawn(async (cx) => {
+            let deleted = false;
+            try {
+                if (props().target === 'rig' && this.definition)
+                    await this.call(['delete', this.definition.id, '--revision', this.definition.revision]);
+                else if (this.profileDocument)
+                    await this.call(['profile', 'delete', '--profile', this.profileDocument.path, '--revision', this.profileDocument.revision]);
+                else
+                    throw new Error('Load the item before deleting');
+                deleted = true;
+            }
+            catch (error) {
+                this.actionError = String(error);
+            }
+            finally {
+                this.busy = false;
+                cx.notify();
+            }
+            if (deleted) {
+                if (props().parent)
+                    closeOverlay(String(props().parent));
+                closeOverlay(String(props().overlay));
+            }
+        });
+    }
+    renderProfileEditor() {
+        const t = theme();
+        const root = v_flex().size_full().min_h(0).bg(t.chrome).text_color(t.foreground);
+        root.child(h_flex().px(20).py(14).gap(12).items_center().border_b(1).border_color(t.border)
+            .child(div().flex_1().text_size(16).font_medium().child('Edit profile'))
+            .child(this.button('editor-close', 'Close', () => closeOverlay(String(props().overlay)))));
+        root.child(div().px(20).py(8).text_size(12).text_color(t.dim).whitespace_normal().child(this.profileDocument?.path ?? String(props().profilePath)));
+        const refs = this.profileDocument?.rigs ?? [];
+        root.child(div().px(20).pb(8).text_size(12).text_color(t.dim).whitespace_normal().child(refs.length
+            ? `Shared by: ${refs.map(rig => rig.name).join(', ')}. Stop these rigs before saving changes.` : 'Reusable configuration · saving does not start services.'));
+        if (this.actionError)
+            root.child(div().px(20).py(6).text_size(12).text_color(t.blocked).whitespace_normal().child(this.actionError));
+        if (this.managementLoading)
+            root.child(div().px(20).text_size(12).text_color(t.dim).child('Loading…'));
+        root.child(Editor.new(this.profileEditor).flex_1().min_h(0));
+        root.child(h_flex().px(20).py(12).gap(8).justify_between().border_t(1).border_color(t.border)
+            .child(this.button('editor-delete', 'Delete profile…', () => this.openDelete('profile', String(props().profilePath), String(props().profilePath))))
+            .child(this.button('editor-save', this.busy ? 'Saving…' : 'Save profile', cx => this.saveProfile(cx))));
+        return root;
+    }
+    saveProfile(cx) {
+        if (this.busy || this.managementLoading || !this.profileDocument)
+            return;
+        this.busy = true;
+        this.actionError = '';
+        const document = this.profileDocument, content = this.profileEditor.value();
+        cx.spawn(async (cx) => {
+            let saved = false;
+            try {
+                const draft = `${appHome()}/mods/${this.modName}/.rig-profile-draft-${Date.now()}-${Math.random().toString(36).slice(2)}.json`;
+                await writeTextFile(draft, content, null);
+                await this.call(['profile', 'update', '--profile', document.path, '--revision', document.revision, '--input', draft, '--consume-input', 'true']);
+                saved = true;
+            }
+            catch (error) {
+                this.actionError = String(error);
+            }
+            finally {
+                this.busy = false;
+                cx.notify();
+            }
+            if (saved) {
+                if (props().parent)
+                    closeOverlay(String(props().parent));
+                closeOverlay(String(props().overlay));
+            }
+        });
     }
     refresh(cx) {
         if (this.busy)
@@ -202,14 +413,12 @@ export default class Rigs extends View {
     loadProfiles(cx) {
         cx.spawn(async (cx) => {
             try {
-                this.data = await this.call(['status']);
-                const profiles = new Map();
-                for (const rig of this.data.rigs)
-                    if (rig.profile && !profiles.has(rig.profile)) {
-                        const label = (rig.profile.split('/').pop() ?? rig.profile).replace(/\.json$/i, '').replace(/^rig[.-]/, '');
-                        profiles.set(rig.profile, { path: rig.profile, label, selections: Object.fromEntries(Object.entries(rig.checkouts).map(([slot, checkout]) => [slot, checkout.root])), services: Object.keys(rig.services).length });
-                    }
-                this.profiles = [...profiles.values()].sort((a, b) => a.label.localeCompare(b.label));
+                const catalog = await this.call(['profile', 'list']);
+                this.profileRigNames = catalog.rig_names ?? [];
+                this.profiles = catalog.profiles.map((profile) => ({
+                    path: profile.path, label: (profile.path.split('/').pop() ?? profile.path).replace(/\.json$/i, '').replace(/^rig[.-]/, ''),
+                    selections: profile.rigs[0]?.checkouts ?? {}, services: profile.services,
+                })).sort((a, b) => a.label.localeCompare(b.label));
             }
             catch (error) {
                 this.actionError = String(error);
@@ -222,7 +431,7 @@ export default class Rigs extends View {
     }
     openCreate(choice) {
         const base = (choice?.label ?? 'new-rig').replace(/[^a-zA-Z0-9_-]+/g, '-').replace(/^-+|-+$/g, '') || 'new-rig';
-        const names = new Set(this.data.rigs.map(rig => rig.name));
+        const names = new Set([...this.profileRigNames, ...this.data.rigs.map(rig => rig.name)]);
         let name = `${base}-dev`, suffix = 2;
         while (names.has(name))
             name = `${base}-dev-${suffix++}`;
@@ -248,7 +457,8 @@ export default class Rigs extends View {
                 const overlay = String(props().overlay);
                 this.openCreate(choice);
                 closeOverlay(overlay);
-            }).tooltip(`${choice.path}\n${Object.keys(choice.selections).length} repo slots · ${choice.services} services`));
+            }).tooltip(`${choice.path}\n${Object.keys(choice.selections).length} repo slots · ${choice.services} services\nRight-click to edit or delete this profile`)
+                .on_mouse_down('right', (_event, cx) => { cx.stop_propagation(); this.openContext('profile', choice.path, choice.label); closeOverlay(String(props().overlay)); }));
         if (!this.profiles.length)
             list.child(div().px(9).py(8).text_size(12).text_color(t.dim).child(this.menuLoaded ? 'No saved profiles yet' : 'Loading profiles…'));
         root.child(list);
@@ -262,14 +472,18 @@ export default class Rigs extends View {
         const t = theme();
         const root = v_flex().id('rig-create').size_full().min_h(0).bg(t.chrome).text_color(t.foreground);
         root.child(h_flex().px(20).py(14).gap(12).items_center().border_b(1).border_color(t.border)
-            .child(div().flex_1().text_size(16).font_medium().child('New rig'))
+            .child(div().flex_1().text_size(16).font_medium().child(this.editRig ? 'Edit rig' : 'New rig'))
             .child(div().id('close-create').px(8).py(4).cursor_pointer().text_size(12).child('Close').on_click(() => closeOverlay(String(props().overlay)))));
         const fields = v_flex().flex_1().min_h(0).p(20).gap(9).overflow_y_scrollbar().mode('always');
+        if (this.definition?.active)
+            fields.child(div().text_size(12).text_color(t.dim).whitespace_normal().child('You can rename this running rig. Stop it before changing its profile or worktrees.'));
+        if (this.managementLoading)
+            fields.child(div().text_size(12).text_color(t.dim).child('Loading rig…'));
         fields.child(div().text_size(11).text_color(t.dim).child('Rig name'))
             .child(Input.new(this.name).h(32).px(8).bg(t.background).border(1).border_color(t.input))
             .child(div().text_size(11).text_color(t.dim).child('Profile'))
             .child(Input.new(this.profile).h(32).px(8).bg(t.background).border(1).border_color(t.input))
-            .child(this.button('load-profile', 'Load repo slots', cx => this.loadProfile(cx)));
+            .child(this.button('load-profile', 'Load repo slots', cx => this.loadProfile(cx, true)));
         for (const repo of this.repoSlots)
             fields.child(v_flex().gap(5).py(6)
                 .child(div().text_size(12).font_medium().child(repo))
@@ -488,16 +702,19 @@ export default class Rigs extends View {
         return h_flex().w(14).flex_none().items_center().justify_center().tooltip(status.label).child(glyph);
     }
     loadProfile(cx, preserveSelections = false) {
+        this.loadedProfile = '';
         cx.spawn(async (cx) => {
             try {
-                const text = await readTextFile(this.profile.value());
-                if (!text)
-                    throw new Error('Select an existing local profile');
-                const profile = JSON.parse(text);
+                const file = this.profile.value();
+                const document = await this.call(['profile', 'import', '--profile', file]);
+                if (this.profile.value() !== file)
+                    return;
+                const profile = JSON.parse(document.content);
                 if (profile.version !== 1 || !Array.isArray(profile.repos))
                     throw new Error('Expected version 1 profile with repo slots');
                 this.repoSlots = profile.repos;
                 this.selections = preserveSelections ? Object.fromEntries(this.repoSlots.filter(repo => this.selections[repo]).map(repo => [repo, this.selections[repo]])) : {};
+                this.loadedProfile = file;
                 this.actionError = '';
             }
             catch (e) {
@@ -507,6 +724,8 @@ export default class Rigs extends View {
         });
     }
     create(cx) {
+        if (this.busy || this.managementLoading)
+            return;
         this.busy = true;
         this.actionError = '';
         cx.spawn(async (cx) => {
@@ -514,15 +733,20 @@ export default class Rigs extends View {
             try {
                 if (!this.repoSlots.length)
                     throw new Error('Load a profile before saving');
+                if (this.profile.value() !== this.loadedProfile)
+                    throw new Error('Load repo slots for the selected profile before saving');
+                if (this.editRig && !this.definition)
+                    throw new Error('Load the rig before saving');
                 if (this.repoSlots.some(r => !this.selections[r]))
                     throw new Error('Explicitly select a checkout for every repo');
-                const args = ['create', this.name.value(), '--profile', this.profile.value()];
+                const args = this.editRig ? ['configure', this.editRig, '--name', this.name.value(), '--revision', this.definition.revision, '--profile', this.profile.value()]
+                    : ['create', this.name.value(), '--profile', this.profile.value()];
                 for (const repo of this.repoSlots)
                     args.push('--repo', `${repo}=${this.selections[repo]}`);
                 const result = await this.call(args);
                 this.selected = result.id;
                 localStorage.setItem('selected', this.selected);
-                this.openPreview(result.plan, result.id);
+                this.openPreview(this.editRig ? result : result.plan, result.id);
                 created = true;
             }
             catch (e) {
@@ -534,8 +758,11 @@ export default class Rigs extends View {
                     this.refresh(cx);
                 cx.notify();
             }
-            if (created && this.createMode)
+            if (created && this.createMode) {
+                if (props().parent)
+                    closeOverlay(String(props().parent));
                 closeOverlay(String(props().overlay));
+            }
         });
     }
     renderPreview() {
@@ -545,10 +772,19 @@ export default class Rigs extends View {
             .child(v_flex().flex_1().gap(3)
             .child(div().text_size(11).text_color(t.dim).child('Rig preview'))
             .child(div().text_size(16).font_medium().child(this.preview?.name ?? String(props()?.label ?? 'Loading…'))))
+            .child(this.button('preview-edit', 'Edit rig…', () => this.openEditRig(this.previewName)))
+            .child(this.button('preview-delete', 'Delete rig…', () => this.openDelete('rig', this.previewName, this.preview?.name ?? this.previewName)))
             .child(div().id('close-preview').px(8).py(4).rounded(6).cursor_pointer().text_color(t.muted)
             .hover(s => s.bg(t.hover)).child('Close').on_click(() => closeOverlay(String(props().overlay)))));
         if (this.actionError)
             root.child(div().px(20).py(8).text_color(t.blocked).whitespace_normal().child(this.actionError));
+        if (this.definition)
+            root.child(v_flex().px(20).py(8).gap(4).border_b(1).border_color(t.border)
+                .child(div().text_size(11).text_color(t.dim).child('Profile'))
+                .child(div().text_size(12).text_color(t.muted).whitespace_normal().child(this.definition.profile))
+                .child(h_flex().gap(8)
+                .child(this.button('preview-edit-profile', 'Edit profile…', () => this.openProfileEditor(this.definition.profile)))
+                .child(this.button('preview-delete-profile', 'Delete profile…', () => this.openDelete('profile', this.definition.profile, this.definition.profile)))));
         if (this.preview) {
             const preview = this.preview;
             const review = v_flex().id('rig-preview-scroll').flex_1().min_h(0).p(20).gap(12).overflow_y_scrollbar().mode('always')
@@ -611,6 +847,12 @@ export default class Rigs extends View {
         return root;
     }
     render(_cx) {
+        if (this.contextMode)
+            return this.renderContext();
+        if (this.deleteMode)
+            return this.renderDelete();
+        if (this.profileMode)
+            return this.renderProfileEditor();
         if (this.menuMode)
             return this.renderMenu();
         if (this.createMode)
@@ -647,6 +889,7 @@ export default class Rigs extends View {
                 .text_size(13).text_color(t.foreground)
                 .when(rig.id !== this.selected, el => el.hover(style => style.bg(t.hover)))
                 .on_click((_event, cx) => { this.selected = rig.id; localStorage.setItem('selected', rig.id); this.openPreview(undefined, rig.id, rig.name); cx.notify(); })
+                .on_mouse_down('right', (_event, cx) => { cx.stop_propagation(); this.openContext('rig', rig.id, rig.name); })
                 .on_hover((hovered, cx) => this.hoverRow(rigKey, hovered, cx))
                 .when(rig.id === this.selected, el => el.bg(t.selected))
                 .child(div().id(`collapse-${rig.id}`).w(18).h(22).flex_none().flex().items_center().justify_center().rounded(4).cursor_pointer()

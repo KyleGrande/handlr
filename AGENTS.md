@@ -6,7 +6,11 @@ This is a tooling project. It has no application server, database, cache or queu
 
 ## Sidebar creation and connected rigs
 
-The **+** icon opens a native popup like Herdr's terminal menu. It contains **Agent Setup Prompt**, the unique profile files referenced by saved rigs, and **Import profile…**. Copying the prompt only copies the guide pointer and current checkout. Selecting a profile opens a New rig dialog with a suggested unused name and editable worktree mappings; saving creates a stopped definition and opens its preview. Reusing a profile creates a distinct rig instance with its own launches and rig-scoped data. Import another profile by its absolute path; files not referenced by saved rigs do not appear in the saved-profile list yet.
+The **+** icon opens a native popup like Herdr's terminal menu. It contains **Agent Setup Prompt**, unique saved profiles, and **Import profile…**. The saved list combines profiles referenced by rigs with explicitly imported/previously used profiles retained in the registry; deleting the last rig does not discard its reusable profile. Copying the prompt only copies the guide pointer and current checkout. Selecting a profile opens a New rig dialog with a suggested unused name and editable worktree mappings; saving creates a stopped definition and opens its preview. Reusing a profile creates a distinct rig instance with its own launches and rig-scoped data. Import another profile by its absolute path. Loading a valid imported profile remembers it even if rig creation is cancelled.
+
+Right-click a rig for **Edit rig…**, **Edit profile…** and **Delete rig…**. Preview also has Edit/Delete rig actions and a Profile section with Edit/Delete profile actions. Edit rig includes renaming, selecting another profile and changing concrete worktree mappings. Renaming retains the rig ID, ownership and current services and is allowed while running. Profile/worktree changes require every owned launch to be stopped/reconciled, clear obsolete allocation/approval/finished launch references and save without starting anything. Changing profiles requires an exact mapping for its repo slots. Rig deletion also requires stopped/reconciled ownership; it removes only the definition, retaining its profile in the saved list, checkouts and service data. Never stop a rig implicitly to edit/delete it.
+
+Right-click a profile in the **+** popup to edit or delete it. The native JSON editor lists all referencing rigs, validates changes through the CLI, rejects stale revisions and requires referencing rigs to be stopped/reconciled. Shared repo slots/mappings must remain compatible; assign a rig a different profile first when changing that contract. Material changes invalidate launch approval. Configured fixed ports and ranges take precedence over incompatible saved port preferences. Profile deletion is a separate confirmed action that deletes the actual file and saved-list entry; refuse while any rig references that canonical file, including via symlinks. Deleting a rig does not imply permission to delete its profile file. Missing unreferenced profiles can be removed from the saved list. Keep secret values out of editable profile literals and use secret source references.
 
 Cross-rig links appear as **↔ peer-name** rows on both rigs while expanded. Collapsing a rig hides its links and services. They group matching service connections per peer, expose binding/address/state in a tooltip and open the peer's preview on click. Matching uses a structured `external` binding's URL authority and a unique endpoint reserved by another rig. Unmatched/ambiguous providers receive no invented rig link. A live link means both services are observed running and no configured external probe has failed; it does not prove traffic. Stopped peers without reservations are not guessed from proposed ports. Connections never transfer ownership or grant permission to stop providers. Checkout-filtered results retain connection metadata for peer rigs.
 
@@ -56,6 +60,17 @@ Use the exact executable/module paths in the linked installed guide’s installa
 ./bin/rig restart project-dev --service compiler
 # Repair a mapping only after stopping:
 ./bin/rig configure project-dev --repo app=/absolute/moved-project
+# Inspect and edit an instance (renaming alone is safe while running):
+./bin/rig show project-dev
+./bin/rig configure project-dev --name project-feature
+# Delete only a stopped/reconciled definition; preserve its profile/data:
+./bin/rig delete project-feature
+./bin/rig profile list
+./bin/rig profile show --profile /absolute/profile.json
+./bin/rig profile import --profile /absolute/profile.json
+# Use revision from profile show; the input is edited JSON, not an executable:
+./bin/rig profile update --profile /absolute/profile.json --input /absolute/edited.json --revision <revision>
+./bin/rig profile delete --profile /absolute/profile.json --revision <revision>
 ```
 
 All operational responses are versioned JSON (`schema_version: 1`), including errors. Check the exit code and `outcome`. An `init` outcome of `no_services` is a successful discovery result; its empty proposal needs a documented service before `create`. `RIG_HOME` selects the registry, defaulting to `~/.local/state/herdr-rigs`. Use a separate temp registry for automated tests; never erase the real registry to recover from an error.
@@ -110,6 +125,7 @@ From the source checkout, run `npm run prepare:desktop`. It prepares temp Git ch
 | `src/init.ts`, `mods/rigs/setup.ts` | Evidence discovery and the copied setup prompt |
 | `src/lifecycle.ts`, `src/connections.ts`, `src/store.ts`, `src/core.ts` | Approval, ownership, locks, durable registry, Core transport and recovery |
 | `src/observe.ts` | Read-only local/Windows-remote process queries, instance matching and observation status |
+| `src/profiles.ts` | Saved profile catalog, shared references, revisions and guarded file editing/deletion |
 | `src/cli.ts` | Shared versioned command interface for agents, shell and panel |
 | `mods/rigs/main.ts` | Native GPUI sidebar, creation menu and dialogs; no DOM, browser framework or Node APIs |
 | `scripts/` | Builds, installation, guarded syncing and disposable acceptance preparation |

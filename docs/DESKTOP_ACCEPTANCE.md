@@ -30,6 +30,14 @@ Keep Herdr on `rigs-workspace`. Rigs must be stacked beneath Spaces and Agents w
 7. Use the chevron beside a rig to collapse its services/endpoints. The rig name, aggregate status and hover controls must remain available. Folding must not open Preview or start/stop anything. Reopen the rig, poll, filter and reload the mod: the saved collapse choice must persist. Clicking the rig name still opens Preview independently.
 8. Hide and show the Rigs node. Confirm no status work while hidden, and fresh state after showing it. `layout.hide/show` calls alone are insufficient evidence unless actual polling/process observations are captured.
 
+## Edit/delete acceptance on disposable definitions
+
+1. Right-click a disposable rig header. Confirm Edit rig…, Edit profile… and Delete rig… appear without opening Preview. Open Preview and confirm Edit/Delete rig controls and Edit/Delete profile actions are available there too, including when no ports can be allocated.
+2. Rename a running disposable rig. Its ID, terminal addresses, ownership and ports must remain unchanged. Profile/worktree edits and Delete must be refused until it is stopped/reconciled. Cancel each editor/deletion dialog once and confirm no changes occur.
+3. Stop the disposable rig, change its profile/mappings through Edit rig, save and review the new Preview. It must remain stopped with no reservations and need fresh approval. Reject a duplicate name and a stale edit from another window.
+4. Right-click a saved profile in + and edit its JSON. Confirm all referencing rigs are named; saving is refused while any is active/unresolved. Invalid JSON/configuration, incompatible shared slots and stale revisions must leave the file intact. Save a valid stopped edit, then reopen Preview to see the new configuration. No profile contents should be passed in CLI arguments; the editor uses a temporary draft file.
+5. Delete only a stopped disposable rig. Its worktree/profile/data must remain, and its profile must still appear once in +. Attempt to delete a referenced profile and verify it is blocked with the referencing rig names. Finally delete an unreferenced disposable profile and verify its file and saved-list entry disappear. Do not use user profiles for destructive acceptance.
+
 ## Quit/reopen and cleanup
 
 1. Save `./bin/rig status <mono-name> --json` and the split equivalent. Record service terminal addresses and endpoints.

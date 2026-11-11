@@ -1,5 +1,12 @@
 # Current verification — 2026-11-10
 
+## Rig and profile management
+
+- Added right-click rig menus and Preview Edit/Delete actions, an instance editor for name/profile/worktree mappings, a native profile JSON editor, and explicit deletion dialogs. Renaming retains identity/launches while running; material rig edits and definition deletion require stopped/reconciled ownership. Profile edits require stopped referencing rigs and reject incompatible mappings/stale revisions. Profile deletion refuses every canonical-file reference, including symlinks. Rig deletion keeps profile/worktree/data; profile deletion removes its file separately.
+- Added shared CLI `show`, extended `configure`, `delete`, and `profile list|show|import|update|delete`. Saved profiles now have an optional registry catalog, so imported/previously used profiles survive deletion of the last rig. Registry format remains version 1. The editor passes a temporary draft path to the CLI rather than JSON contents in process arguments. Candidate profiles are validated before atomic replacement. Configured fixed ports/ranges replace incompatible saved preferences, and material rig edits retain the requirement for renewed approval on previously approved manual profiles.
+- Added regression cases for running rename/ownership, stopped-only edits/deletion, stale revisions, shared/symlink profile references, retained files/catalog entries, incompatible profile mappings, renewed approval and edited port preferences. Added native render fixtures for context menus, rig/profile editors and profile deletion states; updated the guide, README and desktop acceptance steps.
+- Generated CLI/native JavaScript with TypeScript transpilation and synced the owned `~/.config/herdr-app/mods/rigs` installation. No actual rigs or profile files were edited/deleted, and layouts/services were not changed. Tests, type checks, native checks and live click-through were skipped under the user's continuing preference; the new regressions/fixtures and dialog workflows remain unexecuted.
+
 ## Observed native app processes
 
 - Added optional profile `observed_apps`, versioned `rig observe` snapshots and per-rig process observations in `status`. Local Windows uses PowerShell/CIM; local macOS/Linux uses process inspection. Remote Windows uses the installed Core `machine.exec` API with an existing connected machine. Executable names and optional paths select processes; every match retains PID/start-time identity. Queries omit command lines/environment and report unavailable observations as unknown.

@@ -22,7 +22,7 @@ export interface ResolvedService { id: string; repo: string; cwd: string; argv: 
 export interface Plan { id: string; name: string; checkouts: Record<string, Checkout>; services: Record<string, ResolvedService>; observed_apps?: Record<string, ResolvedObservedApp>; order: string[]; endpoints: Record<string, Endpoint>; assignments: string; setup?: SetupReview; review: {fingerprint: string; approved: boolean} }
 export interface Launch { id: string; operation: string; service: string; fingerprint: string; labels: Record<string, string>; terminal?: string; state: 'intent' | 'running' | 'exited' | 'unknown'; created: string; error?: string; excerpt?: string }
 export interface Rig { id: string; name: string; profile: string; checkouts: Record<string, string>; ports: Record<string, number>; launches: Record<string, Launch>; checkout_bindings?: Record<string,Checkout>; allocation?: Plan; claimed: boolean; error?: string; approval?: {fingerprint: string; decisions: Record<string,string>} }
-export interface Registry { version: 1; rigs: Record<string, Rig> }
+export interface Registry { version: 1; rigs: Record<string, Rig>; profiles?: string[] }
 export interface Terminal { address: string; labels: Record<string, string>; state: string; reason?: string; parent?: string; exit_code?: number; argv?: string[]; created_ms: number }
 export class RigError extends Error {}
 export function requireValue(value: unknown, message: string): asserts value { if (!value) throw new RigError(message); }
