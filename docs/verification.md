@@ -1,5 +1,10 @@
 # Current verification — 2026-11-10
 
+## Focused versus all rig filtering
+
+- Focused is now the sidebar default. It uses the focused local pane/terminal CWD, falling back to the current space folder; the existing CLI checkout filter canonicalizes Git subdirectories. Options switch between Show all rigs and Show focused rigs and persist the preference. Focus changes request fresh status, hide stale-scope rows and reject late responses for old scopes. No saved definitions, mappings, reservations or processes are changed by filtering. Empty/no-local-folder/paused views have explicit hints.
+- Compared the installed Files/Changes location helpers and native render refresh pattern. Updated existing native fixture initialization to keep its synthetic all-rigs data deterministic without spawning CLI calls. Generated and synced the mod without tests, type/native checks or interactive focus-switch acceptance under the user's continuing preference to skip checks.
+
 ## Context menu sizing
 
 - Removed the fixed content height that left blank space below rig/profile context menu items. Matched Herdr's native context-menu width (200px), padding (5px), row height (31px), corners (7px) and text size (12.8px), with intrinsic content height and bounded popup limits. Loading/error placeholders retain the same row height.

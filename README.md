@@ -35,6 +35,8 @@ For manual setup, write a version 1 JSON profile. Select an existing Git worktre
 
 The CLI is the same implementation used by the panel:
 
+The sidebar defaults to **Focused**, showing rigs mapped to the focused terminal's Git worktree. A CWD inside `src/` resolves to the same checkout as its project root; another worktree has its own matching rigs. The current space folder is a fallback when no pane/terminal CWD is available. Options offer **Show all rigs** / **Show focused rigs**, with the choice remembered across reloads. This changes only the view: saved worktree mappings and running services remain intact. Focus changes refresh the list and stale responses cannot restore the prior checkout's rows. Multi-repo matches still display the whole rig. Stopped-definition visibility and paused polling are separate controls. A missing local folder shows a hint; remote checkouts are not resolved through the local registry.
+
 ```sh
 ./bin/rig create shop --profile /absolute/shop/rig.json --repo app=/absolute/shop
 ./bin/rig plan shop

@@ -36,7 +36,7 @@ try {
     if (state === 'profile-editor') initialize = `this.profileMode = true; this.profileEditor = EditorState.new({language:'json',value:${JSON.stringify(document.content)},readonly:false});`;
     if (state.startsWith('delete-')) initialize = 'this.deleteMode = true;';
     initialize += `this.definition = ${JSON.stringify(definition)}; this.profileDocument = ${JSON.stringify(document)};`;
-    await fs.writeFile(path.join(directory,'main.js'),`import Rigs from './rigs.js';\nimport {InputState,EditorState} from 'gpui-base';\nexport default class CheckState extends Rigs { init() { this.name = InputState.new({}); this.profile = InputState.new({}); ${initialize} } }\n`);
+    await fs.writeFile(path.join(directory,'main.js'),`import Rigs from './rigs.js';\nimport {InputState,EditorState} from 'gpui-base';\nexport default class CheckState extends Rigs { viewScope() { return 'all'; } init() { this.checkoutOnly = false; this.requestedScope = 'all'; this.dataScope = 'all'; this.name = InputState.new({}); this.profile = InputState.new({}); ${initialize} } }\n`);
     process.stdout.write(execFileSync('herdr-app',['check',directory],{encoding:'utf8'}));
   }
 } finally { await fs.rm(root,{recursive:true,force:true}); }

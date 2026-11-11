@@ -2,12 +2,14 @@
 import { setupPrompt } from './setup.js';
 import { View, div, svg } from 'gpui-kit';
 import { v_flex, h_flex, Input, InputState, Editor, EditorState } from 'gpui-base';
-import { appHome, exec, focused, theme, run, props, pickFolder, writeTextFile, layout, spaces, openOverlay, closeOverlay } from 'herdr';
+import { appHome, exec, focused, panes, theme, run, props, pickFolder, writeTextFile, layout, spaces, openOverlay, closeOverlay } from 'herdr';
 function localCheckout() {
     const context = focused();
-    if (context?.terminal?.includes('/') || spaces().find(space => space.id === context?.space)?.machine)
+    const list = spaces(), space = list.find(space => space.id === context?.space) ?? list.find(space => space.active);
+    if (context?.terminal?.includes('/') || space?.machine)
         return null;
-    return context?.cwd ?? null;
+    const pane = context?.pane ? panes().find(pane => pane.pane === context.pane) : undefined;
+    return pane?.cwd || context?.cwd || space?.folder || null;
 }
 export default class Rigs extends View {
     data = { core: 'loading', rigs: [], observed_at: '' };
@@ -21,8 +23,10 @@ export default class Rigs extends View {
     refreshError = '';
     actionError = '';
     busy = false;
-    checkoutOnly = false;
+    checkoutOnly = true;
     paused = false;
+    requestedScope;
+    dataScope;
     preview = null;
     selected = '';
     repoSlots = [];
@@ -117,6 +121,7 @@ export default class Rigs extends View {
             return;
         }
         this.selected = localStorage.getItem('selected') ?? '';
+        this.checkoutOnly = localStorage.getItem('scope') !== 'all';
         try {
             const saved = JSON.parse(localStorage.getItem('collapsed') ?? '[]');
             if (Array.isArray(saved))
@@ -337,22 +342,34 @@ export default class Rigs extends View {
     refresh(cx) {
         if (this.busy)
             return;
+        const scope = this.viewScope();
+        this.requestedScope = scope;
+        if (scope === null) {
+            this.data = { ...this.data, rigs: [], connections: [] };
+            this.dataScope = null;
+            this.refreshError = '';
+            cx.notify();
+            return;
+        }
         this.busy = true;
         cx.spawn(async (cx) => {
             try {
                 const args = ['status'];
-                if (this.checkoutOnly) {
-                    const cwd = localCheckout();
-                    if (!cwd)
-                        throw new Error('Focus a local terminal checkout first');
-                    args.push('--checkout', cwd);
+                if (scope !== 'all')
+                    args.push('--checkout', scope);
+                const result = await this.call(args);
+                if (scope === this.viewScope()) {
+                    this.data = result;
+                    this.dataScope = scope;
+                    this.refreshError = '';
                 }
-                this.data = await this.call(args);
-                this.refreshError = '';
             }
             catch (error) {
-                this.refreshError = String(error);
-                this.data.core = 'unavailable';
+                if (scope === this.viewScope()) {
+                    this.refreshError = String(error);
+                    this.data = { ...this.data, rigs: [], connections: [] };
+                    this.dataScope = scope;
+                }
             }
             finally {
                 this.busy = false;
@@ -360,6 +377,7 @@ export default class Rigs extends View {
             }
         });
     }
+    viewScope() { return this.checkoutOnly ? localCheckout() : 'all'; }
     refreshPreviewApps(cx) {
         if (this.observing || !Object.keys(this.preview?.observed_apps ?? {}).length)
             return;
@@ -850,7 +868,7 @@ export default class Rigs extends View {
             root.child(div().flex_1().p(20).text_color(t.dim).child(this.actionError ? 'Close and reopen this preview to load the current plan.' : 'Loading preview…'));
         return root;
     }
-    render(_cx) {
+    render(cx) {
         if (this.contextMode)
             return this.renderContext();
         if (this.deleteMode)
@@ -863,6 +881,9 @@ export default class Rigs extends View {
             return this.renderCreate();
         if (this.previewMode)
             return this.renderPreview();
+        const scope = this.viewScope();
+        if (!this.paused && this.visible() && scope !== this.requestedScope)
+            this.refresh(cx);
         const t = theme();
         const content = v_flex().id('rigs-scroll').flex_1().min_h(0).px(8).pb(10).gap(4).overflow_y_scrollbar().mode('always');
         const icon = (id, file, tip, action) => div().id(id).size(26).flex_none().flex().items_center().justify_center().rounded(6)
@@ -878,14 +899,18 @@ export default class Rigs extends View {
             .child(icon('new', 'plus', 'New rig', () => this.openNewMenu()))));
         if (this.tools)
             content.child(v_flex().gap(2)
-                .child(this.button('checkout', this.checkoutOnly ? 'Show all rigs' : 'Show rigs for this checkout', cx => { this.checkoutOnly = !this.checkoutOnly; this.refresh(cx); }))
+                .child(this.button('checkout', this.checkoutOnly ? 'Show all rigs' : 'Show focused rigs', cx => {
+                this.checkoutOnly = !this.checkoutOnly;
+                localStorage.setItem('scope', this.checkoutOnly ? 'focused' : 'all');
+                this.refresh(cx);
+            }))
                 .child(this.button('pause', this.paused ? 'Resume polling' : 'Pause polling', cx => { this.paused = !this.paused; cx.notify(); }))
                 .child(this.button('stopped', this.showStopped ? 'Hide stopped definitions' : 'Show stopped definitions', cx => { this.showStopped = !this.showStopped; cx.notify(); })));
-        if (this.refreshError)
+        if (this.refreshError && scope === this.dataScope)
             content.child(div().px(8).text_size(12).text_color(t.blocked).child(this.refreshError));
         if (this.actionError)
             content.child(v_flex().gap(2).px(8).child(div().text_size(12).text_color(t.blocked).child(this.actionError)).child(this.button('dismiss-action-error', 'Dismiss', cx => { this.actionError = ''; cx.notify(); })));
-        const rigs = this.data.rigs.filter(r => r.claimed || r.review_required || Object.keys(r.observed_apps ?? {}).length || this.showStopped);
+        const rigs = (scope === this.dataScope ? this.data.rigs : []).filter(r => r.claimed || r.review_required || Object.keys(r.observed_apps ?? {}).length || this.showStopped);
         for (const rig of rigs) {
             const card = v_flex().w_full().gap(2).rounded(8);
             const rigKey = `rig-${rig.id}`;
@@ -955,7 +980,11 @@ export default class Rigs extends View {
             content.child(card);
         }
         if (!rigs.length)
-            content.child(div().px(8).text_size(12).text_color(t.dim).child('No active rigs. Use + to create one.'));
+            content.child(div().px(8).text_size(12).text_color(t.dim).whitespace_normal().child(this.paused && scope !== this.dataScope ? 'Polling paused. Resume to load rigs for this view.'
+                : this.checkoutOnly && scope === null ? 'Focus a local checkout, or choose Show all rigs in options.'
+                    : this.busy && scope !== this.dataScope ? 'Loading rigs…'
+                        : this.checkoutOnly ? 'No visible rigs for the focused checkout. Use +, show stopped definitions, or choose Show all rigs.'
+                            : 'No active rigs. Use + to create one.'));
         root.child(content);
         return root;
     }
