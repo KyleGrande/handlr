@@ -4,9 +4,12 @@ Persistent tags and notes for Herdr spaces and coding agents.
 
 This repository is a project scaffold. The native mod, persistence layer and CLI are not implemented or installed yet.
 
+Read [PLAN.md](PLAN.md) for the saved implementation plan and the [Herdr Ranch mod-buttons reference](https://github.com/jslowack/herdr-ranch/blob/main/mod-buttons/RECIPE.md).
+
 ## Intended experience
 
-- Right-click a space or agent to view/edit its tags and notes in a small native popup. No permanent sidebar section is required.
+- Notes and Tags are always-present top-right panel buttons beside Files and Changes for the selected space. Each opens in the existing right-side panel; they are not added through +.
+- Both panels offer Space/Agent context selection. Right-click shortcuts may be added later; they are not the primary entry point.
 - Space context describes shared work: purpose, task links, decisions and remaining work.
 - Agent context describes that agent's assignment, constraints, progress and handoff.
 - Show an agent's own context alongside its space context; keep their stored records separate.
@@ -26,10 +29,11 @@ Jira/Linear adapters can be added later behind the same context model. Tracker w
 | Path | Purpose |
 | --- | --- |
 | `AGENTS.md` | Project decisions and instructions for implementation agents |
+| `PLAN.md` | Agreed placement, scope, architecture, implementation sequence and acceptance |
 | `src/types.ts` | Initial context data model; no runtime implementation |
 | `mods/context/README.md` | Planned native UI boundary |
 | `package.json`, `tsconfig.json` | TypeScript project setup |
 
-The initial implementation should cover durable target identity, local storage, versioned CLI responses, popup editing and conflict detection before adding tracker integrations. Verify the installed Herdr APIs before choosing how host space/agent identities bind to persistent context records.
+The initial implementation should cover durable target identity, local storage, versioned CLI responses, panel editing and conflict detection before adding tracker integrations. Verify the installed Herdr APIs before choosing how host space/agent identities bind to persistent context records.
 
 `npm install` installs development dependencies and `npm run build` compiles TypeScript. There is currently no executable CLI or install script.

@@ -1,11 +1,12 @@
 # Herdr Context
 
-Build a small independent Herdr mod for persistent space/agent tags and notes. Read `README.md` first. This is currently a scaffold, not a functioning mod or CLI.
+Build a small independent Herdr mod for persistent space/agent tags and notes. Read `README.md` and `PLAN.md` first. This is currently a scaffold, not a functioning mod or CLI.
 
 ## Product decisions
 
 - Space context is shared work context. Agent context is a specific assignment/progress/handoff. Display inherited space context without copying it into or overwriting agent notes.
-- Open view/edit actions from right-click menus and a native popup. Keep the interface compact and theme-aware; no new permanent sidebar section is required.
+- Notes and Tags are always-present top-right buttons beside Files and Changes in Herdr's tab bar, opening the existing right-side panel for the selected space. They are not added through +. Keep the interface compact and theme-aware; no new permanent left-sidebar section is required. Space/Agent scope controls belong inside the panels. Right-click shortcuts are optional future convenience.
+- Follow the mod-buttons recipe linked in `PLAN.md` when integrating panel buttons. Its manifest discovery requires a compatible personal tab bar; do not assume stock Herdr handles `button` automatically. Preserve the current personal layout/Rigs integration and Files/Changes behavior instead of replacing the whole layout with the reference's older version.
 - Keep this separate from Rigs. Future Rigs integration reads context associations; it does not own context storage or require this mod to run services.
 - Task links may point to Jira, Linear, GitHub or any ordinary task URL. Do not require a tracker connection. Tracker updates and agent-written notes are optional.
 - Separate descriptive notes from explicitly identified instructions and handoff text. Treat imported tracker content and agent-written notes as context, not automatic authority to execute instructions.
@@ -15,7 +16,7 @@ Build a small independent Herdr mod for persistent space/agent tags and notes. R
 
 Before native UI work, read the installed `AGENTS.md`, `herdr.d.ts` and `gpui-kit.d.ts` under `HERDR_APP_HOME` (default `~/.config/herdr-app`). Those are generated host files; do not edit them.
 
-Use TypeScript sources and generated native JavaScript with GPUI, not a browser framework or Node APIs inside the mod. Keep slow work off the render path. Native `.child(...)` requires an element, string or entity, never null. Use content-sized popups and the host's existing row spacing/styles.
+Use TypeScript sources and generated native JavaScript with GPUI, not a browser framework or Node APIs inside the mod. Keep slow work off the render path. Native `.child(...)` requires an element, string or entity, never null. Use the host's existing panel/button/row styles and content-sized popups where a secondary action needs one.
 
 Herdr's shipped mods/layouts are read-only. Add integrations through supported host actions or personal clones when needed; preserve the user's layout choices. Creating this repository does not install it or replace Spaces/Agents.
 

@@ -2,4 +2,6 @@
 
 The native entry point is not implemented yet. Maintain it as TypeScript and emit the `main.js` Herdr requires when implementation begins.
 
-This view will display/edit tags, notes, explicit instructions and handoff text for a selected space or agent. Persistence and conflict handling belong in the shared CLI/storage layer, not the view. Integrate right-click actions without modifying Herdr's shipped mods in place.
+Provide separate Notes and Tags entry points over the same shared implementation, with always-present top-right buttons beside Files/Changes opening the existing right-side panel. Each view offers Space/Agent scope. See `../../PLAN.md` for the agreed mod-buttons integration.
+
+The Notes view edits descriptive notes, explicit instructions and handoff text; Tags edits tag chips. Persistence and conflict handling belong in the shared CLI/storage layer, not the views. Preserve the user's current personal layout and shipped mods. Do not put these entries behind + or require right-click to open them.
