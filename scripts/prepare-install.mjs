@@ -15,7 +15,7 @@ function wrap(n) {
   if (i < 0) return n.children.some(wrap);
   const original = n.children[i], size = original.size;
   delete original.size;
-  n.children[i] = { id: 'toolbox-terminal-column', type: 'column', ...(size ? { size } : {}), children: [
+  n.children[i] = { id: 'toolbox-terminal-column', type: 'column', gap: original.content?.pane?.gap ?? 8, ...(size ? { size } : {}), children: [
     { id: 'toolbox-tray', type: 'block', hidden: true, size: { px: 220 }, min: 100, max: 500, content: { mod: 'toolbox' } }, original
   ] }; return true;
 }
