@@ -3,16 +3,16 @@ import { mkdir, cp, access, readFile, writeFile, rm } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 const app = process.env.HERDR_APP_HOME || join(homedir(), '.config/herdr-app');
-execFileSync(process.execPath, ['scripts/prepare-install.mjs', ...process.argv.slice(2)], { stdio: 'inherit' });
+execFileSync(process.execPath, ['dist/scripts/prepare-install.js', ...process.argv.slice(2)], { stdio: 'inherit' });
 // Run directly: Herdr submits its checker to the GUI session through launchd.
-execFileSync('herdr-app', ['check', 'mods/toolbox'], { stdio: 'inherit', timeout: 60000 });
-execFileSync('herdr-app', ['check', 'mods/toolbox-tabs'], { stdio: 'inherit', timeout: 60000 });
+execFileSync('herdr-app', ['check', 'dist/mods/toolbox'], { stdio: 'inherit', timeout: 60000 });
+execFileSync('herdr-app', ['check', 'dist/mods/toolbox-tabs'], { stdio: 'inherit', timeout: 60000 });
 const destination = join(app, 'mods/toolbox');
 const tabbar = join(app, 'mods/toolbox-tabs');
 const layout = join(app, 'layouts/toolbox-workspace.json');
 const stamp = Date.now();
-const backups = [];
-async function backup(path) {
+const backups: { path: string; saved: string }[] = [];
+async function backup(path: string) {
   try { await access(path); } catch { return; }
   const saved = `${path}.backup-${stamp}`;
   await cp(path, saved, { recursive: true }); backups.push({ path, saved });

@@ -1,0 +1,55 @@
+{
+  "version": 1,
+  "tools": [
+    {
+      "label": "Build",
+      "icon": "⚒",
+      "command": "npm run build"
+    },
+    {
+      "label": "Typecheck",
+      "icon": "✓",
+      "command": "npm run typecheck"
+    },
+    {
+      "label": "Test",
+      "icon": "▶",
+      "command": "npm test"
+    },
+    {
+      "label": "Native checks",
+      "icon": "◈",
+      "command": "npm run check:native"
+    },
+    {
+      "label": "Prepare install",
+      "icon": "▣",
+      "command": "npm run prepare-install"
+    },
+    {
+      "label": "Install locally",
+      "icon": "↓",
+      "command": "npm run install:local"
+    },
+    {
+      "label": "Git status",
+      "icon": "⑂",
+      "command": "git status --short"
+    },
+    {
+      "label": "View changes",
+      "icon": "±",
+      "command": "git diff --stat"
+    },
+    {
+      "label": "Recent commits",
+      "icon": "◷",
+      "command": "git log -5 --oneline"
+    },
+    {
+      "label": "App status",
+      "icon": "ⓘ",
+      "command": "herdr-app status"
+    }
+  ]
+}

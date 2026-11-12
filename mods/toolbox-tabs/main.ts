@@ -1,8 +1,11 @@
+import type { Context, MouseButtonEvent, ClickEvent, Element } from 'gpui-kit';
+import type { SpaceInfo, TabInfo } from 'herdr';
+import type { LayoutNode } from '../layout.js';
 import { View, div, svg, image } from "gpui-kit";
 import { h_flex, ScrollHandle } from "gpui-base";
 import { spaces, panes, run, openOverlay, theme, window, shared, layout, settings } from "herdr";
 
-function find(node, id) {
+function find(node: LayoutNode | null | undefined, id: string): LayoutNode | null {
   if (node?.id === id) return node;
   for (const child of node?.children ?? []) {
     const found = find(child, id);
@@ -12,6 +15,13 @@ function find(node, id) {
 }
 
 export default class Tabs extends View {
+  pressed: number | null = null;
+  scroll!: ScrollHandle;
+  panels: Record<string, string | null> = {};
+  space?: string;
+  pending: { want: string | null; until: number } | null = null;
+  selected?: string;
+  selectedIndex?: number;
   init() {
     this.pressed = null;
     this.scroll = ScrollHandle.new();
@@ -20,14 +30,14 @@ export default class Tabs extends View {
 
   // The side panel is remembered per space: switching shows that space's choice
   // (closed if it never had one), and opening or closing it records it.
-  syncPanel(space, panel, body, enabled) {
+  syncPanel(space: SpaceInfo | undefined, panel: LayoutNode | null, body: LayoutNode | null, enabled: string[]) {
     if (!space || !panel) return;
     const now = panel.hidden ? null : body?.active ?? null;
     if (space.id !== this.space) {
       const first = this.space === undefined;
       this.space = space.id; this.pending = null;
       if (!(first && !(space.id in this.panels))) {
-        const stored = this.panels[space.id] ?? null, want = enabled.includes(stored) ? stored : null;
+        const stored = this.panels[space.id] ?? null, want = stored !== null && enabled.includes(stored) ? stored : null;
         if (want !== now) {
           this.pending = { want, until: Date.now() + 1000 };
           if (want) { run("layout.select", { stack: "panel-body", child: want }); run("layout.show", { id: "panel" }); }
@@ -47,7 +57,7 @@ export default class Tabs extends View {
   }
 
   render() {
-    const t = theme();
+    const t = theme() as Record<string, `#${string}`>;
     const space = spaces().find(p => p.active);
     const shown = space?.tabs ?? [];
     const active = shown.findIndex(tab => tab.active);
@@ -57,10 +67,10 @@ export default class Tabs extends View {
       this.selectedIndex = active;
       if (active >= 0) this.scroll.scroll_to_item(active);
     }
-    const stop = (_e, cx) => cx.stop_propagation();
-    const button = (id, label, action) => div().id(id).size(26).flex_none().flex().items_center().justify_center().rounded(6).text_color(t.dim).hover(s => s.bg(t.hover).text_color(t.foreground))
+    const stop = (_e: MouseButtonEvent, cx: Context) => cx.stop_propagation();
+    const button = (id: string, label: string | Element, action: (e: ClickEvent, cx: Context) => void) => div().id(id).size(26).flex_none().flex().items_center().justify_center().rounded(6).text_color(t.dim).hover(s => s.bg(t.hover).text_color(t.foreground))
       .on_mouse_down("left", stop).on_click(action).child(label);
-    const item = (c, i) => {
+    const item = (c: TabInfo, i: number) => {
       const program = panes().find(p => p.tab === c.id && p.program?.agent)?.program ?? panes().find(p => p.tab === c.id)?.program;
       const name = /^tb\d+$/.test(c.name) ? program?.name ?? "Terminal" : c.name;
       return h_flex().id(`tab-${c.id}`).h(29).px(10).gap(7).rounded(7).items_center().flex_none().text_size(12.8)
@@ -71,25 +81,25 @@ export default class Tabs extends View {
         .on_mouse_down("left", (e, cx) => { cx.stop_propagation(); this.pressed = i; if (e.click_count === 2) run("tab.rename", { id: c.id }); })
         .on_mouse_up("left", () => {
           const from = this.pressed; this.pressed = null;
-          if (from !== null && from !== i) run("tab.move", { id: shown[from].id, index: space.tabs.findIndex(x => x.id === c.id) + 1 });
+          if (from !== null && from !== i) run("tab.move", { id: shown[from].id, index: space!.tabs.findIndex(x => x.id === c.id) + 1 });
           else run("tab.select", { id: c.id });
         })
-        .on_mouse_down("right", (_e, cx) => { cx.stop_propagation(); openOverlay({ mod: "menu", kind: "popup", width: 200, props: { tab: "tab", target: { id: c.id, space: space.id } } }); })
-        .when(Boolean(program?.icon), el => el.child(program.tint ? svg(program.icon).size(14).text_color(t.muted) : image(program.icon).size(14)))
+        .on_mouse_down("right", (_e, cx) => { cx.stop_propagation(); openOverlay({ mod: "menu", kind: "popup", width: 200, props: { tab: "tab", target: { id: c.id, space: space!.id } } }); })
+        .when(Boolean(program?.icon), el => el.child(program!.tint ? svg(program!.icon!).size(14).text_color(t.muted) : image(program!.icon!).size(14)))
         .child(div().max_w(170).truncate().child(c.zoomed ? `${name} Z` : name))
         .when(c.status === "working", el => el.child(svg("mods/workspace-chrome/spinner.svg").size(12).flex_none().text_color(t.working).spin(900)))
-        .when(c.status === "blocked" || c.status === "done", el => el.child(div().size(6).rounded(3).bg(t[c.status])))
+        .when(c.status === "blocked" || c.status === "done", el => el.child(div().size(6).rounded(3).bg(t[c.status as "blocked" | "done"])))
         .when(c.active, el => el.child(div().id(`close-${c.id}`).text_color(t.dim).on_mouse_down("left", stop).on_click((_e, cx) => { cx.stop_propagation(); run("tab.close", { id: c.id }); }).child(svg("mods/pane/close.svg").size(12))));
     };
-    const root = layout(), sidebar = find(root, "sidebar"), w = window();
+    const root = layout() as LayoutNode, sidebar = find(root, "sidebar"), w = window();
     // Old saved rails and a dragged-narrow sidebar can be smaller than the window buttons.
     const lightsPadding = w?.platform === "macos" && w.titlebar === "none" && !w.fullscreen && root?.traffic_lights
-      ? Math.max(10, (root.traffic_lights[0] + 64) / settings().zoom - (sidebar?.hidden ? 0 : sidebar?.size?.px ?? 0))
+      ? Math.max(10, (root.traffic_lights[0] + 64) / Number(settings().zoom) - (sidebar?.hidden ? 0 : sidebar?.size?.px ?? 0))
       : 10;
     const panel = find(root, "panel"), body = find(root, "panel-body");
-    const enabled = [...new Set([...(shared("workspace.panels") ?? ["files", "changes"]), ...["context"]])];
+    const enabled = [...new Set([...((shared("workspace.panels") as string[] | undefined) ?? ["files", "changes"]), ...["context"]])];
     this.syncPanel(space, panel, body, enabled);
-    const panelButton = (id, label, icon) => {
+    const panelButton = (id: string, label: string, icon: string) => {
       const on = panel && !panel.hidden && body?.active === id;
       return h_flex().id(`panel-${id}`).h(26).px(8).gap(5).flex_none().items_center().rounded(6)
         .text_size(12).bg(on ? t.selected : t.chrome).text_color(on ? t.foreground : t.muted)
@@ -113,9 +123,9 @@ export default class Tabs extends View {
         .text_size(12).bg(find(root, "toolbox-tray")?.hidden === false ? t.selected : t.chrome)
         .text_color(find(root, "toolbox-tray")?.hidden === false ? t.foreground : t.muted)
         .hover(s => s.bg(t.hover)).on_mouse_down("left", stop)
-        .on_click(() => run(find(layout(), "toolbox-tray")?.hidden ? "layout.show" : "layout.hide", { id: "toolbox-tray" }))
+        .on_click(() => run(find(layout() as LayoutNode, "toolbox-tray")?.hidden ? "layout.show" : "layout.hide", { id: "toolbox-tray" }))
         .child(svg("mods/toolbox/toolbox.svg").size(14)).child("Toolbox"))
-      .when(w?.buttons, el => el.child(button("minimize", w.platform === "windows" ? svg("mods/tabs/win-min.svg").size(16) : "−", () => run("window.minimize")))
+      .when(Boolean(w?.buttons), el => el.child(button("minimize", w.platform === "windows" ? svg("mods/tabs/win-min.svg").size(16) : "−", () => run("window.minimize")))
         .child(button("maximize", w.platform === "windows" ? svg(`mods/tabs/${w.maximized ? "win-restore" : "win-max"}.svg`).size(16) : "□", () => run("window.maximize")))
         .child(button("close-window", w.platform === "windows" ? svg("mods/tabs/win-close.svg").size(16) : svg("mods/pane/close.svg").size(13), () => run("window.close"))));
   }

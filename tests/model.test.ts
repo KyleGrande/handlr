@@ -26,3 +26,15 @@ test('repo tools reject malformed records and preserve commands as data', async 
   assert.equal(tools[0].command, 'pnpm run build');
   assert.equal(tools[0].id, 'repo:pnpm run build');
 });
+
+ test('repo folder follows live terminals only within the captured Space', async () => {
+  const { spaceFolder } = await import('../mods/toolbox/model.js');
+  const space = { folder: '/home/user', tabs: [{ id: 'own-tab' }] };
+  const panes = [
+    { tab: 'other-tab', terminal: 't1', cwd: '/other-repo' },
+    { tab: 'own-tab', terminal: null, cwd: '/mod-pane' },
+    { tab: 'own-tab', terminal: 't2', cwd: '/toolbox-repo' },
+  ];
+  assert.equal(spaceFolder(space, panes), '/toolbox-repo');
+  assert.equal(spaceFolder(space, []), '/home/user');
+});
