@@ -1,3 +1,5 @@
+import { runKey, runStatus, loginArgv, findRunTerminal } from './runs.js';
+import type { RunRecord, RunState, TerminalRecord } from './runs.js';
 import type { Context, AsyncContext } from 'gpui-kit';
 import type { SpaceInfo } from 'herdr';
 import type { ToolEntry, ToolboxState } from './model.js';
@@ -7,9 +9,11 @@ type Editor = { owner: string; revision: number; id: string; label: InputState; 
 const state = () => shared(KEY) as ToolboxState | undefined;
 import { View, div, svg } from 'gpui-kit';
 import { h_flex, v_flex, InputState, Input } from 'gpui-base';
-import { spaces, panes, theme, shared, setShared, exec, run, props, layout, readTextFile, openOverlay, closeOverlay, appHome } from 'herdr';
+import { spaces, panes, terminals, theme, shared, setShared, exec, run, props, layout, readTextFile, openOverlay, closeOverlay, appHome } from 'herdr';
 import { parameters, expand, saveEntry, repoTools, spaceFolder } from './model.js';
 const KEY = 'toolbox.v1';
+const RUNS_KEY = 'toolbox.runs.v1';
+const runs = () => (shared(RUNS_KEY) as RunState | undefined)?.runs ?? {};
 const DISPLAY_KEY = 'toolbox.display.v1';
 export default class Toolbox extends View {
   identity: Record<string, string> = {};
@@ -24,6 +28,7 @@ export default class Toolbox extends View {
   launch: { entry: ToolEntry; context: SpaceContext; fields: { name: string; input: InputState }[] } | null = null;
   init(_: unknown, cx: AsyncContext) {
     this.identity = {}; this.pending = {}; this.error = ''; this.repoTools = []; this.repoText = null;
+    if (props()?.view === 'run') this.start(props().entry, props().context, cx);
     if (props()?.view === 'manual') this.edit(props().entry ?? null, props().context);
     if (!props()?.view && !props()?.toolbar) {
       this.reloadRepo(cx);
@@ -61,7 +66,15 @@ export default class Toolbox extends View {
           entry: variant ? { ...entry, id: undefined, label: entry.label + ' copy' } : entry,
         } });
       };
+      const record = runs()[runKey(context.owner, entry.id)];
+      const terminal = record ? findRunTerminal(record, terminals()) : undefined;
+      const status = record ? runStatus(record, terminal) : null;
+      const busy = status?.kind === 'starting' || status?.kind === 'running';
       return v_flex().id('toolbox-tool-menu').w_full().p(6).gap(3).bg(t.popover).text_color(t.foreground)
+        .when(!busy, el => el.child(item('run-tool', record ? 'Run again' : 'Run', 'plus', () => {
+          closeOverlay(props().overlay);
+          openOverlay({ mod: 'toolbox', kind: 'dialog', width: 620, height: 300, props: { view: 'run', entry, context } });
+        })))
         .child(item('edit-tool', 'Edit', 'files', () => edit(false)))
         .child(item('variant-tool', 'Variant', 'plus', () => edit(true)));
     }
@@ -102,16 +115,55 @@ export default class Toolbox extends View {
     this.editor = { owner: context.owner, revision: record?.revision ?? 0, id: entry?.id ?? `${Date.now()}-${Math.random()}`, label: this.input(entry?.label ?? ''), command: this.input(entry?.command ?? ''), icon: this.input(entry?.icon ?? '▶') };
     this.launch = null;
   }
-  start(entry: ToolEntry, context: SpaceContext) {
+  start(entry: ToolEntry, context: SpaceContext, cx: Context) {
+    const key = runKey(context.owner, entry.id), record = runs()[key];
+    if (record) {
+      const status = runStatus(record, findRunTerminal(record, terminals()));
+      if (status.kind === 'starting' || status.kind === 'running') {
+        const terminal = findRunTerminal(record, terminals());
+        if (terminal) run('terminal.peek', { terminal: terminal.address });
+        if (props()?.view === 'run') closeOverlay(props().overlay);
+        return;
+      }
+    }
     const names = parameters(entry.command);
     if (names.length) this.launch = { entry, context, fields: names.map(name => ({ name, input: this.input('') })) };
-    else this.execute(entry, context, {});
+    else this.execute(entry, context, {}, cx);
   }
-  execute(entry: ToolEntry, context: SpaceContext, values: Record<string, string>) {
+  execute(entry: ToolEntry, context: SpaceContext, values: Record<string, string>, cx: Context) {
     try {
-      const command = expand(entry.command, values);
-      run('tab.new', { space: context.s.id, folder: context.cwd, name: entry.label, argv: ['sh', '-lc', `${command}\n_toolbox_status=$?; printf '\\n[Toolbox exit %s]\\nPress Enter to close…' "$_toolbox_status"; read _toolbox_done; exit "$_toolbox_status"`] });
+      const command = expand(entry.command, values), key = runKey(context.owner, entry.id);
+      const previous = runs()[key];
+      if (previous) {
+        const status = runStatus(previous, findRunTerminal(previous, terminals()));
+        if (status.kind === 'starting' || status.kind === 'running') throw new Error('This tool is already running.');
+      }
+      const token = `${Date.now()}-${Math.random()}`;
+      const record: RunRecord = { token, started: Date.now() };
+      setShared(RUNS_KEY, { version: 1, runs: { ...runs(), [key]: record } });
       this.launch = null;
+      cx.spawn(async cx => {
+        try {
+          const environment = await exec('sh', ['-c', 'printf %s "$SHELL"'], { on: context.s.machine });
+          if (environment.code) throw new Error('Could not load terminal environment');
+          const result = await exec('hc', ['run', '--bg', '--json', '--no-parent', '--no-notify',
+            '--cwd', context.cwd, '--label', 'toolbox.owner=' + context.owner,
+            '--label', 'toolbox.tool=' + entry.id, '--label', 'toolbox.run=' + token,
+            '--', ...loginArgv(environment.stdout.trim(), command)], { on: context.s.machine });
+          if (result.code) throw new Error(result.stderr || 'Could not start terminal');
+          const data = JSON.parse(result.stdout);
+          const address = data.address;
+          if (typeof address !== 'string' || !address) throw new Error('Core did not return a terminal address');
+          const terminal = context.s.machine && !address.includes('/') ? context.s.machine + '/' + address : address;
+          if (runs()[key]?.token === token) setShared(RUNS_KEY, { version: 1, runs: { ...runs(), [key]: { ...record, terminal } } });
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          if (runs()[key]?.token === token) setShared(RUNS_KEY, { version: 1, runs: { ...runs(), [key]: { ...record, error: message } } });
+          this.error = message;
+        }
+        cx.notify();
+        if (props()?.view === 'run') closeOverlay(props().overlay);
+      });
     } catch (e: unknown) { this.error = e instanceof Error ? e.message : String(e); }
   }
   render(cx: Context) {
@@ -124,14 +176,14 @@ export default class Toolbox extends View {
       if (tray) run(tray.hidden ? 'layout.show' : 'layout.hide', { id: 'toolbox-tray' });
     });
     const showLabels = (shared(DISPLAY_KEY) as { labels?: boolean } | undefined)?.labels ?? true;
-    const c = props()?.view === 'manual' ? props().context : this.context(cx);
+    const c = props()?.view === 'manual' || props()?.view === 'run' ? props().context : this.context(cx);
     if (!props()?.view && c && this.repoKey !== JSON.stringify([c.s.id, c.cwd, c.s.machine])) this.reloadRepo(cx);
     const field = (name: string, input: InputState) => h_flex().gap(8).items_center().child(div().w(80).child(name)).child(Input.new(input).flex_1().h(30).px(8).bg(t.background).border_1().border_color(t.input).rounded(5));
     const shell = v_flex().id('toolbox').size_full().min_h(0).rounded(10).overflow_hidden()
       .bg(t.background).border_1().border_color(t.border).text_color(t.foreground).text_size(13)
       .child(h_flex().h(42).flex_none().px(14).items_center().border_b(1).border_color(t.border)
-        .child(div().flex_1().font_semibold().child(props()?.view === 'manual' ? (props().entry?.id ? 'Edit tool' : 'Add a tool') : 'Toolbox'))
-        .when(props()?.view !== 'manual', el => el
+        .child(div().flex_1().font_semibold().child(props()?.view === 'manual' ? (props().entry?.id ? 'Edit tool' : 'Add a tool') : props()?.view === 'run' ? 'Run tool' : 'Toolbox'))
+        .when(!props()?.view, el => el
           .child(div().id('toolbox-labels').size(24).flex().items_center().justify_center().mr(8)
             .text_size(12).text_color(showLabels ? t.muted : t.dim).cursor_pointer()
             .tooltip(showLabels ? 'Hide labels' : 'Show labels')
@@ -147,22 +199,37 @@ export default class Toolbox extends View {
       root.child(h_flex().gap(6).child(button('save', 'Save shortcut', () => { try { setShared(KEY, saveEntry(state(), e.owner, { id: e.id, label: e.label.value(), icon: e.icon.value(), command: e.command.value() }, e.revision)); this.editor = null; if (props()?.view === 'manual') closeOverlay(props().overlay); } catch (error: unknown) { this.error = error instanceof Error ? error.message : String(error); } })).child(button('cancel', 'Cancel', () => { this.editor = null; if (props()?.view === 'manual') closeOverlay(props().overlay); })));
     } else if (this.launch) {
       const l = this.launch;
-      root.children(l.fields.map(f => field(f.name, f.input))).child(h_flex().gap(6).child(button('launch', 'Run ' + l.entry.label, () => this.execute(l.entry, l.context, Object.fromEntries(l.fields.map(f => [f.name, f.input.value()]))))).child(button('cancel-launch', 'Cancel', () => { this.launch = null; })));
+      root.children(l.fields.map(f => field(f.name, f.input))).child(h_flex().gap(6).child(button('launch', 'Run ' + l.entry.label, cx => this.execute(l.entry, l.context, Object.fromEntries(l.fields.map(f => [f.name, f.input.value()])), cx))).child(button('cancel-launch', 'Cancel', () => { this.launch = null; if (props()?.view === 'run') closeOverlay(props().overlay); })));
     } else {
       const repoTools = this.repoKey === JSON.stringify([c.s.id, c.cwd, c.s.machine]) ? this.repoTools : [];
       const entries = [...new Map([...repoTools, ...(state()?.owners?.[c.owner]?.entries ?? [])].map(e => [e.id, e])).values()];
       if (this.repoError) root.child(div().text_color(t.blocked).child(this.repoError));
-      root.child(h_flex().w_full().flex_wrap().justify_around().items_center().gap(8).children(entries.map(entry =>
-        v_flex().w(110).flex_none().items_center().gap(2)
-          .child(div().id('run-' + entry.id).size(36).flex_none().flex().items_center().justify_center()
-          .text_size(18).cursor_pointer().hover(s => s.text_color(t.accent))
-          .tooltip(entry.label).child(entry.icon?.trim() || '▶')
-          .on_click((_e, cx) => { this.start(entry, c); cx.notify(); })
-          .on_mouse_down('right', (_e, cx) => {
-            cx.stop_propagation();
-            openOverlay({ mod: 'toolbox', kind: 'popup', width: 180, props: { view: 'tool-menu', entry, context: c } });
-          }))
-          .when(showLabels, el => el.child(div().max_w(110).truncate().text_size(11).text_color(t.dim).child(entry.label))))));
+      root.child(h_flex().w_full().flex_wrap().justify_around().items_center().gap(8).children(entries.map(entry => {
+        const record = runs()[runKey(c.owner, entry.id)];
+        const terminal = record ? findRunTerminal(record, terminals()) as TerminalRecord | undefined : undefined;
+        const status = record ? runStatus(record, terminal) : null;
+        const active = status?.kind === 'starting' || status?.kind === 'running';
+        const color = status?.kind === 'passed' ? t.ansi2 : status?.kind === 'failed' ? t.ansi1 : t.ansi4;
+        return v_flex().w(110).flex_none().items_center().gap(2)
+          .child(div().id('run-' + entry.id).relative().size(36).flex_none().flex().items_center().justify_center()
+            .text_size(18).cursor_pointer().hover(s => s.text_color(t.accent))
+            .tooltip(entry.label + (status ? ' · ' + status.label + (terminal ? ' · Click for output' : '') : ' · Run'))
+            .child(entry.icon?.trim() || '▶')
+            .when(Boolean(status), el => el.child(div().absolute().right(0).top(0).size(10).flex().items_center().justify_center()
+              .child(active ? svg('mods/workspace-chrome/spinner.svg').size(10).text_color(t.ansi4).spin(900)
+                : div().size(6).rounded(3).bg(color))))
+            .on_click((_e, cx) => {
+              if (terminal) run('terminal.peek', { terminal: terminal.address });
+              else if (status?.kind !== 'starting') this.start(entry, c, cx);
+              cx.notify();
+            })
+            .on_mouse_down('right', (_e, cx) => {
+              cx.stop_propagation();
+              openOverlay({ mod: 'toolbox', kind: 'popup', width: 180, props: { view: 'tool-menu', entry, context: c } });
+            }))
+          .when(showLabels, el => el.child(div().max_w(110).truncate().text_size(11).text_color(t.dim).child(entry.label)));
+      })));
+
     }
     return shell.child(root);
   }
