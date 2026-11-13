@@ -1,1 +1,5 @@
-{"place":"none","name":"Herdr Toolbox"}
+{
+  "place": "none",
+  "name": "Herdr Toolbox",
+  "workspace_header": true
+}

@@ -1,4 +1,5 @@
 import { runKey, runStatus, loginArgv, findRunTerminal } from './runs.js';
+
 import type { RunRecord, RunState, TerminalRecord } from './runs.js';
 import type { Context, AsyncContext } from 'gpui-kit';
 import type { SpaceInfo } from 'herdr';
@@ -11,6 +12,12 @@ import { View, div, svg } from 'gpui-kit';
 import { h_flex, v_flex, InputState, Input } from 'gpui-base';
 import { spaces, panes, terminals, theme, shared, setShared, exec, run, props, layout, readTextFile, openOverlay, closeOverlay, appHome } from 'herdr';
 import { parameters, expand, saveEntry, repoTools, spaceFolder } from './model.js';
+
+// Namespace access keeps this mod compatible with Herdr versions without panel().
+import * as WorkspaceHost from 'herdr';
+type WorkspacePanel = { id: string; title: string; embedded_header: boolean };
+const workspacePanel = (): WorkspacePanel | null =>
+  (WorkspaceHost as unknown as { panel?: () => WorkspacePanel | null }).panel?.() ?? null;
 const KEY = 'toolbox.v1';
 const RUNS_KEY = 'toolbox.runs.v1';
 const runs = () => (shared(RUNS_KEY) as RunState | undefined)?.runs ?? {};
@@ -175,14 +182,18 @@ export default class Toolbox extends View {
       const tray = find(layout() as LayoutNode);
       if (tray) run(tray.hidden ? 'layout.show' : 'layout.hide', { id: 'toolbox-tray' });
     });
+    const dock = !props()?.view ? workspacePanel() : null;
     const showLabels = (shared(DISPLAY_KEY) as { labels?: boolean } | undefined)?.labels ?? true;
     const c = props()?.view === 'manual' || props()?.view === 'run' ? props().context : this.context(cx);
     if (!props()?.view && c && this.repoKey !== JSON.stringify([c.s.id, c.cwd, c.s.machine])) this.reloadRepo(cx);
     const field = (name: string, input: InputState) => h_flex().gap(8).items_center().child(div().w(80).child(name)).child(Input.new(input).flex_1().h(30).px(8).bg(t.background).border_1().border_color(t.input).rounded(5));
     const shell = v_flex().id('toolbox').size_full().min_h(0).rounded(10).overflow_hidden()
       .bg(t.background).border_1().border_color(t.border).text_color(t.foreground).text_size(13)
-      .child(h_flex().h(42).flex_none().px(14).items_center().border_b(1).border_color(t.border)
-        .child(div().flex_1().font_semibold().child(props()?.view === 'manual' ? (props().entry?.id ? 'Edit tool' : 'Add a tool') : props()?.view === 'run' ? 'Run tool' : 'Toolbox'))
+      .child(h_flex().h(42).flex_none().pl(14).pr(dock?.embedded_header ? 106 : 14).items_center().border_b(1).border_color(t.border)
+        .when(Boolean(dock?.embedded_header),el=>el.gap(8))
+        .child(div().flex_1().min_w(0).truncate().font_semibold().when(Boolean(dock?.embedded_header),el=>el.flex_none().max_w(72)).on_click((event,cx) => {
+          if (dock && event.click_count >= 2) { cx.stop_propagation(); run('workspace.rename',{panel:dock.id}); }
+        }).child(props()?.view === 'manual' ? (props().entry?.id ? 'Edit tool' : 'Add a tool') : props()?.view === 'run' ? 'Run tool' : dock?.title ?? 'Toolbox'))
         .when(!props()?.view, el => el
           .child(div().id('toolbox-labels').size(24).flex().items_center().justify_center().mr(8)
             .text_size(12).text_color(showLabels ? t.muted : t.dim).cursor_pointer()

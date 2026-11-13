@@ -15,3 +15,18 @@ Sources, tests, and install scripts use strict TypeScript. Run `npm install` fir
 Run `npm test` and `npm run check:native`. Run `npm run install:local` to prepare, check, back up existing Toolbox files, install, and select the Toolbox layout. Preparation uses the personal `rigs-workspace` layout and creates a separate `toolbox-tabs` mod based on Context's tab bar. Context's own mod files remain unchanged. The original personal layout remains available. `npm run prepare-install` only writes reviewable artifacts under `prepared/`.
 
 The native mod and tab bar checks pass. Installed layout and appearance are verified in Herdr. Parameter quoting and revision/Space isolation tests pass. Remote command launches still require smoke testing. Shortcut deletion, environment editing, and Windows execution are not implemented yet.
+
+## Shared workspace header
+
+The mod declares `"workspace_header": true` in mod.json. In a compatible panel
+workspace, its original 42px title row carries the host's centered drag grip and
+rename/expand/close controls. The row reserves 106px on the right for those
+controls; existing mod actions remain available. Double-click its title to
+rename the panel without changing its identity, props or stored data.
+
+The workspace API is optional and read through the `herdr` module namespace.
+Released Herdr versions without `panel()` retain the original standalone header.
+Dialogs and popups retain their own titles. This integration does not change
+installation layout choices or any service, command, context or data ownership.
+
+Verified in the isolated Workspace Native app on 2026-11-13: all seven restored panels show one title row. Context, Toolbox and Rigs retain their original header actions; the app status reports no rendering errors. Screenshot: workspace `.checks/native/shared-mod-headers.png`. This verifies header presentation only.
