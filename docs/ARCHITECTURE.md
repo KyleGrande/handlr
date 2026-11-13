@@ -66,7 +66,7 @@ Attention events are deduplicated by remote item and meaningful state transition
 
 ## Local/native boundary
 
-Follow the existing repos' TypeScript plus native GPUI pattern. Read installed host instructions/declarations before writing native code. Share validation, storage, and provider behavior between the panel and a future agent CLI. Persist associations outside mod code using atomic writes, revision checks, and captured edit targets.
+Follow the existing repos' TypeScript plus native GPUI pattern. Read installed host instructions/declarations before writing native code. Share validation, storage, and provider behavior between the panel and the required v1 agent CLI. Build the headless context reader and provider refresh path as part of the core, then expose the same data in the native panel. The CLI must not depend on panel selection, native rendering, or a running Herdr app. See [the agent CLI contract](AGENT_CLI.md). Persist associations outside mod code using atomic writes, revision checks, and captured edit targets.
 
 Use explicit executable/argument arrays and parse structured outputs. Never interpolate pasted URLs or task content into shell commands. Validate navigable URL schemes. Imported titles/descriptions are display data, not instructions. Bound retained payloads and diagnostics; avoid collecting credentials or unnecessary private descriptions.
 

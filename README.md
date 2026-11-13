@@ -23,11 +23,14 @@ The underlying links are many-to-many: several tasks can share a checkout and PR
 
 One-time connection setup uses **GitHub CLI (`gh`)** and **Atlassian Teamwork Graph CLI (`twg`)**. Proposed background adapters reuse those CLI connections for ongoing reads. Ticket stores connection references rather than copied credentials. Ordinary URLs work without a provider connection; Linear can gain its own adapter without changing the core experience.
 
+**Agent access is required in v1.** A read-only Ticket CLI returns the current Ticket's tasks, PRs, canonical links, checkout mappings, CI/review observations, and freshness across all its repositories. It works without the panel or Herdr app being open. Agents resolve context from their own checkout or an explicit Ticket ID, and can request a bounded refresh through the shared provider adapters. See the [proposed agent CLI](docs/AGENT_CLI.md).
+
 ## Planning documents
 
 - [Experience and wireframe](docs/EXPERIENCE.md)
 - [Implementation phases and acceptance criteria](PLAN.md)
 - [Connections, identities, and adapter boundaries](docs/ARCHITECTURE.md)
+- [Required v1 agent CLI](docs/AGENT_CLI.md)
 
 ## Herdr responsibilities
 

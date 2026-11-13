@@ -14,6 +14,7 @@ Planning repository created. Experience, CLI connection direction, relationships
 - Initial connections through `gh` and Atlassian `twg`, configured once and reused.
 - Provider-neutral core with URL-only fallback and future Linear support.
 - CI and code review are the initial monitoring focus; task and PR states stay separate.
+- Read-only agent context CLI is required in the first usable version, alongside the native panel. It returns complete Ticket context and explicit freshness without requiring Herdr to be open.
 
 ## Phase 0 — validate the experience and CLI contract
 
@@ -22,6 +23,7 @@ Planning repository created. Experience, CLI connection direction, relationships
 - Test a selected Jira site's work-item reads and GitHub PR checks/reviews with existing authorized credentials.
 - Verify focused checkout identity and deletion/recreation behavior using Git/Core evidence.
 - Define exact adapter fixtures from sanitized observations; retain no tokens or private payloads in the repo.
+- Validate the [agent CLI contract](docs/AGENT_CLI.md): checkout resolution, ambiguous matches, complete cross-repo context, cached reads, bounded refresh, and structured errors.
 
 Exit: a reviewed interaction prototype and demonstrated provider reads with documented schemas and unresolved constraints. Do not claim Jira/TWG compatibility from reading documentation alone.
 
@@ -33,7 +35,7 @@ Exit: a reviewed interaction prototype and demonstrated provider reads with docu
 - Native Focused / All / Watching views and expandable Ticket detail with Open, Copy links, and Copy status.
 - `gh` PR observations and `twg` Jira work-item observations through capability-based adapters.
 - Bounded background refresh, visible stale/offline/auth states, and actionable CI/review detail.
-- Shared versioned CLI for agents to read linked work and make explicit local associations.
+- Required read-only agent CLI for complete Ticket context: tasks, PRs, links, mappings, CI/review state, and per-source freshness. Support checkout discovery, explicit Ticket IDs, and bounded refresh with the panel/app closed. Local association commands can share its underlying service without making reads depend on writes.
 
 Acceptance scenarios:
 
@@ -50,6 +52,10 @@ Acceptance scenarios:
 11. Panel closure/reopen and app restart retain associations and resume observations.
 12. A Ticket maps two different checkouts of the same repo without collapsing them. Renaming the Ticket preserves its stable ID and links.
 13. Removing a mapping preserves task/PR history; archiving a Ticket does not delete checkouts or alter a Rig.
+14. An agent in either mapped checkout reads the whole Ticket through versioned JSON with the panel/app closed; nested directories resolve the same checkout.
+15. Several Tickets match the agent's checkout: return an explicit ambiguity result and candidate IDs; an explicit Ticket ID resolves it without using global UI selection.
+16. A bounded CLI refresh succeeds for one provider and fails for another: return usable context, per-source timestamps/errors, and partial freshness without presenting cached values as newly observed. Cached reads work offline and never initiate provider calls.
+17. Agent reads require no local association writes, tracker mutations, progress reports, or interactive authentication; missing login returns a structured connection issue.
 
 Meaningful automated checks should cover association integrity, deduplication, stale revisions, captured edit targets, identity reuse, provider error parsing, head-SHA freshness, and copy selection. Native checks and live click-through must verify the panel when implementation exists. No tests are needed for this documentation-only milestone.
 

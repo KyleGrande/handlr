@@ -87,12 +87,17 @@ Open Connections from the empty state or panel menu. Detect installed `gh` and `
 
 Keep this screen out of the daily workflow. An expired connection gets a focused reconnect action while all other providers continue working. A new checkout should not require setup again. Future adapters, including Linear, appear as optional connections.
 
+## Agent access — required in v1
+
+An agent can check the current work directly through Ticket's CLI: all related tasks, PRs, source links, mapped repositories/checkouts, CI/review status, and freshness. The panel offers **Copy agent read command** with an explicit Ticket ID so the user can hand over the same context reliably.
+
+The agent can also discover Tickets from its own checkout. Reading one Ticket includes its other repositories. Multiple matches return candidates rather than choosing silently; another user's UI focus never changes the agent's target. Cached reads work offline with the app closed, and an explicit refresh checks connected providers with a bounded wait. Errors and stale observations remain visible in structured output. The [CLI proposal](AGENT_CLI.md) defines the initial contract.
+
 ## Later ideas
 
 - Start work from a task: create/select a worktree, attach the task, optionally open its Space.
 - Link suggestions from task keys in branches, PR descriptions, and provider relationships, with visible evidence.
 - A small attention indicator on the Ticket button while the panel is closed.
-- Read-only agent context command returning the current tasks, PRs, links, and freshness.
 - Explicit Jira transitions, PR review requests, CI retries, and backlink publishing after the read experience works well.
 - Optional release/deployment evidence from a provider that actually exposes it.
 
