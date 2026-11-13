@@ -140,3 +140,18 @@ process replacement, atomic bindings, late loads, draft migration, autosave race
 consolidation and minimal layout upgrades. See [PLAN.md](PLAN.md) for actual
 native/live acceptance results. Tracker adapters, remote storage sync and
 right-click shortcuts remain planned.
+
+## Shared workspace header
+
+The mod declares `"workspace_header": true` in mod.json. In a compatible panel
+workspace, its original 42px title row carries the host's centered drag grip and
+rename/expand/close controls. The row reserves 106px on the right for those
+controls; existing mod actions remain available. Double-click its title to
+rename the panel without changing its identity, props or stored data.
+
+The workspace API is optional and read through the `herdr` module namespace.
+Released Herdr versions without `panel()` retain the original standalone header.
+Dialogs and popups retain their own titles. This integration does not change
+installation layout choices or any service, command, context or data ownership.
+
+Verified in the isolated Workspace Native app on 2026-11-13: all seven restored panels show one title row. Context, Toolbox and Rigs retain their original header actions; the app status reports no rendering errors. Screenshot: workspace `.checks/native/shared-mod-headers.png`. This verifies header presentation only.

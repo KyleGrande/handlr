@@ -38,3 +38,14 @@ User decisions in the conversation take precedence over defaults here. Do author
 Keep README, agent guide, CLI help and implemented behavior consistent. Mark proposed commands/features as planned until they work. Add meaningful persistence/conflict/identity regressions as implementation arrives. Run checks appropriate to changes unless the user requests otherwise, and accurately report any unverified behavior.
 
 Keep this repository separate from `/Users/kylegrande/Documents/ChatGPT/Herdr Rigs`. Do not alter Rigs. Installation may apply the reviewed, minimal Context integration to the selected personal layout, preserving all other layout choices and shipped files.
+
+## Workspace header compatibility
+
+The mod opts into shared headers with `workspace_header: true` in mod.json.
+When `herdr.panel()` returns embedded_header, use one 42px original title row,
+the provided panel title and a 106px right gutter for host controls. Keep the
+center grip clear of mod-specific buttons. Title double-click runs
+workspace.rename with the supplied panel ID. Access panel through an optional
+namespace property so older Herdr installations keep their original UI.
+Never change owner selection, props, storage keys, process lifecycle or layouts
+merely to adopt this header. Test standalone and workspace presentations.

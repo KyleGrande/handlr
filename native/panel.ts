@@ -1,10 +1,16 @@
 import { View, div, type Context, type AsyncContext } from 'gpui-kit';
 import { h_flex, v_flex, Input, InputState, Editor, EditorState, RadioGroup, Radio } from 'gpui-base';
-import { spaces, agents, focused, terminals, exec, writeTextFile, theme, nextCommand } from 'herdr';
+import { spaces, agents, focused, terminals, exec, writeTextFile, theme, nextCommand, run } from 'herdr';
 import { config } from './config.js';
 import { Autosave, Drafts, highlightedAgent, type Draft } from '../src/drafts.js';
 import { scratchpad, targetKey, target as validateTarget } from '../src/model.js';
 import type { ContextTarget, ContextRecord, ContextPatch, Request, Response } from '../src/types.js';
+
+// Namespace access keeps this mod compatible with Herdr versions without panel().
+import * as WorkspaceHost from 'herdr';
+type WorkspacePanel = { id: string; title: string; embedded_header: boolean };
+const workspacePanel = (): WorkspacePanel | null =>
+  (WorkspaceHost as unknown as { panel?: () => WorkspacePanel | null }).panel?.() ?? null;
 
 function location() {
   const space = spaces().find(s => s.active);
@@ -174,6 +180,7 @@ export default class ContextPanel extends View {
     this.tagInput.set_value(''); cx.notify();
   }
   render(cx: Context) {
+    const dock = workspacePanel();
     // Follow live host selection directly, as Files and Changes do.
     if (this.selectionKey() !== this.locationKey) this.refresh(cx);
     const t = theme() as Record<string, `#${string}`>, d = this.draft();
@@ -181,7 +188,9 @@ export default class ContextPanel extends View {
     const label = (value: string) => div().text_size(11.5).text_color(t.muted).child(value);
     const current = this.current(), content = d && current ? { ...d.record, ...d.patch } : null;
     const shell = v_flex().id('context').size_full().min_h(0).rounded(10).overflow_hidden().bg(t.background).border_1().border_color(t.border).text_color(t.foreground).text_size(13)
-      .child(h_flex().h(42).flex_none().px(14).items_center().border_b(1).border_color(t.border).child(div().font_semibold().child('Context')));
+      .child(h_flex().h(42).flex_none().pl(14).pr(dock?.embedded_header ? 106 : 14).items_center().border_b(1).border_color(t.border).child(div().min_w(0).truncate().font_semibold().on_click((event,cx) => {
+        if (dock && event.click_count >= 2) { cx.stop_propagation(); run('workspace.rename',{panel:dock.id}); }
+      }).child(dock?.title ?? 'Context')));
     const root = v_flex().flex_1().min_h(0).p(12).gap(10)
       .child(RadioGroup.new('context-scope').accessibility_label('Context scope').flex().p(3).gap(2).rounded(8).bg(t.raised).border_1().border_color(t.border)
         .children((['shared', 'agent'] as const).map(scope => Radio.new(`scope-${scope}`).checked(this.scope === scope)
