@@ -7,7 +7,8 @@ Planning repository created. Experience, CLI connection direction, relationships
 ## Product direction
 
 - Independent native Herdr mod named Ticket, consistent with Context/Rigs/Toolbox.
-- Daily view follows the focused checkout; Watching crosses checkouts.
+- Named Tickets contain multiple named repo/checkout mappings, similar to Rigs. Multiple checkouts of one repo are supported too.
+- Focused filters Tickets by the current checkout; opening a Ticket shows all its mapped work. All and Watching cross checkouts.
 - Many-to-many task/worktree/PR relationships, with direct task–PR links.
 - Paste/open/copy source URLs as first-class actions.
 - Initial connections through `gh` and Atlassian `twg`, configured once and reused.
@@ -26,20 +27,20 @@ Exit: a reviewed interaction prototype and demonstrated provider reads with docu
 
 ## Phase 1 — useful daily workflow
 
-- Durable associations, watches, URL normalization, and generic link fallback.
+- Durable named Tickets, repo/checkout mappings, associations, watches, URL normalization, and generic link fallback.
 - One-time Connections flow; retain account/site/project selections.
-- Paste a task/PR URL and attach it to an existing checkout.
-- Native This checkout / Watching views with Open, Copy links, and Copy status.
+- Paste a task/PR URL to create or extend a Ticket; add multiple existing checkouts through named mappings.
+- Native Focused / All / Watching views and expandable Ticket detail with Open, Copy links, and Copy status.
 - `gh` PR observations and `twg` Jira work-item observations through capability-based adapters.
 - Bounded background refresh, visible stale/offline/auth states, and actionable CI/review detail.
 - Shared versioned CLI for agents to read linked work and make explicit local associations.
 
 Acceptance scenarios:
 
-1. Two Jira tasks attach to one worktree and one PR; links survive restart.
-2. One task spans two repositories/PRs, with separate CI/review states.
+1. One named Ticket groups two Jira tasks, one worktree, and one PR; links and name survive restart.
+2. One Ticket spans frontend/backend repositories and checkouts, with separate PR/CI/review states. Focusing either checkout reveals the complete Ticket.
 3. Two tasks share a checkout with different PRs; no false task–PR links are inferred.
-4. Switching focus changes the checkout view; Watching retains the earlier PR.
+4. Switching focus filters the Ticket list; All and Watching retain work elsewhere. Multiple Tickets sharing a checkout remain selectable.
 5. A failing check and requested review changes expose exact source links.
 6. A PR gets a new head commit; stale checks are not presented as current success.
 7. Missing/expired `twg` leaves GitHub and saved URLs usable, with clear freshness.
@@ -47,6 +48,8 @@ Acceptance scenarios:
 9. Two Spaces on one verified checkout share its links; different machines remain distinct.
 10. Copy output contains only the selected source URLs/status and does not send anything.
 11. Panel closure/reopen and app restart retain associations and resume observations.
+12. A Ticket maps two different checkouts of the same repo without collapsing them. Renaming the Ticket preserves its stable ID and links.
+13. Removing a mapping preserves task/PR history; archiving a Ticket does not delete checkouts or alter a Rig.
 
 Meaningful automated checks should cover association integrity, deduplication, stale revisions, captured edit targets, identity reuse, provider error parsing, head-SHA freshness, and copy selection. Native checks and live click-through must verify the panel when implementation exists. No tests are needed for this documentation-only milestone.
 

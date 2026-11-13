@@ -34,6 +34,8 @@ Use ordinary versioned records and an edge table; a graph database is unnecessar
 
 | Record | Identity and purpose |
 | --- | --- |
+| Ticket | Stable local UUID, mutable name, active/archived state, and related work; analogous to a named Rig instance. |
+| Checkout mapping | Stable mapping ID within a Ticket, named role, repository reference, and concrete checkout reference. Several mappings can use different checkouts of the same repository. |
 | Task | Internal UUID plus provider, host/tenant, and stable remote ID; display key and URL are mutable attributes. |
 | PR | Provider host, repository identity, and PR identity; preserve canonical URL and head SHA. |
 | Checkout | Internal UUID plus Core machine identity, repository identity, and verified Git worktree metadata/path. |
@@ -42,13 +44,15 @@ Use ordinary versioned records and an edge table; a graph database is unnecessar
 | Snapshot | Provider observation, freshness, connection health, and last successful payload. |
 | Connection | Provider, selected account/tenant, executable reference, and defaults; no token copy. |
 
-Initial relations: task ↔ checkout, PR ↔ checkout, and task ↔ PR. A generic link can attach to any item. Association removal is local and does not mutate the provider. Confirmed links and candidate suggestions are distinct.
+Ticket membership groups tasks, checkout mappings, and PRs. Within that grouping, relations include task ↔ checkout, PR ↔ checkout, and task ↔ PR. A generic link can attach to any item. Group membership does not imply every task applies to every mapping or PR. Association removal is local and does not mutate the provider. Confirmed links and candidate suggestions are distinct.
+
+Repository and checkout records are reusable references. The same checkout can participate in several Tickets; unlike Rigs' running-stack reservations, Ticket grouping grants no exclusive claim or process ownership. Removing a mapping preserves remote items, direct task–PR history, and independent watches. Archiving a Ticket does not stop a Rig or delete any checkout.
 
 Task ↔ PR is explicit: two tasks sharing a checkout do not prove that every PR addresses both. Stable external IDs prevent task-key reuse or repository naming collisions. Preserve URL-only items until resolution succeeds, then merge duplicates without losing associations or watches.
 
 Checkout paths and branch names are locators, not sufficient lifetime identities. A deleted/recreated worktree at the same path must not silently inherit previous work. The spike must establish what Git/Core evidence can verify and require explicit repair when ambiguous. Store machine qualification so identical paths on different machines remain separate.
 
-The active Herdr Space selects context, but does not own task–PR relationships. Two Spaces using the same verified checkout should see the same links. Resolve from focused terminal CWD, including subdirectories; use the Space folder only when no terminal CWD is available. If identity cannot be verified, show an unresolved state instead of switching to an assumed checkout.
+The active Herdr Space selects context, but does not own Tickets or task–PR relationships. Resolve the focused checkout from terminal CWD, including subdirectories; use the Space folder only when no terminal CWD is available. Focused returns all Tickets with a matching mapping, and each Ticket detail loads its complete set of mappings and linked work. Two Spaces using the same verified checkout see the same matching Tickets. If identity cannot be verified, show an unresolved state instead of switching to an assumed checkout. Keep explicit Ticket selection by stable ID; asynchronous focus changes must not redirect edits to another Ticket.
 
 ## Refresh and attention
 

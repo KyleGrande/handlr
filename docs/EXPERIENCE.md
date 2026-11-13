@@ -4,9 +4,9 @@ This is a product proposal, not implemented behavior. Example identifiers and st
 
 ## Everyday flow
 
-1. **Pick work.** Paste a Jira URL, paste a PR URL, or search assigned work through a connected provider. URL-only items work immediately, even if setup is incomplete.
-2. **Connect the checkout.** Attach the item to the focused worktree or choose another registered checkout. The UI names the target before saving. A second task can attach to that same checkout.
-3. **Work normally.** Ticket follows the checkout resolved from the focused terminal. It suggests PRs matching the repository and branch; you confirm ambiguous relationships. Explicit links survive branch changes.
+1. **Start a Ticket.** Give the work a name, or paste a task/PR URL to seed the name and first link. Search assigned work through a connected provider. URL-only items work immediately, even if setup is incomplete.
+2. **Connect repositories and checkouts.** Add named mappings like a Rig: `web` and `api` can point to different repositories/worktrees, or two mappings can point to different checkouts of the same repository. Add related tasks and PRs to the same Ticket. The UI names the Ticket and checkout target before saving.
+3. **Work normally.** The focused terminal's checkout filters matching Tickets. Opening one shows the entire Ticket, including work in its other repositories. Suggest PRs per mapping using repository and branch evidence; confirm ambiguous relationships. Explicit links survive branch changes.
 4. **See what changed.** CI failures, requested changes, unresolved review threads, approvals, and merged PRs appear beside the relevant work. Switching away does not stop watching linked PRs.
 5. **Share.** Copy a task URL, PR URL, all selected links, or a concise Markdown status. Copying never sends a message.
 6. **Finish.** Merge is a PR event. Task completion remains the provider's own state. Archive local work when finished; keep its links and history available.
@@ -16,37 +16,42 @@ This is a product proposal, not implemented behavior. Example identifiers and st
 Use one Ticket button adjacent to the existing Context/Toolbox controls. Proposed default placement is the existing right-side panel, with host styling. Exact placement needs a native prototype alongside the user's current layout.
 
 ```text
-Ticket                                  +    …
-[ This checkout ]  [ Watching ]
-app · auth-refresh
+Ticket                                      +    …
+[ Focused ]  [ All ]  [ Watching ]
 
-Tasks                                  Link…
-APP-421  Refresh login       In progress  ↗ ⧉
-APP-438  Handle expiry       In progress  ↗ ⧉
+▾ Refresh authentication              2 need attention
+  Tasks                                      Link…
+  APP-421  Refresh login       In progress     ↗ ⧉
+  APP-438  Handle expiry       In progress     ↗ ⧉
 
-Pull requests                          Link…
-app #259 · Refresh authentication        ↗ ⧉
-  CI       1 failed · 7 passed
-  Review   Changes requested · 2 unresolved
-  Updated  35 seconds ago
+  Repositories / checkouts                     +
+  ▾ web · web/auth-refresh
+    web #259 · Refresh login                   ↗ ⧉
+    CI: 7 passed · Review: approved
+  ▾ api · api/auth-refresh
+    api #84 · Refresh tokens                   ↗ ⧉
+    CI: 1 failed · Review: changes requested
+    2 unresolved threads · Updated 35s ago
 
-Needs attention
-  × Integration tests failed             Open
-  ↳ Review thread in session.ts          Open
+  [ Copy links ]                  [ Copy status ]
 
-[ Copy links ]                  [ Copy status ]
+▸ Session cleanup                      Awaiting review
 ```
 
 Rows open their source; a separate copy control copies the canonical URL without navigation. Hover may reveal details, but status words remain visible without relying on color. Expand a PR for individual checks and review threads. Keep identifiers and useful titles visible; put full paths in secondary detail.
 
-**This checkout** is a focused work view. **Watching** is a persistent personal list across repositories, showing actionable changes first. It includes linked work by default and lets the user watch or unwatch unrelated items. Unwatching does not unlink a task or delete its history.
+**Focused** shows Tickets with any mapping matching the focused checkout. Expanding a Ticket always includes all its mapped repositories/checkouts and associated tasks/PRs; focus never clips a cross-repo Ticket to a single repository. If several Tickets share the focused checkout, list all matches rather than choosing one silently. **All** shows active Tickets with archived work available through a secondary filter.
 
-Avoid adding a mandatory Ticket-specific project or work bundle. Existing tasks, checkouts, and PRs are enough for the first version. If grouping becomes useful later, add it without making users duplicate their Jira structure.
+**Watching** is a persistent personal list across Tickets and repositories, showing actionable changes first. It includes linked work by default and lets the user watch or unwatch unrelated items. Unwatching does not unlink a task or delete its history.
+
+A **Ticket** is the named local work grouping, analogous to a Rig's named stack and repo mappings. It can contain several external tasks and several checkouts. Creating one does not create another issue in Jira or require a new project structure. A single-task/single-checkout Ticket should be quick to start; multiple mappings are optional. Rename, edit mappings, and archive the Ticket without changing source task identities or deleting checkouts. A checkout may belong to more than one Ticket.
 
 ## Important cases
 
 | Situation | Proposed behavior |
 | --- | --- |
+| Frontend and backend changes belong together | One Ticket maps both checkouts and shows each PR's CI/review state. |
+| One repo needs two checkouts | Distinct named mappings retain their separate branches and PRs. |
 | Two tasks, one worktree, one PR | Both tasks appear; link the PR to the tasks it actually addresses. |
 | One task, frontend and backend PRs | Show both repositories and PR statuses under that task. |
 | Several tasks share a checkout but use separate PRs | Preserve explicit task–PR links; proximity alone is insufficient. |
@@ -63,7 +68,7 @@ Avoid adding a mandatory Ticket-specific project or work bundle. Existing tasks,
 
 ## Copying and sharing
 
-**Copy links** defaults to the current checkout's explicitly associated task and PR URLs, deduplicated and grouped. Let the user select a subset. Do not include worktree paths, local service URLs, notes, or credentials by default.
+**Copy links** defaults to the selected Ticket's explicitly associated task and PR URLs across all its mappings, deduplicated and grouped by task/repository. Let the user select a subset, including a single mapping. Do not include worktree paths, local service URLs, notes, or credentials by default.
 
 **Copy status** builds a deterministic summary from the displayed snapshot, including observation time if stale. It does not need an LLM. Example output:
 
