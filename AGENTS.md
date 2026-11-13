@@ -156,3 +156,14 @@ npm run install:mod       # First install: personal layout clone plus mod
 - Run `npm run test:live` when changing Core lifecycle or the command interface used by live fixtures. `npm run test:crash` covers durable launch recovery and stale-lock behavior. Both start disposable test processes and clean up only their own launches.
 - Follow `docs/DESKTOP_ACCEPTANCE.md` for native click-through, endpoint opening, output peeks, visibility polling and actual app quit/reopen. Do not quit the user's app without authorization. Source review, checker rendering and registry reopen tests do not prove those desktop behaviors.
 - Record exactly what was checked and any remaining limits in `docs/verification.md`. Do not present historical test results as a fresh run, or mark UI acceptance complete based on build success.
+
+## Workspace header compatibility
+
+The mod opts into shared headers with `workspace_header: true` in mod.json.
+When `herdr.panel()` returns embedded_header, use one 42px original title row,
+the provided panel title and a 106px right gutter for host controls. Keep the
+center grip clear of mod-specific buttons. Title double-click runs
+workspace.rename with the supplied panel ID. Access panel through an optional
+namespace property so older Herdr installations keep their original UI.
+Never change owner selection, props, storage keys, process lifecycle or layouts
+merely to adopt this header. Test standalone and workspace presentations.

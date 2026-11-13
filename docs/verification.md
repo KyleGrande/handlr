@@ -183,3 +183,16 @@ The original PLAN.md scope remains active. The user additionally required TypeSc
 Computer-use discovery found Herdr running, but selecting the app returned **“Computer Use was not approved to use Herdr.”** No native clicks or quit/reopen were attempted through another automation mechanism. The goal cannot be called complete until the remaining desktop gates have evidence.
 
 Herdr computer-use access was rechecked during the continuation and remained denied. The user replied that they will enable access; that response authorizes the work but does not prove the tool permission has changed. Await actual access before native interaction.
+
+## Workspace shared header — 2026-11-13
+
+On `fix/workspace-shared-headers`, the native TypeScript build and initial
+checker pass against released Herdr. The eager state checker covers the docked
+header and all existing popup/preview/service states without CLI calls or service
+launches. Its context/delete fixtures now supply the props that actual popups
+receive; the missing-props failure was reproduced using the unmodified baseline.
+The header changes do not alter the CLI, registry, ownership or lifecycle.
+Live verification below concerns header presentation only; the broader desktop
+acceptance items above remain separate.
+
+Verified in the isolated Workspace Native app on 2026-11-13: all seven restored panels show one title row. Context, Toolbox and Rigs retain their original header actions; the app status reports no rendering errors. Screenshot: workspace `.checks/native/shared-mod-headers.png`. This verifies header presentation only.

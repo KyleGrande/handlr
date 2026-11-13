@@ -1,8 +1,15 @@
 import type { AppObservation, Plan, ResolvedService, RigConnection } from '../../src/types.js';
+
 import { setupPrompt } from './setup.js';
 import { View, div, svg, type AsyncContext, type Context } from 'gpui-kit';
 import { v_flex, h_flex, Input, InputState, Editor, EditorState } from 'gpui-base';
 import { appHome, exec, focused, panes, theme, run, props, pickFolder, writeTextFile, layout, spaces, openOverlay, closeOverlay } from 'herdr';
+
+// Namespace access keeps this mod compatible with Herdr versions without panel().
+import * as WorkspaceHost from 'herdr';
+type WorkspacePanel = { id: string; title: string; embedded_header: boolean };
+const workspacePanel = (): WorkspacePanel | null =>
+  (WorkspaceHost as unknown as { panel?: () => WorkspacePanel | null }).panel?.() ?? null;
 
 type Preview = Omit<Plan, 'services'> & {services: Record<string, Omit<ResolvedService, 'secrets'>>};
 function localCheckout() {
@@ -638,6 +645,7 @@ export default class Rigs extends View {
     } else root.child(div().flex_1().p(20).text_color(t.dim).child(this.actionError ? 'Close and reopen this preview to load the current plan.' : 'Loading preview…'));
     return root;
   }
+  workspaceHeader() { return workspacePanel(); }
   render(cx: Context) {
     if (this.contextMode) return this.renderContext();
     if (this.deleteMode) return this.renderDelete();
@@ -645,6 +653,8 @@ export default class Rigs extends View {
     if (this.menuMode) return this.renderMenu();
     if (this.createMode) return this.renderCreate();
     if (this.previewMode) return this.renderPreview();
+    const dock = this.workspaceHeader();
+    const embedded = Boolean(dock?.embedded_header);
     const scope = this.viewScope();
     if (!this.paused && this.visible() && scope !== this.requestedScope) this.refresh(cx);
     const t = theme() as { [K in keyof ReturnType<typeof theme>]: `#${string}` };
@@ -654,9 +664,13 @@ export default class Rigs extends View {
         .text_color(t.dim).hover(s => s.bg(t.hover).text_color(t.foreground)).tooltip(tip)
         .on_click((_e,cx) => { if (!this.busy) action(cx); })
         .child(svg(`mods/workspace-chrome/${file}.svg`).size(14));
-    const root = v_flex().id('rigs-root').size_full().min_h(0).bg(t.chrome).border_t(1).border_color(t.border).text_color(t.foreground).text_size(13);
-    root.child(h_flex().h(31).pl(16).pr(10).flex_none().items_center().justify_between().text_size(11.5).text_color(t.dim)
-      .child('Rigs')
+    const root = v_flex().id('rigs-root').size_full().min_h(0).bg(t.chrome).border_t(1).border_color(t.border).text_color(t.foreground).text_size(13)
+      .when(embedded,el=>el.bg(t.background).rounded(10).overflow_hidden().border_1());
+    root.child(h_flex().h(embedded ? 42 : 31).pl(embedded ? 14 : 16).pr(embedded ? 106 : 10).flex_none().items_center().justify_between().text_size(embedded ? 13 : 11.5).text_color(embedded ? t.foreground : t.dim)
+      .when(embedded,el=>el.border_b(1).border_color(t.border).justify_start().gap(8))
+      .child(div().min_w(0).truncate().when(embedded,el=>el.font_semibold().max_w(72)).on_click((event,cx)=>{
+        if (dock && event.click_count >= 2) {cx.stop_propagation();run('workspace.rename',{panel:dock.id});}
+      }).child(dock?.title ?? 'Rigs'))
       .child(h_flex().gap(2).items_center().flex_none()
         .child(icon('options', 'settings', 'Rig options', cx => { this.tools = !this.tools; cx.notify(); }))
         .child(icon('new', 'plus', 'New rig', () => this.openNewMenu()))));

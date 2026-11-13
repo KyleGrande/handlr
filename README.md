@@ -185,3 +185,16 @@ For the remaining native interaction checks, use [docs/DESKTOP_ACCEPTANCE.md](do
 Individual services can also be controlled with `rig up|down|restart <name> --service <id>`. Service start includes declared readiness prerequisites. Partial stacks retain conservative reservations for the entire profile while any owned launch remains active or unresolved. Restart holds the rig lease through stop/start and preserves reservations until replacement or explicit reconciliation.
 
 Connected rigs show compact **↔ peer-name** rows when expanded. Collapsing a rig hides its links and services. Hover for service/binding/address details or click the peer to open its preview. Links match declared external URLs to uniquely reserved endpoints in other rigs; ambiguous or unmanaged targets are not assigned an invented owner. Profiles remain reusable; selecting one from the + popup creates a separate stopped rig definition with editable checkout mappings.
+
+## Shared workspace header
+
+The mod declares `"workspace_header": true` in mod.json. In a compatible panel
+workspace, its original 42px title row carries the host's centered drag grip and
+rename/expand/close controls. The row reserves 106px on the right for those
+controls; existing mod actions remain available. Double-click its title to
+rename the panel without changing its identity, props or stored data.
+
+The workspace API is optional and read through the `herdr` module namespace.
+Released Herdr versions without `panel()` retain the original standalone header.
+Dialogs and popups retain their own titles. This integration does not change
+installation layout choices or any service, command, context or data ownership.
