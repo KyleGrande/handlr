@@ -28,7 +28,7 @@ for packaging and [the implementation record](handlr/IMPLEMENTATION.md) for veri
 history and remaining work.
 
 Herdr's original documentation is retained in [docs/UPSTREAM-README.md](docs/UPSTREAM-README.md).
-The local `panel-workspace` branch contains Handlr's changes; `master` initially
+The default `main` branch contains Handlr's changes; `master` initially
 retains upstream's baseline. Use an `upstream` remote pointing to
 `https://github.com/herdrdev/herdr-app.git` when incorporating upstream fixes.
 
