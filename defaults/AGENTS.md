@@ -92,6 +92,11 @@ If `shared.json` is invalid, Herdr logs a warning and keeps it as
 
 ## The model: spaces, tabs, terminals
 
+The **Machines** panel (`workspace.open {name:"machines"}`) shows this computer
+and saved remote machines with connection status, space and terminal counts.
+Expand a machine to select or create spaces. Its footer opens Add machine and
+Settings → Machines. It refreshes every five seconds and omits temporary machines.
+
 Every layout shows the same world; a layout may show less, never a
 different one. Each machine keeps its spaces, tabs and splits in its core's
 `herdr-app` document. Connected screens share that layout and live terminals,

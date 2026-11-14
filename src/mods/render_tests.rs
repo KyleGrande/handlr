@@ -786,6 +786,48 @@ fn long_space_names_use_the_sidebar_width(cx: &mut TestAppContext) {
 }
 
 #[gpui::test]
+fn machines_panel_handles_connection_and_layout_states(cx: &mut TestAppContext) {
+    cx.update(gpui_shell::init);
+    let staged = Staged::new();
+    // Run the CLI checker's actual load/render/materialization path using the
+    // test display; AppKit's hidden-window checker is unavailable in a sandbox.
+    let mut previous = None;
+    let calls = Rc::new(RefCell::new(Calls::default()));
+    let check_policy = Policy::new()
+        .with_capabilities(Capabilities::new().read_roots([staged.0.clone()]))
+        .with_host_module(module(fixture(true, props(), updates("current", "current")), calls.clone())).unwrap();
+    gpui_shell::policy::update_default(|policy| { previous = Some(policy); check_policy });
+    let runtime = ShellRuntime::new_isolated().unwrap();
+    let window = cx.add_window(|_, _| Empty);
+    let checked = window.update(cx, |_, window, cx| runtime.check(staged.0.join("mods/machines"), window, cx)).unwrap();
+    gpui_shell::policy::set_default(previous.unwrap());
+    assert!(checked.unwrap().contains("This computer"));
+    gpui::AnyWindowHandle::from(window).update(cx, |_, window, _| window.remove_window()).unwrap();
+    cx.run_until_parked();
+    assert!(calls.borrow().unexpected.is_empty());
+    for (state, layout, can_open) in [
+        ("connected", "ready", true),
+        ("connected", "loading", false),
+        ("connected", "unavailable", false),
+        ("needs_login", "unavailable", false),
+        ("unreachable", "unavailable", false),
+    ] {
+        let mut values = fixture(true, props(), updates("current", "current"));
+        values.insert("machines".into(), json!([
+            {"name":null,"layout":"ready"}, {"name":"remote","layout":layout}
+        ]));
+        let setup = format!("this.list = [{{name:'remote', target:'user@host', state:{}, why:'Connection details', keeps_running_after_logout:false}}];", json!(state));
+        let tree = describe_with_values(cx, &staged, "mods/machines", values, Some(&setup)).unwrap();
+        assert!(tree.contains("This computer"), "{tree}");
+        assert!(tree.contains("machine-1-space-0"), "{tree}");
+        assert!(tree.contains("Connection details"), "{tree}");
+        assert!(tree.contains("Agents stop when you disconnect"), "{tree}");
+        assert_eq!(tree.contains("machine-new-1"), can_open, "{state}/{layout}: {tree}");
+        assert_eq!(tree.contains("Run hc machine login remote"), state == "needs_login", "{tree}");
+    }
+}
+
+#[gpui::test]
 fn rebuilt_machine_offers_connect_only_for_identity_mismatch(cx: &mut TestAppContext) {
     cx.update(gpui_shell::init);
     let staged = Staged::new();

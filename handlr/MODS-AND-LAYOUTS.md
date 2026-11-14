@@ -14,14 +14,16 @@ sharing artifacts, not files the app requires to load a mod. A layout's root
 | Context | `mod-worktrees/context/{RECIPE.md,preview.png}` | Build/installer emits `main.js`, `mod.json`, `context.svg`, `native/`, `src/`; configured CLI, launcher and guide are also required |
 | Toolbox | `mod-worktrees/toolbox/{RECIPE.md,preview.png}` | Build emits `dist/mods/toolbox/` and companion `toolbox-tabs/`, including JS, manifests, SVG and setup guide |
 | Rigs | `mod-worktrees/rigs/{RECIPE.md,preview.png}` | `mods/rigs/{main.js,setup.js,mod.json,AGENTS.md}` plus installed Node/CLI checkout paths |
+| Ticket | Separate `Herdr Ticket` repository: `RECIPE.md`, `preview.png` | `build/ticket/{main.js,mod.json,runtime.js}` plus the built CLI checkout |
 
 Context, Toolbox and Rigs are independent Git repositories, ignored by this
 repository. Their new recipes/screenshots must be committed in those repositories
 to travel with those sources. Their pre-existing local edits remain intact.
 The bundled Machines panel belongs to the host's `defaults/mods/machines/`;
 it is not an independent gallery package and needs no separate gallery recipe.
-Other installed personal mods, including Ticket, are not maintained by this
-workspace audit. Shipped default mods likewise use the host guide/API contract.
+Ticket is maintained in the separate sibling `Herdr Ticket` repository on its
+`handlr-ui` branch; its implementation and sharing files were included in the
+follow-up audit. Shipped default mods use the host guide/API contract.
 
 `npm run build` regenerates the prototype layouts and native workspace document.
 The macOS portable packager reads the native layout rather than defining a

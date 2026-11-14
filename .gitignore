@@ -17,3 +17,8 @@
 /defaults/mods/changes/jsconfig.json
 /defaults/mods/files/gpui-kit.d.ts
 /defaults/mods/files/jsconfig.json
+
+# Local Handlr workspace state
+/handlr/mod-worktrees/
+/handlr/rig.handlr.json
+.DS_Store
