@@ -4,6 +4,7 @@ dist/
 build/
 .host/
 .artifacts/
+layout-backups/
 .env
 .env.*
 !.env.example

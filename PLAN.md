@@ -2,7 +2,7 @@
 
 ## Status
 
-Planning repository created. Experience, CLI connection direction, relationships, and delivery phases are proposals. No application source, mod installation, provider integration, or live UI acceptance exists yet.
+Local core, required agent CLI, native panel, installer, and GitHub observation adapter are implemented. Build/tests and native/live GitHub verification pass. Phase 0 and Phase 1 are **partially delivered**, not complete: Jira/TWG is unverified, native cross-repo PR attention still needs broader live acceptance, and automatic link discovery remains planned. See [STATUS.md](docs/STATUS.md) for evidence and the remaining checklist. Phases 2 and 3 remain planned.
 
 ## Product direction
 
@@ -30,7 +30,7 @@ Exit: a reviewed interaction prototype and demonstrated provider reads with docu
 ## Phase 1 — useful daily workflow
 
 - Durable named Tickets, repo/checkout mappings, associations, watches, URL normalization, and generic link fallback.
-- One-time Connections flow; retain account/site/project selections.
+- Connections reports existing gh CLI authentication without a Ticket login or setup step. Tracker site/project selection remains planned.
 - Paste a task/PR URL to create or extend a Ticket; add multiple existing checkouts through named mappings.
 - Native Focused / All / Watching views and expandable Ticket detail with Open, Copy links, and Copy status.
 - `gh` PR observations and `twg` Jira work-item observations through capability-based adapters.
@@ -57,7 +57,7 @@ Acceptance scenarios:
 16. A bounded CLI refresh succeeds for one provider and fails for another: return usable context, per-source timestamps/errors, and partial freshness without presenting cached values as newly observed. Cached reads work offline and never initiate provider calls.
 17. Agent reads require no local association writes, tracker mutations, progress reports, or interactive authentication; missing login returns a structured connection issue.
 
-Meaningful automated checks should cover association integrity, deduplication, stale revisions, captured edit targets, identity reuse, provider error parsing, head-SHA freshness, and copy selection. Native checks and live click-through must verify the panel when implementation exists. No tests are needed for this documentation-only milestone.
+Automated checks cover association integrity, URL deduplication, stale revisions, identity reuse, provider error parsing, head-SHA freshness, pagination, bounded refresh, read-only offline behavior, and copy selection. Captured edit targets are implemented in the panel; focus-change-during-edit still needs live acceptance. Native checks and live click-through verify the initial workflow; the remaining acceptance gaps are tracked in STATUS.md.
 
 ## Phase 2 — reduce manual linking
 
@@ -72,6 +72,6 @@ Meaningful automated checks should cover association integrity, deduplication, s
 
 Consider task transitions, publishing backlinks, PR actions, and CI retries once monitoring is reliable. Specify exact targets, supported permissions, and failure/retry semantics before implementation. Automatic status synchronization is a separate product decision.
 
-## Scope of the first milestone
+## Original planning milestone (completed before implementation)
 
-This repository starts with planning. No provider authentication, package installation, existing mod/layout modification, worktree creation, tracker writes, or service launches are part of this milestone. Next implementation step: the native experience prototype and read-only provider spike.
+The repository started as planning only. Implementation now adds an independent mod and CLI without changing other repositories, shipped mods, or layout files. The GitHub spike uses existing gh credentials and performs reads only. No tracker login, worktree creation outside disposable tests, provider writes, or development-service launches were performed.

@@ -1,6 +1,16 @@
 # Proposed Ticket experience
 
-This is a product proposal, not implemented behavior. Example identifiers and statuses below are fictional.
+This is the target experience. The native panel now implements local create/rename/archive, named checkout mappings, explicit relationships, Focused/All/Watching, source Open/Copy, and GitHub observation detail. The optional layout installer adds a Ticket toolbar button and right-panel view in a clone of the current workspace. Search, suggestions, worktree creation, and tracker observations remain planned. Example identifiers and statuses below are fictional; see [STATUS.md](STATUS.md) for actual live evidence.
+
+The implemented panel follows Context and Toolbox's native panel frame,
+compact header, segmented scope tabs, theme colors, typography, and styled
+inputs. Ticket rows and icon actions follow Rigs' compact navigation treatment.
+Actions wrap within the panel width; forms scroll with Ticket content.
+In Handlr workspaces, the host supplies the panel frame, title, and window
+controls. Ticket omits its own frame/title row, uses 8px content padding, and
+places New Ticket and Connections beside the scope tabs. Those actions remain
+available when Handlr's No Headers setting hides the host title row. Standalone
+windows and older Herdr hosts keep Ticket's original frame and 42px header.
 
 ## Everyday flow
 
@@ -81,9 +91,9 @@ CI: 1 failing check. Review: changes requested; 2 unresolved threads.
 
 Use the original Jira/PR links for recipients; v1 does not require a hosted Ticket sharing service.
 
-## One-time setup
+## Connections
 
-Open Connections from the empty state or panel menu. Detect installed `gh` and `twg`, reuse existing login where possible, and guide missing installation/login. Select GitHub host/account and Atlassian site/projects explicitly. Verify a harmless read for each enabled provider, then retain those defaults across Spaces and worktrees.
+GitHub reads automatically use the existing gh CLI authentication. Connections detects installed `gh` and `twg` and shows gh's active account; there is no GitHub login field or Ticket-specific connection step. Missing authentication is reported with guidance to check gh in the user's terminal, without starting login. Atlassian site/project selection remains planned until the tracker adapter is verified.
 
 Keep this screen out of the daily workflow. An expired connection gets a focused reconnect action while all other providers continue working. A new checkout should not require setup again. Future adapters, including Linear, appear as optional connections.
 

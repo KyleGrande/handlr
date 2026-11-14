@@ -1,6 +1,6 @@
 # Herdr Ticket
 
-Read README.md, PLAN.md, docs/EXPERIENCE.md, docs/ARCHITECTURE.md, and docs/AGENT_CLI.md before implementation. This is currently a planning-only repository; mark proposed commands and features as planned until they work.
+Read README.md, PLAN.md, docs/EXPERIENCE.md, docs/ARCHITECTURE.md, and docs/AGENT_CLI.md before implementation. The local CLI/native panel and GitHub reads are implemented; read docs/STATUS.md for verified behavior and remaining limits. Mark proposed commands and features as planned until they work.
 
 The read-only agent CLI is a required v1 capability, not a later enhancement. Return complete cross-repo Ticket context, canonical links, and per-source freshness through versioned JSON. Support explicit Ticket IDs and the agent's own verified checkout; return candidate IDs on ambiguity rather than using global UI focus. Cached reads and bounded provider refresh must work without the native app/panel. Reads require no progress reports or external mutations; never launch interactive login from an agent read.
 

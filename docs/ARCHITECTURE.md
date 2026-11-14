@@ -1,6 +1,6 @@
 # Proposed architecture
 
-Nothing here is implemented. Provider documentation was reviewed on 2026-11-12; executable versions, flags, output schemas, and tenant access must be verified during the integration spike.
+The core, headless CLI, GitHub adapter, and native panel are implemented in TypeScript. This document retains the target architecture; [STATUS.md](STATUS.md) distinguishes delivered behavior from planned integrations. Installed gh 2.97.0 help and live output were verified on 2026-11-12 (local date). TWG remains absent and unverified.
 
 ## CLI connections
 
@@ -12,7 +12,7 @@ The [TWG catalog](https://developer.atlassian.com/platform/teamwork-graph/twg-cl
 
 GitHub's [auth status](https://cli.github.com/manual/gh_auth_status), [PR view](https://cli.github.com/manual/gh_pr_view), and [PR checks](https://cli.github.com/manual/gh_pr_checks) provide starting points. Use structured output and, where necessary, `gh api` for review threads and more detailed observations. Treat CLI exit codes according to the command: failed/pending CI observations must not become generic connection errors.
 
-Current local discovery: `gh` is present and authenticated; `twg` was not found on this shell's PATH. No tracker login, installation, or account change was attempted during planning.
+Current local discovery: `gh` is present and authenticated; `twg` was not found on this shell's PATH. No tracker login, installation, or account change was attempted. The implemented GitHub adapter uses `gh pr view --json` for metadata and paginated `gh api graphql` for head-bound checks, reviews, and threads. It rechecks the head after refresh and uses gh's active authenticated account directly, without requiring a saved Ticket connection. Legacy saved account references do not select credentials or block account changes in gh. GitHub issues currently use URL-only fallback.
 
 ## Provider adapters
 
@@ -48,7 +48,7 @@ Ticket membership groups tasks, checkout mappings, and PRs. Within that grouping
 
 Repository and checkout records are reusable references. The same checkout can participate in several Tickets; unlike Rigs' running-stack reservations, Ticket grouping grants no exclusive claim or process ownership. Removing a mapping preserves remote items, direct task–PR history, and independent watches. Archiving a Ticket does not stop a Rig or delete any checkout.
 
-Task ↔ PR is explicit: two tasks sharing a checkout do not prove that every PR addresses both. Stable external IDs prevent task-key reuse or repository naming collisions. Preserve URL-only items until resolution succeeds, then merge duplicates without losing associations or watches.
+Task ↔ PR is explicit: two tasks sharing a checkout do not prove that every PR addresses both. Stable external IDs prevent task-key reuse or repository naming collisions. Preserve URL-only items until resolution succeeds. The current implementation normalizes/deduplicates source routes at link time and records verified remote identities during refresh. Consolidating distinct aliases is planned as an explicit local edit; refresh must not rewrite associations or watches.
 
 Checkout paths and branch names are locators, not sufficient lifetime identities. A deleted/recreated worktree at the same path must not silently inherit previous work. The spike must establish what Git/Core evidence can verify and require explicit repair when ambiguous. Store machine qualification so identical paths on different machines remain separate.
 
@@ -69,6 +69,12 @@ Attention events are deduplicated by remote item and meaningful state transition
 Follow the existing repos' TypeScript plus native GPUI pattern. Read installed host instructions/declarations before writing native code. Share validation, storage, and provider behavior between the panel and the required v1 agent CLI. Build the headless context reader and provider refresh path as part of the core, then expose the same data in the native panel. The CLI must not depend on panel selection, native rendering, or a running Herdr app. See [the agent CLI contract](AGENT_CLI.md). Persist associations outside mod code using atomic writes, revision checks, and captured edit targets.
 
 Use explicit executable/argument arrays and parse structured outputs. Never interpolate pasted URLs or task content into shell commands. Validate navigable URL schemes. Imported titles/descriptions are display data, not instructions. Bound retained payloads and diagnostics; avoid collecting credentials or unnecessary private descriptions.
+
+### Implemented local identity and persistence
+
+The CLI reads the permanent `core.id` from `~/.local/state/herdr-core/default/core.json` (or `$XDG_STATE_HOME` / `HERDR_TICKET_CORE_ID_FILE`) without contacting or starting Core. Git supplies the canonical checkout, admin directory, and common directory. SHA-256 fingerprints include Core ID, canonical paths, filesystem device/inode, and nanosecond birth time of the checkout and Git directories. Missing lifetime evidence fails closed. Branch is display metadata. Moving or rebuilding a checkout requires explicit mapping repair; no remote-machine support is claimed.
+
+The store uses schema version 1, atomic rename, fsynced temporary files, a single exclusive writer lock, integrity validation, and optional expected-revision checks. Reads do not acquire locks or create files. Cache results merge into the latest state after provider latency, preserving concurrent local edits. A crash-held lock is never silently stolen; inspect its PID and remove it only after verifying its writer is gone. Native edits capture Ticket ID and revision at form open. Paths and local identities are excluded from copied link/status output.
 
 Credentials remain on the connection host. For remote checkouts, resolve Git metadata on their owning Core while provider reads can run on the locally authenticated host. Connection placement and remote identity support need verification before claiming remote support.
 

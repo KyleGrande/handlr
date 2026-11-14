@@ -1,0 +1,5 @@
+#!/usr/bin/env node
+import('../dist/src/cli.js').then(m => m.main()).catch(() => {
+  process.stdout.write(JSON.stringify({schema_version:1,ok:false,data:null,error:{code:'installation_error',message:'Build Ticket with npm run build before use.'}})+'\n');
+  process.exitCode = 6;
+});

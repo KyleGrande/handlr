@@ -1,0 +1,17 @@
+{
+  "name": "herdr-ticket",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": { "herdr-ticket": "bin/herdr-ticket" },
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "build": "tsc -p tsconfig.json && npm run build:mod",
+    "build:mod": "node scripts/host-types.mjs && tsc -p native/tsconfig.json && node scripts/package-mod.mjs",
+    "test": "node --test dist/test/*.test.js",
+    "check": "npm run build && npm test && herdr-app check build/ticket",
+    "install:mod": "node scripts/install.mjs",
+    "install:layout": "node scripts/install-layout.mjs"
+  },
+  "devDependencies": { "@types/node": "^22.0.0", "typescript": "^5.9.0" }
+}
