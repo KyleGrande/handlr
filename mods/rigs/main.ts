@@ -38,6 +38,7 @@ export default class Rigs extends View {
   name!: InputState; profile!: InputState;
   cli = ''; cliArgs: string[] = []; previewName = ''; showStopped = false;
   previewMode = false; modName = 'rigs';
+  headerHovered = false;
   hoveredRow = ''; controlKey = ''; controlOperation = '';
   observing = false; observationError = '';
   contextMode = ''; deleteMode = false; profileMode = false; editRig = '';
@@ -666,12 +667,12 @@ export default class Rigs extends View {
         .child(svg(`mods/workspace-chrome/${file}.svg`).size(14));
     const root = v_flex().id('rigs-root').size_full().min_h(0).bg(t.chrome).border_t(1).border_color(t.border).text_color(t.foreground).text_size(13)
       .when(embedded,el=>el.bg(t.background).rounded(10).overflow_hidden().border_1());
-    root.child(h_flex().h(embedded ? 42 : 31).pl(embedded ? 14 : 16).pr(embedded ? 106 : 10).flex_none().items_center().justify_between().text_size(embedded ? 13 : 11.5).text_color(embedded ? t.foreground : t.dim)
+    root.child(h_flex().id("rigs-header").on_hover((on,cx) => { this.headerHovered = on; cx.notify(); }).h(embedded ? 42 : 31).pl(embedded ? 14 : 16).pr(embedded ? 82 : 10).flex_none().items_center().gap(8).text_size(embedded ? 13 : 11.5).text_color(embedded ? t.foreground : t.dim)
       .when(embedded,el=>el.border_b(1).border_color(t.border).justify_start().gap(8))
       .child(div().min_w(0).truncate().when(embedded,el=>el.font_semibold().max_w(72)).on_click((event,cx)=>{
         if (dock && event.click_count >= 2) {cx.stop_propagation();run('workspace.rename',{panel:dock.id});}
       }).child(dock?.title ?? 'Rigs'))
-      .child(h_flex().gap(2).items_center().flex_none()
+      .child(h_flex().opacity(this.headerHovered ? 1 : 0).gap(2).items_center().flex_none()
         .child(icon('options', 'settings', 'Rig options', cx => { this.tools = !this.tools; cx.notify(); }))
         .child(icon('new', 'plus', 'New rig', () => this.openNewMenu()))));
     if (this.tools) content.child(v_flex().gap(2)

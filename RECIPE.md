@@ -74,7 +74,7 @@ through the local registry. Process observation is not app readiness or emulator
 boot detection. Preserve legacy manual profiles and recorded state.
 
 Use optional namespace access for `panel()` on released hosts; embedded headers
-reserve 106px on the right. Refresh installed code through guarded `sync:mod`,
+reserve 82px on the right. Refresh installed code through guarded `sync:mod`,
 not an installer that rewrites/selects layouts. Do not assume a generated guide
 or build result proves desktop/lifecycle acceptance.
 
