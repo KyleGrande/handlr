@@ -5,6 +5,12 @@ Layout/mod packaging rules and our file inventory are in
 brief is [prototype/RECIPE.md](prototype/RECIPE.md); external panel recipes live
 in their separate local mod repositories.
 
+The original sibling `Herdr Context`, `Herdr Toolbox` and `Herdr Rigs` checkouts
+now use the pushed `fix/workspace-shared-headers` branches for Handlr. The
+temporary `handlr/mod-worktrees/` checkouts were removed; Handlr Dev's installed
+Rigs mod points to the original `Herdr Rigs` checkout. Ticket remains in its
+original sibling repository on `handlr-ui`.
+
 Run commands here, inside the repository's `handlr/` subdirectory. The native
 host is one directory above, so Cargo commands use `--manifest-path ../Cargo.toml`.
 
@@ -94,3 +100,11 @@ The subsequent repository-root move promoted `host/` into `Handlr/`, preserving
 Git history, the current branch, and local edits. Installed app bundle launch
 paths, installed Rigs CLI paths, Rig checkout/profile mappings, and external mod
 worktree registrations were migrated to the new paths. No `host/` alias remains.
+
+## Tab Groups
+
+Drag a panel's six-dot grip onto **+ Tab Group** beside another panel title to
+put the two panels in separate tabs. Alternatively, use Cmd+Shift+P →
+**Create Tab Group…**, then choose two open docked panels. Other stacked panels
+stay in their current views. The group is saved across restarts; Cmd+Option+Z
+undoes the change. Escape cancels a pending drag or palette selection.

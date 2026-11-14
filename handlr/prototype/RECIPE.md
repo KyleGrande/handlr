@@ -53,7 +53,9 @@ Keep both layout SVGs alongside their JSON files. The native layout does not
 need the prototype controls mod. Files, Changes, Spaces, Agents, tabs and pane
 are bundled host mods. Context, Toolbox and Rigs are separate repositories;
 build and configure those using their own recipes/installers before using the
-full document. Their sources live locally in ignored `handlr/mod-worktrees/`.
+full document. Their sources live in the sibling `Herdr Context`, `Herdr Toolbox`
+and `Herdr Rigs` repositories on `fix/workspace-shared-headers`; the temporary
+`handlr/mod-worktrees/` checkouts have been removed.
 Their code and dependencies are not distributed by this folder.
 
 The portable macOS packager reads this native layout/document, renames the

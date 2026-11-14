@@ -11,14 +11,17 @@ sharing artifacts, not files the app requires to load a mod. A layout's root
 | --- | --- | --- |
 | Native panel workspace | `prototype/RECIPE.md`, `prototype/preview.png` | `prototype/layouts/panel-workspace-native.json`, matching SVG, `prototype/workspaces/panel-workspace-native.json` |
 | Earlier fixed-layout demo | Covered by the workspace recipe; its own Settings SVG | `prototype/layouts/panel-workspace-prototype.json`, matching SVG, `prototype/mods/workspace-prototype/{main.js,actions.js,mod.json}` |
-| Context | `mod-worktrees/context/{RECIPE.md,preview.png}` | Build/installer emits `main.js`, `mod.json`, `context.svg`, `native/`, `src/`; configured CLI, launcher and guide are also required |
-| Toolbox | `mod-worktrees/toolbox/{RECIPE.md,preview.png}` | Build emits `dist/mods/toolbox/` and companion `toolbox-tabs/`, including JS, manifests, SVG and setup guide |
-| Rigs | `mod-worktrees/rigs/{RECIPE.md,preview.png}` | `mods/rigs/{main.js,setup.js,mod.json,AGENTS.md}` plus installed Node/CLI checkout paths |
+| Context | Sibling `Herdr Context` repository: `RECIPE.md`, `preview.png` | Build/installer emits `main.js`, `mod.json`, `context.svg`, `native/`, `src/`; configured CLI, launcher and guide are also required |
+| Toolbox | Sibling `Herdr Toolbox` repository: `RECIPE.md`, `preview.png` | Build emits `dist/mods/toolbox/` and companion `toolbox-tabs/`, including JS, manifests, SVG and setup guide |
+| Rigs | Sibling `Herdr Rigs` repository: `RECIPE.md`, `preview.png` | `mods/rigs/{main.js,setup.js,mod.json,AGENTS.md}` plus installed Node/CLI checkout paths |
 | Ticket | Separate `Herdr Ticket` repository: `RECIPE.md`, `preview.png` | `build/ticket/{main.js,mod.json,runtime.js}` plus the built CLI checkout |
 
-Context, Toolbox and Rigs are independent Git repositories, ignored by this
-repository. Their new recipes/screenshots must be committed in those repositories
-to travel with those sources. Their pre-existing local edits remain intact.
+Context, Toolbox and Rigs are independent Git repositories beside Handlr. Their
+original checkouts use `fix/workspace-shared-headers`, tracking the pushed remote
+branches. The temporary `handlr/mod-worktrees/` checkouts were removed after
+verifying their commits were pushed and building the original checkouts.
+Handlr Dev's installed Rigs CLI and guide now reference the original `Herdr Rigs`
+checkout. Recipes/screenshots live in their respective repositories.
 The bundled Machines panel belongs to the host's `defaults/mods/machines/`;
 it is not an independent gallery package and needs no separate gallery recipe.
 Ticket is maintained in the separate sibling `Herdr Ticket` repository on its
