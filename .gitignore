@@ -17,6 +17,8 @@
 /defaults/mods/changes/jsconfig.json
 /defaults/mods/files/gpui-kit.d.ts
 /defaults/mods/files/jsconfig.json
+/defaults/mods/machines/gpui-kit.d.ts
+/defaults/mods/machines/jsconfig.json
 
 # Local Handlr workspace state
 /handlr/mod-worktrees/
