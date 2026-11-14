@@ -27,6 +27,24 @@ test('layout IDs are unique; every selected view is a direct member', async () =
   visit(root);
 });
 
+test('native layout uses the shipped terminal center and a matching workspace document', async () => {
+  const load = async path => JSON.parse(await readFile(new URL(path, import.meta.url)));
+  const native = await load('../prototype/layouts/panel-workspace-native.json');
+  const main = await load('../../defaults/layouts/main.json');
+  const document = await load(`../prototype/workspaces/${native.workspace}.json`);
+  assert.equal(document.version, 1);
+  const expectedTabs = structuredClone(main.children[1].children[0]);
+  expectedTabs.id = '@workspace/tabs';
+  const expectedBody = structuredClone(main.children[1].children[1]);
+  expectedBody.id = '@workspace/terminal-body';
+  expectedBody.children = [expectedBody.children[0]];
+  expectedBody.children[0].id = '@workspace/active-tab';
+  assert.deepEqual(native.children, [expectedTabs, expectedBody]);
+  assert.deepEqual(native.terminal_padding, main.terminal_padding);
+  const preview = await readFile(new URL(`../prototype/${native.preview}`, import.meta.url), 'utf8');
+  assert.match(preview, /<svg\b/);
+});
+
 test('stable zones are outside the center tab and have independent stacks', async () => {
   const root = await fresh();
   assert.deepEqual(root.children.map(n => n.id), ['prototype-left', 'prototype-center', 'prototype-right']);

@@ -1,5 +1,10 @@
 # Handlr development tools
 
+Layout/mod packaging rules and our file inventory are in
+[MODS-AND-LAYOUTS.md](MODS-AND-LAYOUTS.md). The native workspace reconstruction
+brief is [prototype/RECIPE.md](prototype/RECIPE.md); external panel recipes live
+in their separate local mod repositories.
+
 Run commands here, inside the repository's `handlr/` subdirectory. The native
 host is one directory above, so Cargo commands use `--manifest-path ../Cargo.toml`.
 

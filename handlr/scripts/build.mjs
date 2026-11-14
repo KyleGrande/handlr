@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 
 const controls = 'workspace-prototype';
 const block = (id, mod, extra = {}) => ({ id, type: 'block', content: { mod }, ...extra });
@@ -76,4 +76,16 @@ for (const [edge, zone] of [['left',layout.children[0]],['right',layout.children
 for (const edge of ['top','bottom','top_center','bottom_center']) workspace.zones.push({edge,extent:200,hidden:true,groups:[]});
 await mkdir(new URL('../prototype/workspaces/',import.meta.url),{recursive:true});
 await writeFile(new URL('../prototype/workspaces/panel-workspace-native.json',import.meta.url),JSON.stringify(workspace,null,2)+'\n');
+// Keep the native workspace's center layout available independently of packaging.
+const main = JSON.parse(await readFile(new URL('../../defaults/layouts/main.json', import.meta.url), 'utf8'));
+const tabs = structuredClone(main.children[1].children[0]); tabs.id = '@workspace/tabs';
+const body = structuredClone(main.children[1].children[1]); body.id = '@workspace/terminal-body';
+body.children = [body.children[0]]; body.children[0].id = '@workspace/active-tab';
+const nativeLayout = {
+  id: '@workspace/center', workspace: 'panel-workspace-native', type: 'column', resizable: false,
+  preview: 'layouts/panel-workspace-native.svg',
+  background: main.background, terminal_padding: main.terminal_padding, children: [tabs, body]
+};
+await writeFile(new URL('../prototype/layouts/panel-workspace-native.json', import.meta.url), JSON.stringify(nativeLayout, null, 2) + '\n');
 console.log('Built prototype/layouts/panel-workspace-prototype.json');
+console.log('Built prototype/layouts/panel-workspace-native.json and workspace document');
