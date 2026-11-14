@@ -1,5 +1,8 @@
 # Herdr Rigs
 
+[RECIPE.md](RECIPE.md) describes how to reconstruct this mod and its dependencies;
+[preview.png](preview.png) is the dated native panel reference.
+
 A TypeScript CLI and native Herdr panel for named, restartable development stacks. Requires Node 22.18+, Git, `hc` 0.1.19 and `herdr-app` 0.1.14. Services run as parentless Core terminals. Closing the panel does not stop them.
 
 ## Install in Herdr
