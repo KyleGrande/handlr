@@ -10,8 +10,9 @@ Run npm test and herdr-app check for toolbox and toolbox-tabs. Require passing n
 
 The mod opts into shared headers with `workspace_header: true` in mod.json.
 When `herdr.panel()` returns embedded_header, use one 42px original title row,
-the provided panel title and a 106px right gutter for host controls. Keep the
-center grip clear of mod-specific buttons. Title double-click runs
+the provided panel title and an 82px right gutter for host controls. Keep the
+center grip clear of mod-specific buttons. Place mod controls beside the title
+on the left and show them only while the header is hovered. Title double-click runs
 workspace.rename with the supplied panel ID. Access panel through an optional
 namespace property so older Herdr installations keep their original UI.
 Never change owner selection, props, storage keys, process lifecycle or layouts

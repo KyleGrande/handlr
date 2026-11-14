@@ -173,6 +173,7 @@ export default class Toolbox extends View {
       });
     } catch (e: unknown) { this.error = e instanceof Error ? e.message : String(e); }
   }
+  headerHovered = false;
   render(cx: Context) {
     if (props()?.view === 'menu' || props()?.view === 'tool-menu') return this.renderMenu();
     const t = theme() as Record<string, `#${string}`>;
@@ -189,17 +190,16 @@ export default class Toolbox extends View {
     const field = (name: string, input: InputState) => h_flex().gap(8).items_center().child(div().w(80).child(name)).child(Input.new(input).flex_1().h(30).px(8).bg(t.background).border_1().border_color(t.input).rounded(5));
     const shell = v_flex().id('toolbox').size_full().min_h(0).rounded(10).overflow_hidden()
       .bg(t.background).border_1().border_color(t.border).text_color(t.foreground).text_size(13)
-      .child(h_flex().h(42).flex_none().pl(14).pr(dock?.embedded_header ? 106 : 14).items_center().border_b(1).border_color(t.border)
-        .when(Boolean(dock?.embedded_header),el=>el.gap(8))
-        .child(div().flex_1().min_w(0).truncate().font_semibold().when(Boolean(dock?.embedded_header),el=>el.flex_none().max_w(72)).on_click((event,cx) => {
+      .child(h_flex().id("toolbox-header").on_hover((on,cx) => { this.headerHovered = on; cx.notify(); }).h(42).flex_none().pl(14).pr(dock?.embedded_header ? 82 : 14).items_center().gap(8).border_b(1).border_color(t.border)
+        .child(div().min_w(0).truncate().font_semibold().when(Boolean(dock?.embedded_header),el=>el.flex_none().max_w(72)).on_click((event,cx) => {
           if (dock && event.click_count >= 2) { cx.stop_propagation(); run('workspace.rename',{panel:dock.id}); }
         }).child(props()?.view === 'manual' ? (props().entry?.id ? 'Edit tool' : 'Add a tool') : props()?.view === 'run' ? 'Run tool' : dock?.title ?? 'Toolbox'))
         .when(!props()?.view, el => el
-          .child(div().id('toolbox-labels').size(24).flex().items_center().justify_center().mr(8)
+          .child(div().id('toolbox-labels').opacity(this.headerHovered ? 1 : 0).size(24).flex().items_center().justify_center().mr(8)
             .text_size(12).text_color(showLabels ? t.muted : t.dim).cursor_pointer()
             .tooltip(showLabels ? 'Hide labels' : 'Show labels')
             .on_click(() => setShared(DISPLAY_KEY, { version: 1, labels: !showLabels })).child('Aa'))
-          .child(div().id('toolbox-add').size(24).flex().items_center().justify_center().rounded(6)
+          .child(div().id('toolbox-add').opacity(this.headerHovered ? 1 : 0).size(24).flex().items_center().justify_center().rounded(6)
           .text_color(t.muted).hover(s => s.bg(t.hover)).tooltip('Add a tool').on_click(() => { if (c?.owner) openOverlay({ mod: 'toolbox', kind: 'popup', width: 240, props: { view: 'menu', context: c } }); }).child(svg('mods/workspace-chrome/plus.svg').size(14)))));
     const root = v_flex().flex_1().min_h(0).p(12).gap(10).overflow_y_scrollbar();
     if (this.error) root.child(button('error', this.error + ' · Dismiss', () => { this.error = ''; this.pending = {}; }));
