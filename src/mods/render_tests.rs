@@ -158,6 +158,7 @@ fn fixture(populated: bool, props: Value, update: Value) -> BTreeMap<String, Val
         ("telemetry".into(), json!({"enabled":true,"setting":true,"sends":true,"off_because":null,"endpoint":"https://invalid.example", "draft":{},"queued":[],"last_sent":null})),
         ("window".into(), json!({"platform":"linux","titlebar":"none","buttons":true,"maximized":false,"fullscreen":false,"active":true})),
         ("placement".into(), Value::Null),
+        ("panel".into(), Value::Null),
         ("home".into(), json!("/fixture")), ("appHome".into(), json!("/fixture/app")),
         ("keys".into(), Value::Array(serde_json::from_str::<BTreeMap<String, BTreeMap<String, String>>>(include_str!("../../defaults/keys.json")).unwrap().into_iter().flat_map(|(section, bindings)| bindings.into_iter().map(move |(keys, action)| json!({"section":section,"keys":keys,"action":action}))).collect())),
         ("commands".into(), Value::Array(crate::commands::COMMANDS.iter().map(|c| json!({"name":c.name,"about":c.about,"args":c.args.iter().map(|a| json!({"name":a.name,"required":a.required})).collect::<Vec<_>>()})).collect())),
@@ -886,7 +887,11 @@ fn settings_sections_and_updates(cx: &mut TestAppContext) {
     for section in ["look", "alerts", "privacy", "updates"] {
         let mut p = props();
         p["section"] = json!(section);
-        describe(cx, &staged, "frame/settings", true, p, updates("current", "current"), None).unwrap();
+        let tree = describe(cx, &staged, "frame/settings", true, p, updates("current", "current"), None).unwrap();
+        if section == "look" {
+            assert!(tree.contains("st-no-headers"), "{tree}");
+            assert!(tree.contains("No Headers"), "{tree}");
+        }
     }
     for app in ["source", "current", "ready"] {
         for core in ["current", "ready", "error", "managed", "updating"] {
@@ -1239,4 +1244,52 @@ fn status_bar_shows_the_real_palette_key(cx: &mut TestAppContext) {
     let tree = describe_with_values(cx, &staged, "mods/workspace-status", unbound, None).unwrap();
     assert!(tree.contains("commands"), "unbound hint still offers commands: {tree}");
     assert!(!tree.contains("Shift P"), "unbound hint must not invent a key: {tree}");
+}
+
+#[gpui::test]
+fn docked_mods_keep_one_original_header_with_custom_title(cx: &mut TestAppContext) {
+    cx.update(gpui_shell::init);
+    let staged=Staged::new();
+    for name in ["files","changes","spaces","agents"] {
+        let mut values=fixture(false,props(),updates("current","current"));
+        values.insert("panel".into(),json!({"id":"panel-a","title":"Review panel","embedded_header":true}));
+        let tree=describe_with_values(cx,&staged,&format!("mods/{name}"),values,None).unwrap();
+        assert_eq!(tree.matches("Review panel").count(),1,"{tree}");
+        assert!(tree.contains(".pr[Number(82.0)]"),"reserve native action space: {tree}");
+    }
+}
+
+#[gpui::test]
+fn tabs_only_offer_legacy_panel_buttons_when_the_layout_has_that_panel(cx: &mut TestAppContext) {
+    cx.update(gpui_shell::init);
+    let staged = Staged::new();
+    for present in [false, true] {
+        let mut values = fixture(true, props(), updates("current", "current"));
+        values.insert("layout".into(), json!({"id":"root","type":"row","children":if present {
+            vec![json!({"id":"panel","type":"column","hidden":true,"children":[{"id":"panel-body","type":"stack","children":[]} ]})]
+        } else { vec![] }}));
+        let tree = describe_with_values(cx, &staged, "mods/tabs", values, None).unwrap();
+        assert!(tree.contains("tab-tab1"), "{tree}");
+        for id in ["panel-files", "panel-changes"] {
+            assert_eq!(tree.contains(id), present, "{id}: {tree}");
+        }
+    }
+}
+
+#[gpui::test]
+fn palette_searches_openable_mods_and_picker_only_goes_to_placed_panels(cx: &mut TestAppContext) {
+    cx.update(gpui_shell::init);
+    let staged=Staged::new();
+    let options=json!({"overlay":"palette","openables":[
+        {"name":"workspace.open","args":{"name":"custom-tools"},"group":"Panel","title":"Open Custom tools","words":"add mod"},
+        {"name":"mod.open","args":{"name":"custom-dialog"},"group":"App","title":"Open Custom dialog","words":"mod"}
+    ]});
+    for (query,title) in [("customtools","Open Custom tools"),("customdialog","Open Custom dialog")] {
+        let tree=describe(cx,&staged,"frame/palette",true,options.clone(),updates("current","current"),Some(&format!("this.query={query:?};"))).unwrap();
+        assert!(title.split_whitespace().skip(1).all(|word|tree.contains(word)),"{tree}");
+    }
+    let values=fixture(true,json!({"overlay":"picker","workspacePanels":[{"id":"one","title":"My review"}]}),updates("current","current"));
+    let tree=describe_with_values(cx,&staged,"mods/picker",values,Some("this.filter='review';")).unwrap();
+    assert!(tree.contains("My review"),"{tree}");
+    assert!(tree.contains("pk-panel-one"),"{tree}");
 }

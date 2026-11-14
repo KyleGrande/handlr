@@ -28,6 +28,18 @@ const fn cmd(name: &'static str, args: &'static [Arg], about: &'static str) -> C
 }
 
 pub const COMMANDS: &[Command] = &[
+    cmd("workspace.reveal", &[req("panel")], "Go to an already open workspace panel without creating or reopening it."),
+    cmd("workspace.open", &[req("name")], "Add or reveal an installed mod panel in the active workspace, reusing its existing identity."),
+    cmd("workspace.rename", &[opt("panel"), opt("view"), opt("name"), opt("expected_revision")], "Rename a workspace panel or view; omitted name prompts, empty panel name resets its title."),
+    cmd("workspace.activate", &[opt("name"), opt("document")], "Create/select an opt-in local panel workspace; preserve other layouts."),
+    cmd("workspace.inspect", &[], "Read the active local panel workspace, revision and history availability."),
+    cmd("workspace.apply", &[req("transaction")], "Atomically apply workspace commands at an expected revision; preserves panel identities."),
+    cmd("workspace.float", &[opt("panel"), opt("group")], "Detach a panel or group into a native floating window; defaults to the last clicked panel."),
+    cmd("workspace.dock", &[opt("panel"), opt("group"), opt("edge")], "Return a floating panel to its saved dock, or to an explicit edge."),
+    cmd("workspace.undo", &[opt("expected_revision")], "Undo one local workspace transaction; defaults to the current revision."),
+    cmd("workspace.redo", &[opt("expected_revision")], "Redo one local workspace transaction; defaults to the current revision."),
+    cmd("workspace.export", &[], "Read the active local workspace document for export."),
+    cmd("workspace.import", &[req("expected_revision"), req("document")], "Validate/import a local workspace document as one undoable transaction."),
     // What exists.
     cmd("space.new", &[opt("name"), opt("folder"), opt("tab"), opt("argv"), opt("task"), opt("machine"), opt("focus")],
         "Make a space: its name (default: none, so it's called after where its first terminal is), the folder its terminals start in (default: the focused terminal's), its first tab's name (default: none, so it's called by its number), optionally an agent (argv) and its first message (task), and the machine it lives on (`hc machine ls`; default the focused space's machine for keys and clicks, this computer for scripts; empty string: this computer; its terminals start in that machine's home unless folder). It is shown at once; focus false keeps the shown space and tab (with no space shown, the new space is shown)."),
@@ -137,7 +149,7 @@ pub fn validate_args(c: &Command, args: &Value) -> Result<(), String> {
                 return Err(format!("{}: unknown argument(s): {}; valid arguments: {valid}", c.name, unknown.join(", ")));
             }
             for (key, value) in args {
-                if matches!(key.as_str(), "id" | "pane" | "space" | "terminal" | "target") && !value.is_string() && !value.is_null() {
+                if matches!(key.as_str(), "id" | "pane" | "space" | "terminal" | "target" | "panel" | "view") && !value.is_string() && !value.is_null() {
                     return Err(format!("{}: argument {key} must be a string (or null to omit it)", c.name));
                 }
             }

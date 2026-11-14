@@ -410,7 +410,7 @@ export default class extends View {
     let seen = Rc::new(RefCell::new(Vec::new()));
     let calls = seen.clone();
     gpui_shell::policy::set_default(Policy::new()
-        .with_host_module(module(Instance { name: "test".into(), props: Value::Null }, 0)).unwrap()
+        .with_host_module(module(Instance::new("test".into(), Value::Null), 0)).unwrap()
         .with_host_module(HostModule::new("fixture").function("note", move |a| {
             calls.borrow_mut().push(a.string(0)?.to_owned());
             Ok(HostValue::Null)
@@ -450,7 +450,7 @@ export default class extends View {
     let notes = Rc::new(RefCell::new(Vec::new()));
     let calls = notes.clone();
     gpui_shell::policy::set_default(Policy::new()
-        .with_host_module(module(Instance { name: "focus-test".into(), props: Value::Null }, 42)).unwrap()
+        .with_host_module(module(Instance::new("focus-test".into(), Value::Null), 42)).unwrap()
         .with_host_module(HostModule::new("fixture").function("note", move |a| {
             calls.borrow_mut().push(a.string(0)?.to_owned());
             Ok(HostValue::Null)
@@ -655,4 +655,27 @@ export default class extends View {
     assert!(start.elapsed() < Duration::from_millis(200));
     cx.run_until_parked();
     window.update(cx, |_, window, _| window.remove_window()).unwrap();
+}
+
+#[gpui::test]
+fn panel_metadata_is_copy_scoped_reactive_and_independent_of_props(cx: &mut TestAppContext) {
+    use gpui_shell::plugin::DescriptionSession;
+    cx.update(gpui_shell::init);
+    let fixture=Fixture::new(r#"import { View, div } from 'gpui-kit'; import { panel, props } from 'herdr'; export default class extends View { render() { return div().child((panel()?.title ?? 'outside')+':'+JSON.stringify(props())); } }"#);
+    let runtime=ShellRuntime::new_isolated().unwrap();
+    let window=cx.add_window(|_,_|Empty);
+    window.update(cx,|_,window,cx| {
+        publish_panels(json!({"301":{"id":"a","title":"First","embedded_header":true},"302":{"id":"b","title":"Second","embedded_header":false}}));
+        let policy=|copy|Policy::new().with_host_module(super::module(Instance::new("panel-probe".into(),json!({"draft":"keep"})),copy)).unwrap();
+        let mut a=DescriptionSession::load(runtime.clone(),&fixture.0,policy(301),window,cx).unwrap();
+        let mut b=DescriptionSession::load(runtime.clone(),&fixture.0,policy(302),window,cx).unwrap();
+        let mut outside=DescriptionSession::load(runtime,&fixture.0,policy(303),window,cx).unwrap();
+        assert!(a.describe(window,cx).unwrap().contains("First:"));
+        assert!(b.describe(window,cx).unwrap().contains("Second:"));
+        assert!(outside.describe(window,cx).unwrap().contains("outside:"));
+        publish_panels(json!({"301":{"id":"a","title":"Renamed","embedded_header":true},"302":{"id":"b","title":"Second","embedded_header":false}}));
+        let tree=a.describe(window,cx).unwrap();
+        assert!(tree.contains("Renamed:")&&tree.contains("keep"));
+        assert!(b.describe(window,cx).unwrap().contains("Second:"));
+    }).unwrap();
 }

@@ -142,7 +142,14 @@ impl AppWindow {
         {
             let _ = window;
             if self.titlebar() == Titlebar::System {
-                let strip = self.window_drag(div().flex_none().h(px(MAC_STRIP)).w_full(), cx);
+                // Native buttons end at 21px (7px inset + 14px diameter).
+                // Workspace canvas padding supplies the remaining breathing room.
+                let (height, background) = if self.workspace.is_some() {
+                    (22.0, "canvas")
+                } else {
+                    (MAC_STRIP, "background")
+                };
+                let strip = self.window_drag(div().flex_none().h(px(height)).w_full().bg(c(background)), cx);
                 return div().size_full().flex().flex_col().child(strip).child(div().flex_1().min_h_0().flex().child(tree)).into_any_element();
             }
             tree

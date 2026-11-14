@@ -7,6 +7,7 @@ use std::process::Command;
 pub fn command(program: impl AsRef<OsStr>) -> Command {
     #[allow(unused_mut)]
     let mut cmd = Command::new(program);
+    crate::core_session::apply(&mut cmd);
     #[cfg(windows)]
     {
         use std::os::windows::process::CommandExt;

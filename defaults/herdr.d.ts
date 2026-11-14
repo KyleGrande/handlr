@@ -454,3 +454,7 @@ export interface FolderWatch extends Promise<string[]> {
   /** Resolves with [] and releases this call's watch. Safe to call again or after settlement. */
   cancel(): void;
 }
+
+/** This mod copy's docked panel metadata, or null outside a local workspace.
+ * embedded_header means native controls share the mod's existing title row. */
+export function panel(): {id: string; title: string; embedded_header: boolean} | null;

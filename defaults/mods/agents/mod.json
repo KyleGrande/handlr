@@ -1,1 +1,5 @@
-{ "place": "none", "title": "Agents" }
+{
+  "place": "none",
+  "title": "Agents",
+  "workspace_header": true
+}

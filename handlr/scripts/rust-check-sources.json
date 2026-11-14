@@ -1,0 +1,47 @@
+[
+  {
+    "repository": "serde-rs/serde",
+    "directory": "serde",
+    "revision": "7fc3b4c30c94f73a96ebd1553f2b090d928fc3a8"
+  },
+  {
+    "repository": "serde-rs/json",
+    "directory": "json",
+    "revision": "de8500740cdcabffb9734f503e4889def823cf10"
+  },
+  {
+    "repository": "dtolnay/syn",
+    "directory": "syn3",
+    "revision": "b5d62a6e43a29418e118b7bcb48e211cefc0154f"
+  },
+  {
+    "repository": "dtolnay/quote",
+    "directory": "quote",
+    "revision": "723dcb47d3f0ddc896e17287c8a8d3f2ea2317d5"
+  },
+  {
+    "repository": "dtolnay/proc-macro2",
+    "directory": "proc-macro2",
+    "revision": "ed8a5497669cd63db33bf24646f261b012bbbc4a"
+  },
+  {
+    "repository": "dtolnay/unicode-ident",
+    "directory": "unicode-ident",
+    "revision": "5b54a632702b5744a1c40ea01c127c0ac0498172"
+  },
+  {
+    "repository": "dtolnay/itoa",
+    "directory": "itoa",
+    "revision": "af77385d0daf4d0e949e81f2588be2e44f69f086"
+  },
+  {
+    "repository": "BurntSushi/memchr",
+    "directory": "memchr",
+    "revision": "5fdb40c054e1fff359a2f7bdf7f87a13b34b465d"
+  },
+  {
+    "repository": "dtolnay/zmij",
+    "directory": "zmij",
+    "revision": "7b7cc48b58028e8af7be87e94c0c1c8936f1a57c"
+  }
+]

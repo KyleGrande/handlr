@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 480">
+  <rect width="800" height="480" fill="#17191e"/>
+  <g fill="#282c34" stroke="#49515e">
+    <rect x="12" y="12" width="210" height="270" rx="6"/>
+    <rect x="12" y="292" width="210" height="176" rx="6"/>
+    <rect x="232" y="12" width="336" height="456" rx="6"/>
+    <rect x="578" y="12" width="210" height="222" rx="6"/>
+    <rect x="578" y="244" width="210" height="224" rx="6"/>
+  </g>
+  <g fill="#e2e6ed" font-family="sans-serif" font-size="15">
+    <text x="26" y="40">Code  |  Context</text>
+    <text x="26" y="80">▾ Changes</text>
+    <text x="26" y="166">▾ Files</text>
+    <text x="26" y="322">Spaces  |  Agents</text>
+    <text x="248" y="40">Workspace / terminal tabs</text>
+    <text x="594" y="40">Toolbox</text>
+    <text x="594" y="274">Rigs</text>
+  </g>
+  <path d="M12 140H222 M232 56H568" stroke="#49515e"/>
+</svg>

@@ -6,7 +6,7 @@ name: ci
 
 on:
   push:
-    branches: [master]
+    branches: [master, panel-workspace]
   # No paths-ignore here: CI is required to merge, so every PR needs it.
   pull_request:
 
@@ -31,6 +31,15 @@ env:
   SAVE_CACHES: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
 
 jobs:
+  handlr-tools:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm --prefix handlr test
+
   platform-tests:
     strategy:
       fail-fast: false
@@ -99,6 +108,7 @@ jobs:
           key: ${{ steps.cache.outputs.cache-primary-key }}
       - name: Tests
         run: |
+          cargo test --locked -p panel-workspace
           only=()
           if [ "$RUNNER_OS" != Linux ]; then
             for t in tests/*.rs; do

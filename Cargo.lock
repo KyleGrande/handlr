@@ -3714,6 +3714,7 @@ dependencies = [
  "image",
  "libc",
  "notify",
+ "panel-workspace",
  "png 0.17.16",
  "raw-window-handle",
  "serde",
@@ -5831,6 +5832,14 @@ dependencies = [
  "primefield",
  "primeorder",
  "sha2 0.11.0",
+]
+
+[[package]]
+name = "panel-workspace"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

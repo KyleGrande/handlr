@@ -8,6 +8,20 @@ Your terminal address is `$HC_TERMINAL_ID`; it is not a pane ID.
 
 ## Inspect before acting
 
+The opt-in panel-workspace development feature uses `workspace.activate`,
+`workspace.inspect`, `workspace.apply`, `workspace.undo`, `workspace.redo`,
+`workspace.export` and `workspace.import`. Read the installed AGENTS.md's local
+workspace section for schemas and current limitations. It is not the complete
+docking release. Do not test it by switching the person's production window;
+use an isolated app home and Core session.
+
+`workspace.float {panel?, group?}` moves a mod panel into a resizable native
+window while keeping its existing live copy. `workspace.dock {panel?, group?,
+edge?}` returns it to its dock. Closing that window also redocks it. On macOS,
+Cmd+Option+F floats the last clicked panel; adding Shift returns it to its dock.
+Cmd+Option+Z and Cmd+Option+Shift+Z undo and redo workspace changes. Their
+`expected_revision` argument is optional for interactive use.
+
 ```sh
 herdr-app ls          # spaces > tabs > terminals, including pane IDs
 herdr-app status      # current layout, focus, overlays, zoom and file/mod errors
@@ -25,6 +39,12 @@ only after a successful check; on failure, check the connection and retry.
 Package-managed cores are checked but updated through their package manager.
 Dismiss a core update error with its × or `overlay.close {id:"core-update-error"}`;
 it stays dismissed until the error changes or the update recovers.
+
+Handlr's Settings > Machines includes `core_session` in settings.json:
+`"own"` for its separate session, `"shared"` for Herdr's default session.
+Changes apply on the next app launch; do not stop or restart either Core.
+Handlr's app home and panel layout remain separate. A custom machine transport
+can expose the separate session in Herdr for access to both.
 
 ## Show something when asked
 
@@ -122,6 +142,28 @@ worker. Use app commands when the
 user wants to see a new tab or split, hc for orchestration that need not change
 the screen.
 
+## Move local workspace panels
+
+In an opt-in panel workspace, drag the centered six-dot grip in a section header to move that
+section. Drag a view tab to move the view, or the centered six-dot grip in the tab
+row to move the whole group. A translucent area highlight shows the destination, matching terminal dragging. Window
+edges accept new groups, including hidden top/bottom zones. Horizontal drops
+show separate **full width** and **center** targets: the outer target spans the
+window, while the inner target only spans the terminal column and preserves the
+side panes' full height. Engine edge values are `top`/`bottom` for full width and
+`top_center`/`bottom_center` for center-only docks. Dropping a section
+on a view tab inserts it there; dropping a group on a view tab merges its views.
+Hover a panel header for float/redock, expand/restore and close buttons on the right.
+Mod actions sit beside the title on the left and appear on hover.
+Double-click its title or a view tab to rename; Enter saves, Escape cancels.
+Files and Changes share their original title row with these controls. Single-view
+groups omit redundant labels, selected tabs have no filled background, and there
+are no collapse controls. Closing a panel retains its instance and data.
+Expand enlarges the current view; restore returns to the dock arrangement.
+Escape cancels dragging. These moves preserve registered panel instances and persist via
+the workspace transaction engine. Terminal panes remain in their Core tabs;
+terminal-to-dock and floating transfers are not connected yet.
+
 ## Customize layouts, keys, or mods
 
 First read `~/.config/herdr-app/AGENTS.md` (or `$HERDR_APP_HOME/AGENTS.md` if
@@ -184,3 +226,14 @@ Never experiment with pointer/key automation on the person's real display.
 When developing the app on Linux, its `scripts/sandbox` provides an isolated
 home, core and display: `up`, `do`, `status`, `shot`, then `down` when done.
 Never stop a server or session you didn't start.
+
+In a panel workspace, use `do workspace.open '{"name":"files"}'` to add or reveal a panel. Cmd+Shift+P lists Open entries for installed panels and declared overlays; Cmd+P is the go-to picker. Reopening preserves the panel identity and saved state.
+
+`workspace.reveal {panel}` goes to an already placed panel; Cmd+P includes those panels by title and does not reopen closed ones.
+
+Closed workspace panels remember their last dock, group/view, order and size across restart. `workspace.open` restores that placement before falling back to the mod default.
+
+For panel workspaces, `no_headers: true` in settings.json (Settings → Look → No Headers)
+hides title rows and their controls in docked and floating panels. Group tabs remain;
+turn the setting off to restore headers and drag handles. This changes presentation
+only and preserves saved panel collapse state.

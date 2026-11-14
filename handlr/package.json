@@ -1,0 +1,16 @@
+{
+  "name": "handlr-development",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "release": "node scripts/release-macos.mjs",
+    "install:release": "node scripts/release-macos.mjs --install",
+    "build": "node scripts/build.mjs",
+    "test": "node --test tests/*.test.mjs",
+    "check:mod": "herdr-app check prototype/mods/workspace-prototype",
+    "prepare:checks": "node scripts/prepare-native-checks.mjs",
+    "setup:toolchain": "node scripts/install-toolchain.mjs",
+    "prepare:rust": "node scripts/fetch-rust-check-deps.mjs && node scripts/prepare-rust-check.mjs",
+    "test:rust": "node scripts/toolchain.mjs cargo test --offline --manifest-path .checks/rust/engine/Cargo.toml"
+  }
+}

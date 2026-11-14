@@ -2,7 +2,7 @@
 
 import { View, div, image, svg } from "gpui-kit";
 import { v_flex, h_flex } from "gpui-base";
-import { agents, terminals, panes, focused, spaces, run, theme, shared, setShared, setAgentOrder, openOverlay, closeOverlay, props, window, layout } from "herdr";
+import { agents, terminals, panes, focused, spaces, run, theme, shared, setShared, setAgentOrder, openOverlay, closeOverlay, props, window, layout, panel } from "herdr";
 
 function find(node, id) {
   if (node?.id === id) return node;
@@ -215,6 +215,7 @@ export default class Agents extends View {
   }
 
   render(cx) {
+    const dock=panel(); const embedded=Boolean(dock?.embedded_header);
     const t = theme();
     if (props()?.sortMenu) return this.sortMenu(t);
     const collapsed = narrow();
@@ -416,20 +417,25 @@ export default class Agents extends View {
       .border_t(1)
       .border_color(t.border)
       .text_size(13)
+      .when(embedded,el=>el.bg(t.background).rounded(10).overflow_hidden().border_1())
       .when(!collapsed, (el) =>
         el.child(
           h_flex()
-            .px(16)
-            .h(41)
-            .pt(14)
-            .pb(5)
+            .id("agents-header").on_hover((on, cx) => { this.headerHovered = on; cx.notify(); })
+            .pl(embedded ? 14 : 16).pr(embedded ? 82 : 16)
+            .h(embedded ? 42 : 41)
+            .pt(embedded ? 0 : 14)
+            .pb(embedded ? 0 : 5)
+            .when(embedded,e=>e.border_b(1).border_color(t.border))
             .flex_none()
             .items_center()
-            .justify_between()
-            .child(div().text_size(11.5).font_medium().text_color(t.dim).child("Agents"))
+            .gap(8)
+            .child(div().min_w(0).truncate().text_size(embedded ? 13 : 11.5).font_medium().text_color(embedded ? t.foreground : t.dim).when(embedded,e=>e.font_semibold()).on_click((event,cx)=>{
+              if(dock && event.click_count>=2){cx.stop_propagation();run("workspace.rename",{panel:dock.id});}
+            }).child(dock?.title ?? "Agents"))
             .child(
               div()
-                .id("ag-sort")
+                .id("ag-sort").opacity(this.headerHovered ? 1 : 0)
                 .text_size(11)
                 .text_color(t.dim)
                 .hover((s) => s.text_color(t.foreground))

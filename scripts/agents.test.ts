@@ -8,8 +8,8 @@ function harness(pins: string[], globals: Record<string, unknown> = {}) {
   const data = new Map([["pins", JSON.stringify(pins)]]);
   const writes: unknown[] = [];
   const storage = { getItem: (k: string) => data.get(k) ?? null, setItem: (k: string, v: string) => data.set(k, v), removeItem: (k: string) => data.delete(k) };
-  const Agents = new Function("View", "localStorage", "props", "run", ...Object.keys(globals), `${source}; return Agents;`)(
-    class {}, storage, () => ({}), (...args: unknown[]) => writes.push(args),
+  const Agents = new Function("View", "localStorage", "props", "run", "panel", ...Object.keys(globals), `${source}; return Agents;`)(
+    class {}, storage, () => ({}), (...args: unknown[]) => writes.push(args), () => null,
     ...Object.values(globals),
   );
   const agents = new Agents();

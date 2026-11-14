@@ -10,6 +10,9 @@ mod movable;
 mod pane_drag;
 mod pane_size;
 mod titlebar;
+mod workspace;
+mod workspace_drag;
+mod workspace_float;
 
 use crate::layout::{Axis, Background as Paint, Content, Fit, HeaderContent, Kind, Line, Node, PaneFrame, Size as Span};
 use crate::model::{self, Tab, Model};
@@ -314,6 +317,7 @@ impl OverlayKind {
 }
 
 struct Overlay {
+    native_window: AnyWindowHandle,
     id: String,
     kind: OverlayKind,
     slot: String,
@@ -357,6 +361,11 @@ pub struct AppWindow {
     core: Arc<Core>,
     runtime: Option<Rc<ShellRuntime>>,
     chrome: Node,
+    workspace: Option<crate::workspace::Session>,
+    workspace_windows: HashMap<String, WindowHandle<workspace_float::WorkspaceFloat>>,
+    workspace_float_layouts: HashMap<String, Node>,
+    workspace_main_window: Option<AnyWindowHandle>,
+    workspace_active_panel: Option<String>,
     /// Which layout `chrome` is (`layouts/<name>.json`).
     layout_name: String,
     /// The agent an `{ "agent": "focused" }` block shows (by address); any core
@@ -369,6 +378,7 @@ pub struct AppWindow {
     swapped: HashMap<String, String>,
     float_drag: Option<floats::FloatDrag>,
     pane_drag: Option<pane_drag::PaneDrag>,
+    workspace_drag: Option<workspace_drag::WorkspaceDrag>,
     pane_grip_hover: Option<String>,
     /// Each pane's top row the grip sits centered in: its top header, else a strip.
     pane_grip_rows: RefCell<HashMap<String, f32>>,
@@ -483,12 +493,18 @@ impl AppWindow {
             core,
             runtime,
             chrome: default_layout("main"),
+            workspace: None,
+            workspace_windows: HashMap::new(),
+            workspace_float_layouts: HashMap::new(),
+            workspace_main_window: None,
+            workspace_active_panel: None,
             layout_name: "main".into(),
             agent: None,
             agent_focused: None,
             swapped: HashMap::new(),
             float_drag: None,
             pane_drag: None,
+            workspace_drag: None,
             pane_grip_hover: None,
             pane_grip_rows: RefCell::default(),
             win_drag: None,
@@ -887,6 +903,7 @@ impl AppWindow {
     fn reload_config(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let s_time = mtime(&settings::path());
         if s_time.is_none() || s_time != self.watched.settings {
+            let previous_no_headers = self.person.no_headers;
             let loaded = settings::load_person();
             crate::telemetry::set_setting(settings::telemetry_setting(&loaded));
             match loaded {
@@ -898,6 +915,16 @@ impl AppWindow {
             }
             self.watched.settings = mtime(&settings::path());
             self.apply_look(window, cx);
+            if previous_no_headers != self.person.no_headers {
+                if let Some(session) = &self.workspace {
+                    match self.workspace_projection(session.engine.document(), &self.file_chrome) {
+                        Ok(layout) => { self.chrome = layout; self.sync(window, cx); }
+                        Err(error) => self.report_layout(&error),
+                    }
+                }
+                cx.notify();
+                window.refresh();
+            }
         }
         let k_time = mtime(&crate::keys::path());
         if k_time.is_none() || k_time != self.watched.keys {
@@ -931,6 +958,7 @@ impl AppWindow {
     /// Makes `name` the shown layout (its file, or its default if missing or
     /// broken), with the person's clicks on it.
     fn load_layout(&mut self, name: &str) {
+        self.workspace = None;
         self.layout_name = name.to_owned();
         self.written_layout.clear();
         let mut from_file = false;
@@ -976,6 +1004,18 @@ impl AppWindow {
             self.write_state(&state);
         }
         mods::set_shared("layout".into(), json!(name));
+        if let Some(document) = self.file_chrome.workspace.clone() {
+            let loaded = if mods::valid_name(&document) {
+                crate::workspace::Session::load(file(&format!("workspaces/{document}.json")))
+            } else { Err("workspace document name must be a plain layout name".into()) };
+            match loaded.and_then(|session| {
+                let chrome = self.workspace_preflight_for(session.engine.document(), &self.file_chrome)?;
+                Ok((session, chrome))
+            }) {
+                Ok((session, chrome)) => { self.workspace = Some(session); self.chrome = chrome; }
+                Err(error) => { self.layout_file_ok = false; self.report_layout(&error); }
+            }
+        }
     }
 
     fn report_layout(&self, message: &str) {
@@ -1004,6 +1044,7 @@ impl AppWindow {
         self.save();
         self.float_drag = None;
         self.pane_drag = None;
+        self.workspace_drag = None;
         self.float_anims.clear();
         self.float_reveal.clear();
         self.float_hover.clear();
@@ -1032,6 +1073,34 @@ impl AppWindow {
         }
         match serde_json::from_str::<Node>(&text) {
             Ok(mut n) => {
+                if self.workspace.is_some() || n.workspace.is_some() {
+                    let update = (|| -> Result<_, String> {
+                        let session = match &n.workspace {
+                            Some(name) if mods::valid_name(name) => Some(crate::workspace::Session::load(file(&format!("workspaces/{name}.json")))?),
+                            Some(_) => return Err("workspace document name must be a plain layout name".into()),
+                            None => None,
+                        };
+                        let chrome = match &session {
+                            Some(session) => self.workspace_preflight_for(session.engine.document(), &n)?,
+                            None => n.clone(),
+                        };
+                        Ok((session, chrome))
+                    })();
+                    match update {
+                        Ok((session, chrome)) => {
+                            self.workspace = session;
+                            self.file_chrome = n;
+                            self.chrome = chrome;
+                            self.written_layout = text;
+                            self.layout_file_ok = true;
+                            let _ = std::fs::remove_file(file("layout.error"));
+                            self.apply_look(window, cx);
+                            self.sync(window, cx);
+                        }
+                        Err(error) => self.report_layout(&error),
+                    }
+                    return;
+                }
                 self.written_layout = text;
                 let was_broken = !self.layout_file_ok;
                 self.layout_file_ok = true;
@@ -1087,6 +1156,13 @@ impl AppWindow {
             return;
         }
         self.note_pane_folders();
+        if self.workspace.is_some() {
+            // Generated composition is persisted by the workspace transaction,
+            // never written over the authored layout or into Core's tree.
+            if let Err(error) = self.workspace_save_sizes() { self.report_layout(&error); }
+            self.save_view();
+            return;
+        }
         let mut state = layout_sync::State::between(&self.file_chrome, &self.chrome);
         state.theme = self.picked_theme.clone();
         if self.layout_file_ok {
@@ -1183,7 +1259,7 @@ impl AppWindow {
         let mut mods = Vec::new();
         let visit = |n: &Node, terms: &mut Vec<(String, String)>, mods: &mut Vec<(String, Instance)>| match n.content() {
             Some(Content::Terminal { terminal }) => terms.push((n.id.clone(), terminal.clone())),
-            Some(Content::Mod { name, props }) => mods.push((n.id.clone(), Instance { name: name.clone(), props: props.clone() })),
+            Some(Content::Mod { name, props }) => mods.push((n.id.clone(), Instance::new(name.clone(), props.clone()))),
             _ => {}
         };
         let stacks = |root: &Node, mods: &mut Vec<(String, Instance)>| {
@@ -1191,7 +1267,7 @@ impl AppWindow {
                 if let Kind::Stack { header: Some(h), .. } = &n.kind
                     && let HeaderContent::Mod { name, props } = &h.content
                 {
-                    mods.push((format!("{}#header", n.id), Instance { name: name.clone(), props: props.clone() }));
+                    mods.push((format!("{}#header", n.id), Instance::new(name.clone(), props.clone())));
                 }
             }
         };
@@ -1244,6 +1320,21 @@ impl AppWindow {
                 }
             }
         }
+        if let Some(session) = &self.workspace {
+            for floating in &session.engine.document().floating {
+                if let Ok(node) = self.workspace_float_node(&floating.group_id) {
+                    for block in node.visible_blocks() { visit(block, &mut terms, &mut mods); }
+                }
+            }
+        }
+        mods.retain(|(slot, _)| !slot.starts_with(crate::workspace::HEADER));
+        if let Some(session) = &self.workspace {
+            for (slot, instance) in &mut mods {
+                if let Some(panel) = session.engine.document().panels.get(slot) {
+                    instance.storage_namespace = panel.storage_namespace.clone();
+                }
+            }
+        }
         (terms, mods)
     }
 
@@ -1252,7 +1343,7 @@ impl AppWindow {
     /// tab (zoomed or not shown), and the overlays.
     fn owned_mods(&self) -> HashMap<String, Instance> {
         let mut out = HashMap::new();
-        let inst = |name: &String, props: &Value| Instance { name: name.clone(), props: props.clone() };
+        let inst = |name: &String, props: &Value| Instance::new(name.clone(), props.clone());
         for n in self.chrome.walk() {
             if let Some(Content::Mod { name, props }) = n.content() {
                 out.insert(n.id.clone(), inst(name, props));
@@ -1304,6 +1395,16 @@ impl AppWindow {
                     if let Some(Content::Mod { name, props }) = n.content() {
                         out.insert(n.id.clone(), inst(name, props));
                     }
+                }
+            }
+        }
+        out.retain(|slot, _| !slot.starts_with(crate::workspace::HEADER));
+        if let Some(session) = &self.workspace {
+            for panel in session.engine.document().panels.values() {
+                if let panel_workspace::Content::Mod { name, props, .. } = &panel.content {
+                    let mut instance = Instance::new(name.clone(), props.clone());
+                    instance.storage_namespace = panel.storage_namespace.clone();
+                    out.insert(panel.id.clone(), instance);
                 }
             }
         }
@@ -1408,6 +1509,9 @@ impl AppWindow {
 
     /// Creates what's visible, drops what isn't, publishes state, saves, focuses.
     fn sync(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.workspace_main_window.get_or_insert(window.window_handle());
+        self.workspace_float_layouts = self.workspace.iter().flat_map(|s|&s.engine.document().floating)
+            .filter_map(|f|self.workspace_float_node(&f.group_id).ok().map(|n|(f.group_id.clone(),n))).collect();
         self.model.order_spaces();
         let (model, live) = (&self.model, &self.live);
         self.swapped.retain(|p, a| model.address_of(p).is_some() && live.contains_key(a));
@@ -1495,6 +1599,7 @@ impl AppWindow {
             }
         }
         self.publish_shown_copies();
+        if let Err(error) = self.workspace_sync_floats(window, cx) { self.report_layout(&error); }
 
         // Keyboard to the focused pane when it changes (never steal it from an open dialog).
         let model_pane = self.model.focused_pane();
@@ -1817,6 +1922,10 @@ impl AppWindow {
         changed |= mods::publish_focused(focused.unwrap_or(Value::Null));
         changed |= mods::publish_floats(self.float_placements());
         changed |= mods::publish_layout(&self.chrome);
+        let panels: serde_json::Map<String,Value> = self.workspace.iter().flat_map(|s|s.engine.document().panels.values())
+            .filter_map(|panel|Some((self.copies.get(&panel.id)?.id.to_string(),json!({"id":panel.id,"title":crate::workspace::panel_title(panel),"embedded_header":self.workspace_panel_embedded(panel)}))))
+            .collect();
+        changed |= mods::publish_panels(Value::Object(panels));
         if changed {
             self.refresh_snapshot_mods(cx);
         }
@@ -2914,6 +3023,15 @@ impl AppWindow {
             args = json!({});
         }
         let (title, hint, current) = match name {
+            "workspace.rename" => {
+                let Some(session)=&self.workspace else {return};
+                let doc=session.engine.document();
+                let current=if let Some(id)=Self::arg(&args,"panel") { doc.panels.get(id).map(crate::workspace::panel_title) }
+                    else {Self::arg(&args,"view").and_then(|id|doc.view(id)).map(|v|v.title.clone())};
+                if current.is_none() {return}
+                args["expected_revision"]=json!(session.engine.revision());
+                ("rename panel or view","Enter to save · Esc to cancel",current)
+            }
             "space.rename" => {
                 let id = Self::owned(&args, "id").or_else(|| self.model.active.clone());
                 let current = id.as_deref().and_then(|i| self.model.space(i)).map(|p| p.name.clone());
@@ -2938,6 +3056,25 @@ impl AppWindow {
     }
 
     fn dispatch(&mut self, name: &str, a: &Value, person: bool, window: &mut Window, cx: &mut Context<Self>) {
+        if name.starts_with("workspace.") {
+            let result = self.workspace_command(name, a, window, cx);
+            self.answer(result);
+            return;
+        }
+        if name == "layout.select" && self.workspace.as_ref().is_some_and(|s|
+            Self::arg(a, "stack").and_then(|id| s.engine.document().group(id)).is_some()) {
+            let group = self.workspace.as_ref().unwrap().engine.document().group(Self::arg(a,"stack").unwrap()).unwrap();
+            if !group.views.iter().any(|v| Some(v.id.as_str()) == Self::arg(a,"child")) {
+                return self.fail("workspace view is not a member of that group");
+            }
+            let transaction = panel_workspace::Transaction {
+                expected_revision: self.workspace.as_ref().unwrap().engine.revision(),
+                commands: vec![panel_workspace::Command::SelectView { view_id: Self::arg(a,"child").unwrap_or_default().into() }],
+            };
+            let result = self.workspace_command("workspace.apply", &json!({"transaction":transaction}), window, cx);
+            self.answer(result);
+            return;
+        }
         let active_ctx = self.model.active_tab().map(|c| c.id.clone());
         match name {
             // ---- spaces
@@ -3433,7 +3570,7 @@ impl AppWindow {
                 if self.overlays.iter().any(|o| o.id == "palette") {
                     self.close_overlay("palette", window, cx);
                 } else {
-                    let spec = json!({ "mod": "frame-palette", "kind": "popup", "at": "top", "offset": 60, "width": 620, "height": 0.85 });
+                    let spec = json!({ "mod": "frame-palette", "kind": "popup", "at": "top", "offset": 60, "width": 620, "height": 0.85, "props":{"openables":self.panel_palette_entries()} });
                     self.open_overlay("palette".into(), spec, window, cx);
                 }
                 return;
@@ -3532,6 +3669,7 @@ impl AppWindow {
         if self.chrome.find(id).is_some() {
             return self.chrome.find_mut(id);
         }
+        if let Some(node) = self.workspace_float_layouts.values_mut().find(|n|n.find(id).is_some()) {return node.find_mut(id);}
         self.model.spaces.iter_mut().flat_map(|p| p.tabs.iter_mut()).find_map(|c| c.root.find_mut(id))
     }
 
@@ -3590,6 +3728,7 @@ impl AppWindow {
     fn mod_block_shown(&self, id: &str) -> bool {
         self.copies.contains_key(id)
             && (self.chrome.visible_blocks().iter().any(|n| n.id == id && matches!(n.content(), Some(Content::Mod { .. })))
+                || self.workspace_float_layouts.values().any(|n|n.visible_blocks().iter().any(|n|n.id == id))
                 || self.model.active_tab().is_some_and(|t| t.shown().visible_blocks().iter().any(|n| n.id == id)))
     }
 
@@ -3670,6 +3809,7 @@ impl AppWindow {
         if !props.is_object() {
             props = json!({});
         }
+        if name == "picker" { props["workspacePanels"] = json!(self.workspace_picker_panels()); }
         props["overlay"] = json!(id);
         let num = |k: &str, d: f32| spec.get(k).and_then(Value::as_f64).map_or(d, |v| v as f32);
         let size = match kind {
@@ -3699,7 +3839,7 @@ impl AppWindow {
             focus.focus(window, cx);
         }
         if layout.is_none() {
-            let copy = self.load(Instance { name, props }, window, cx);
+            let copy = self.load(Instance::new(name, props), window, cx);
             // Popups (menus) are as tall as what's in them; `height` is the most.
             if fit
                 && let Some(root) = &copy.root
@@ -3711,6 +3851,7 @@ impl AppWindow {
         let first_term = layout.as_ref().and_then(|l| l.visible_blocks().into_iter().find(|n| matches!(n.content(), Some(Content::Terminal { .. }))).map(|n| n.id.clone()));
         let has_layout = layout.is_some();
         self.overlays.push(Overlay {
+            native_window: window.window_handle(),
             id,
             kind,
             slot,
@@ -3833,6 +3974,20 @@ impl AppWindow {
 
     fn handle(&mut self, req: Request, window: &mut Window, cx: &mut Context<Self>) {
         match req {
+            Request::FromCopy {copy,request} => {
+                let native = self.copies.iter().find(|(_,c)|c.id == copy).and_then(|(slot,_)| {
+                    if let Some(overlay) = self.overlays.iter().find(|o| &o.slot == slot) {return Some(overlay.native_window)}
+                    let doc = self.workspace.as_ref()?.engine.document();
+                    let group = crate::workspace::floating::group_for_panel(doc,slot)?;
+                    self.workspace_windows.get(group).map(|h|(*h).into())
+                });
+                if let Some(native) = native.filter(|n|*n != window.window_handle()) {
+                    // The owner is already borrowed: defer the second window's
+                    // update so a mod's popup and focus stay with its panel.
+                    let owner = cx.weak_entity();
+                    cx.defer(move |cx| {let _ = native.update(cx,|_,w,cx| {let _ = owner.update(cx,|owner,cx|owner.handle(*request,w,cx));});});
+                } else {self.handle(*request,window,cx);}
+            }
             Request::Run { name, args } => self.run(&name, args, window, cx),
             Request::OpenOverlay { id, spec } => self.open_overlay(id, spec, window, cx),
             Request::CloseOverlay { id } => self.close_overlay(&id, window, cx),
@@ -4200,6 +4355,9 @@ impl AppWindow {
     }
 
     fn render_block(&self, n: &Node, content: &Content, focused: &HashSet<String>, cx: &mut Context<Self>) -> AnyElement {
+        if crate::workspace::internal_header(n) {
+            return self.workspace_header(n, cx);
+        }
         match content {
             Content::Terminal { .. } => match self.pane_term(&n.id) {
                 Some(t) => {
@@ -4224,7 +4382,7 @@ impl AppWindow {
                 }
                 None => div().into_any_element(),
             },
-            Content::Mod { .. } => self.render_slot(&n.id, cx),
+            Content::Mod { .. } => self.workspace_embedded_panel(n,cx).unwrap_or_else(||self.render_slot(&n.id,cx)),
             Content::Agent { .. } => match self.shown_agent() {
                 Some(addr) => match self.agent_view(&n.id, &addr) {
                     Some(t) => div().size_full().child(shown_terminal(&t.view, cx)).into_any_element(),
@@ -4258,6 +4416,7 @@ impl AppWindow {
     }
 
     fn render_slot(&self, slot: &str, cx: &mut Context<Self>) -> AnyElement {
+        let workspace_panel = self.workspace.as_ref().is_some_and(|s|s.engine.document().panels.contains_key(slot));
         let in_overlay = slot.starts_with("overlay:") || self.overlays.iter().any(|o| o.layout.as_ref().is_some_and(|l| l.find(slot).is_some()));
         // A mod that is a pane in a tab: a click makes it the focused pane, and the
         // keyboard is its own (an editor, a board), like a terminal's.
@@ -4266,6 +4425,10 @@ impl AppWindow {
             Some(Copy { root: Some(root), inst, .. }) => div()
                 .size_full()
                 .key_context(format!("Mod mod = {}", inst.name).as_str())
+                .when(workspace_panel, |d| {
+                    let panel = slot.to_owned();
+                    d.capture_any_mouse_down(cx.listener(move |this,_,_,_| {this.workspace_active_panel = Some(panel.clone());}))
+                })
                 .when(in_pane, |d| {
                     let id = slot.to_owned();
                     d.on_any_mouse_down(cx.listener(move |this, _, _, cx| {
@@ -4280,7 +4443,7 @@ impl AppWindow {
                 })
                 // Bare layout clicks leave the keyboard with the pane, but an input
                 // or other focusable control owns the keyboard once it takes focus.
-                .when(!in_overlay && !in_pane, |d| {
+                .when(!in_overlay && !in_pane && !workspace_panel, |d| {
                     d.capture_any_mouse_down(cx.listener(|_, _, window, cx| {
                         cx.defer_in(window, |this, window, cx| this.refocus_pane(window, cx));
                     }))
@@ -4307,6 +4470,9 @@ impl AppWindow {
 
     /// Plain fallback for `"header": { "content": "tabs" }`.
     fn builtin_tabs(&self, n: &Node, cx: &mut Context<Self>) -> AnyElement {
+        if self.workspace.as_ref().is_some_and(|s| s.engine.document().group(&n.id).is_some()) {
+            return self.workspace_tabs(n, cx);
+        }
         let active = n.active_child().map(|c| c.id.clone());
         let stack = n.id.clone();
         let mut row = div().size_full().flex().flex_row().bg(c("surface")).text_xs();
@@ -4420,17 +4586,17 @@ impl AppWindow {
         }
     }
 
-    fn render_overlays(&self, viewport: Size<Pixels>, cx: &mut Context<Self>) -> Vec<AnyElement> {
+    fn render_overlays(&self, viewport: Size<Pixels>, native_window: AnyWindowHandle, cx: &mut Context<Self>) -> Vec<AnyElement> {
         let mut out = Vec::new();
         let mut toast_y = 16.0;
         // Drawn last, so it stays clickable over an open dialog.
-        let pill = self.render_update_pill(cx);
+        let pill = if Some(native_window) == self.workspace_main_window {self.render_update_pill(cx)} else {None};
         if pill.is_some() {
             toast_y += UPDATE_PILL_HEIGHT + 8.0;
         }
         // Windows under dialogs, popups and toasts; each kind in the order opened
         // (a window pressed last is last: on top).
-        let order = self.overlays.iter().filter(|o| o.kind == OverlayKind::Window).chain(self.overlays.iter().filter(|o| o.kind != OverlayKind::Window));
+        let order = self.overlays.iter().filter(|o| o.native_window == native_window && o.kind == OverlayKind::Window).chain(self.overlays.iter().filter(|o| o.native_window == native_window && o.kind != OverlayKind::Window));
         for o in order {
             let id = o.id.clone();
             // Up to 1: a share of the window (terminals in overlays want room, not px).
@@ -4823,7 +4989,7 @@ fn num_in(v: &Value, k: &str) -> f32 {
 fn float_mod(id: &str, name: &str, props: &Value) -> (String, Instance) {
     let mut props = if props.is_object() { props.clone() } else { json!({}) };
     props["float"] = json!(id);
-    (floats::slot(id), Instance { name: name.to_owned(), props })
+    (floats::slot(id), Instance::new(name.to_owned(), props))
 }
 
 /// A pane header's slot and copy, told which pane it sits on (a mod pane has no terminal).
@@ -4831,7 +4997,7 @@ fn pane_header_mod(n: &Node, name: &str, props: &Value) -> (String, Instance) {
     let mut props = if props.is_object() { props.clone() } else { json!({}) };
     props["pane"] = json!(n.id);
     props["terminal"] = json!(n.terminal());
-    (format!("{}#frame", n.id), Instance { name: name.to_owned(), props })
+    (format!("{}#frame", n.id), Instance::new(name.to_owned(), props))
 }
 
 /// Every node shown on screen (hidden ones and inactive stack children skipped).
@@ -5013,10 +5179,11 @@ impl Render for AppWindow {
         let focused = self.focused_path(window, cx);
         let tree = self.render_node(&self.chrome, &focused, None, cx);
         let tree = self.window_frame(tree, window, cx);
-        let overlays = self.render_overlays(window.viewport_size(), cx);
+        let overlays = self.render_overlays(window.viewport_size(), window.window_handle(), cx);
         let tracker = self.float_tracker(cx);
         let win_tracker = self.window_tracker(cx);
         let pane_drag = self.pane_drag_layer(cx);
+        let workspace_drag = self.workspace_drag_layer(cx);
         div()
             .id("herdr")
             .track_focus(&self.focus)
@@ -5060,7 +5227,11 @@ impl Render for AppWindow {
             }))
             .capture_key_down(cx.listener(|this, ev: &KeyDownEvent, window, cx| {
                 if ev.keystroke.key == "escape" {
-                    if this.pane_drag.is_some() {
+                    if this.workspace_drag.is_some() {
+                        this.workspace_drag = None;
+                        cx.notify();
+                        cx.stop_propagation();
+                    } else if this.pane_drag.is_some() {
                         this.cancel_pane_drag(cx);
                         cx.stop_propagation();
                     } else if cx.stop_active_drag(window) {
@@ -5097,6 +5268,7 @@ impl Render for AppWindow {
             .children(tracker)
             .children(win_tracker)
             .child(pane_drag)
+            .child(workspace_drag)
             .child(crate::bench::frame_end())
     }
 }
@@ -6241,6 +6413,8 @@ export default class Probe extends View {
     }
 
     include!("window/drag_tests.rs");
+    include!("window/workspace_drag_tests.rs");
+    include!("window/workspace_float_tests.rs");
 
     /// The whole path, in a real window: a layout names the toast mod, a
     /// notification opens it with its props, and it can close itself (as one

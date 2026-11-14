@@ -167,6 +167,90 @@ the highlighted line shows where it will land.
   `setAgentOrder(list.map(a => a.address))` on render so `agent.next` /
   `agent.prev` follow its list.
 
+## Local panel workspaces (opt-in development feature)
+
+`workspace.activate {name?, document?}` creates or selects a separate personal
+layout with a `workspace` document name on its root. Existing layouts stay intact.
+On macOS, panel workspaces use a 22px draggable title bar with native window
+buttons and the same canvas background as the workspace.
+Composition is saved locally in `workspaces/<name>.json`, with a last-good copy;
+it does not change Core's ownership of terminal tabs.
+
+`workspace.inspect` reads `{revision, document, can_undo, can_redo, warning}`.
+`workspace.apply {transaction: {expected_revision, commands}}` validates a full
+draft and persists it before publishing. Commands use stable IDs and an `op`
+field: `new_group`, `new_view`, `register_panel`, `show_panel`, `move_section`,
+`move_view`, `move_group`, `select_view`, `reveal_panel`, `collapse`, `hide_panel`,
+`resize_section`, `resize_group`, `resize_zone`, `hide_zone`, `bind`, `duplicate`,
+and `maximize`. All indices address the destination after removing the source.
+Create containers and populate them in the same transaction. Empty containers
+are normalized at commit; hidden panels remain registered and retain live copies.
+The precise command schema lives in `crates/panel-workspace/src/operations.rs`.
+
+`workspace.undo {expected_revision?}` and `workspace.redo {expected_revision?}`
+operate on bounded session history. `workspace.export` reads the local document;
+`workspace.import {expected_revision, document}` validates/imports one document as
+an undoable change. Restart restores composition, not undo history.
+
+Panel headers have one title row. Files and Changes keep their original cards
+and title bars; native controls share that row. Groups with only one view omit
+the redundant view label. Selected view tabs have no filled background.
+Drag the centered six-dot grip to move a panel; drag a view tab to move the view.
+Multi-view groups have a centered grip in their tab row to move the whole group.
+There are four outer zones (`left`, `right`, `top`, `bottom`) plus two center-only
+zones (`top_center`, `bottom_center`). Top/bottom outer zones span the window;
+center-only zones sit above/below terminals between the full-height side panes.
+While dragging, choose the labeled **Top/Bottom · full width** target at the
+window edge, or **Top/Bottom · center** just inside the central column.
+The same edge values work with `new_group`, `move_group`, `resize_zone` and
+`hide_zone`. Center docks are created on first use in older four-zone documents.
+They resize and persist independently of the outer docks.
+Translucent highlights show the receiving area. Escape cancels. Panel headers
+show float/redock, expand/restore and close controls on the right on hover.
+Mod-specific controls sit beside the title on the left and appear on hover. Close hides a panel and keeps its data;
+there are no collapse controls. Expand enlarges the current view.
+
+Double-click a panel title or a view tab to rename it.
+Enter saves; Escape cancels. `workspace.rename {panel?, view?, name?, expected_revision?}`
+accepts exactly one panel/view identity. Omitting name from a person action opens
+the standard rename prompt. Names are trimmed, single-line and limited to 120
+characters; an empty panel name restores the default. Renaming is undoable and
+never changes mod props, storage, instance identity or running processes.
+`rename_panel` and `rename_view` are also available inside workspace transactions.
+
+A mod with its own title row can declare `"workspace_header": true` in mod.json.
+Its docked row must be 42px high and reserve 106px at the right for native
+controls; keep its own action buttons away from the center grip. The host then
+overlays controls onto that row and omits its additional title bar. Changing
+this manifest capability requires reselecting the workspace or restarting.
+Keep dialogs/popups standalone and preserve existing props and storage keys.
+
+Mods can read `panel()` from `herdr` for their own copy's
+`{id, title, embedded_header}` or null outside a panel workspace. It is reactive
+and separate from props/storage. Files and Changes use it to label their original
+header and reserve room for native controls, without adding another title bar.
+
+`workspace.float {panel?, group?}` detaches the last clicked panel (or an explicit
+panel/group) into a real resizable OS window, retaining its live mod copy and draft.
+`workspace.dock {panel?, group?, edge?}` returns it to its saved placement; an explicit
+edge chooses a different dock. Closing the native window also returns it to the dock.
+The header's outward arrow opens a floating window; its inward arrow redocks it.
+Floating windows have no additional toolbar. Panel controls stay visible. Panels
+have 8px outer padding and gaps so cards never touch the window edge or each other.
+On macOS, Cmd+Option+F floats, Cmd+Option+Shift+F redocks, Cmd+Option+Z undoes and
+Cmd+Option+Shift+Z redoes workspace changes. Other platforms use Ctrl+Alt instead.
+In a floating window Cmd+W returns the panel to its dock. Bounds survive restart.
+
+This feature is under development. The native adapter currently rejects terminal
+ownership transfers before committing. Complete keyboard/menu navigation, center transfers, floating drag/drop, pinned-context
+delivery, and migration from arbitrary layouts are not implemented yet. The
+engine's `bind` operation records binding only; it does not yet pin a mod's data.
+Do not treat this feature as the complete panel-workspace release.
+Only mods explicitly declaring `"multiple_instances": true` in mod.json may
+enable duplication. New duplicate instances use independent storage under
+`data/instances/<namespace>/store.json`; legacy panels without a namespace retain
+their mod/props-based storage path. Moving or changing binding never changes props.
+
 ## Layouts: `layouts/<name>.json`
 
 Each file is one whole window. `layout.switch` (`ctrl-shift-l`) cycles
@@ -700,12 +784,24 @@ What's about the user, never a look:
 
 - `zoom` scales the whole app: terminals, mods, the layout's px sizes
   (0.5 to 3; the zoom keys change it). Write sizes as designed at zoom 1.
+- `no_headers`: `true` enables Settings → Look → No Headers for panel workspaces.
+  Panel title rows and their controls disappear, reclaiming their height; group
+  navigation tabs remain. Applies live to docked and floating panels. Turn it off
+  to restore headers, drag handles and actions. Saved collapse state is retained.
 - `sounds`: `{ "enabled": true, "done": "<file>", "blocked": "<file>" }`.
   When an agent needs the person, or finishes while they aren't looking at
   it, Herdr plays a sound and (unless they're looking) posts a toast that
   goes there when clicked. `done` / `blocked` replace the bundled MP3s
   (path absolute or relative to `~/.config/herdr-app`). Changes apply live,
   including the Play buttons in Settings > Alerts.
+- `core_session`: `"own"` uses Handlr's separate Core session; `"shared"`
+  connects to Herdr's default Core by removing the launcher's HC_SESSION,
+  HC_SOCKET and XDG state/config/runtime overrides from child processes.
+  Absent, preserves the launch environment (the installed Handlr defaults to
+  its separate session). Read once at startup; quit and reopen Handlr to apply.
+  Neither choice stops a Core or moves terminals. Handlr's app home and panel
+  layout stay separate. To access both, add Handlr's separate session as a
+  machine in Herdr using a transport with that session's socket/storage paths.
 - `core`: the herdr-core binary to use, when it isn't where Herdr looks
   (PATH, the login shell's PATH, `~/.local/bin`, Homebrew, mise, Nix,
   cargo). Read at start.
@@ -1120,3 +1216,11 @@ including a small herdr-core skill you can install with the user's permission.
 - One mod per idea. Don't edit `AGENTS.md` or the `.d.ts` files (the app
   rewrites them). Don't touch other mods unless the request
   needs it.
+
+Workspace layouts use the default Herdr terminal tab bar, pane frame, spacing and terminal padding. The terminal center remains in the workspace center column; panel positions and terminal sessions are unchanged.
+
+Cmd+Shift+P (the command palette) includes Open entries for installed panels and mods declaring an overlay. `workspace.open {name}` adds or reveals an installed panel, preserving its existing identity, props and storage. Cmd+P remains the go-to picker. A panel declares `workspace_header: true`, a docking `place`, or `button.opens: "panel"` in mod.json; helper/header mods do not appear as panels.
+
+Cmd+P also lists currently placed workspace panels by their display titles; selecting one runs `workspace.reveal {panel}`. It never reopens a closed panel. Use Cmd+Shift+P to open or restore one.
+
+Closing a workspace panel saves its last placement in `closed_panels` in the workspace document. `workspace.open {name}` restores that placement (dock, group/view, order and weights), including after restart; an existing destination is reused. The mod default is used only when no saved placement exists. Explicit `show_panel` placement replaces the saved destination.

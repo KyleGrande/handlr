@@ -516,6 +516,8 @@ export default class Settings extends View {
       .w_full()
       .child(this.heading(t, "Layout"))
       .child(this.layoutPicker(t, cx))
+      .child(this.row(t, "No Headers", "Hide panel title rows. Turn off to restore panel controls and drag handles.",
+        this.toggle(t, "st-no-headers", Boolean(p.no_headers), (_e, cx) => this.change(q => { q.no_headers = !q.no_headers; }, cx))))
       .child(div().h(18))
       .child(this.heading(t, "Theme"))
       .child(this.row(t, "Appearance", "Light or dark, or as your system is now.", this.appearancePicker(t, cx)))
@@ -710,9 +712,26 @@ export default class Settings extends View {
     return row;
   }
 
+  coreSession(t) {
+    const sharedSession = this.person.core_session === "shared";
+    return v_flex().w_full()
+      .child(this.heading(t, "Core session"))
+      .child(this.row(t, "Use Herdr’s existing session",
+        sharedSession
+          ? "Herdr and Handlr share spaces, terminals, and agents. Handlr keeps its own panel layout."
+          : "Handlr uses its own session with separate spaces, terminals, and agents.",
+        this.toggle(t, "st-core-session", sharedSession, (_e, cx) =>
+          this.change((p) => { p.core_session = sharedSession ? "own" : "shared"; }, cx))))
+      .child(div().pt(10).text_size(12.5).line_height("18px").text_color(t.dim)
+        .child("Quit and reopen Handlr to apply a change. Running terminals and agents stay alive in both sessions."))
+      .child(div().pt(8).pb(18).text_size(12.5).line_height("18px").text_color(t.dim)
+        .child("Want access to both? You can always add Handlr’s separate session as a machine in Herdr, even on this computer."));
+  }
+
   machines(t) {
     const version = updates().core.version;
     return v_flex().w_full()
+      .child(this.coreSession(t))
       .child(this.heading(t, "Machines"))
       .child(div().pb(8).text_size(12.5).line_height("18px").text_color(t.dim).child("Your computers, reached over ssh. Their terminals keep running when you disconnect."))
       .child(this.row(t, "This computer", `Connected · ${version ? `hc ${version}` : "hc version unknown"}`, div().w(7).h(7).rounded(4).bg(t.ansi2)))
