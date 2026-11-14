@@ -148,7 +148,7 @@ right-click shortcuts remain planned.
 
 The mod declares `"workspace_header": true` in mod.json. In a compatible panel
 workspace, its original 42px title row carries the host's centered drag grip and
-rename/expand/close controls. The row reserves 106px on the right for those
+hover-only float/redock, expand/restore and close controls. The row reserves 82px on the right for those
 controls; existing mod actions remain available. Double-click its title to
 rename the panel without changing its identity, props or stored data.
 
