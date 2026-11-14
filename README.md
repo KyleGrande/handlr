@@ -1,5 +1,8 @@
 # Herdr Toolbox
 
+[RECIPE.md](RECIPE.md) describes how to reconstruct this mod and its dependencies;
+[preview.png](preview.png) is the dated native panel reference.
+
 Native Herdr command shortcuts belonging to the selected Space. The Toolbox button sits beside Context in the tab bar and opens a tray above terminals. The pane matches Context's theme background, rounded border, header, typography, and content spacing.
 
 The header **+** opens a native popup matching Rigs: **Copy agent prompt** and **Add a tool (manual)**. The copied prompt points an agent to the installed setup guide and current repo. The agent inspects package scripts and scripts/ and writes `.herdr/toolbox.json`; Toolbox loads these tools automatically within five seconds, without running them. Manual tools persist per Space.
