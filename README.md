@@ -1,5 +1,8 @@
 # Herdr Context
 
+[RECIPE.md](RECIPE.md) describes how to reconstruct this mod and its dependencies;
+[preview.png](preview.png) is the dated native panel reference.
+
 A native Markdown scratchpad and tags for Herdr Spaces and agents, independent of Rigs.
 
 One **Context** button sits beside Files and Changes and opens the existing right
