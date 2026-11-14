@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1254 1254">
+  <title>Handlr macOS icon with enlarged sheep artwork</title>
+  <defs>
+    <clipPath id="tile-clip"><rect x="80" y="80" width="1094" height="1094" rx="232"/></clipPath>
+  </defs>
+  <image href="handlr-macos-artwork.png" width="1254" height="1254" clip-path="url(#tile-clip)"/>
+</svg>

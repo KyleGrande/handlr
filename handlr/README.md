@@ -15,6 +15,16 @@ node scripts/toolchain.mjs cargo test --locked --manifest-path ../Cargo.toml --b
 ad-hoc signs it and writes `dist/Handlr.app` and a ZIP. `npm run install:release`
 also installs it to `~/Applications/Handlr.app`, keeping a backup of an existing
 installation. The original artwork is `assets/icons/handlr-source.png`.
+The macOS icon's enlarged artwork and editable clip are in the repository's
+`assets/icons/handlr-macos.*`; its image edit prompts are in
+`assets/icons/macos-edit-prompt.md` here.
+
+After building `../target/release/herdr-app`, run `npm run package:macos` to
+produce the portable GitHub prerelease under `dist/public/`, with a SHA-256
+checksum. This packager uses a fresh plist and seeds only bundled panels,
+without copying any development data or machine-specific paths. Its launcher
+keeps user data in `~/Library/Application Support/Handlr`, seeds missing initial
+configuration files, and preserves existing files on subsequent launches.
 
 This is the existing local packaging harness. It requires a previously prepared
 isolated app configuration at `.checks/Handlr.app/Contents/Info.plist`. That

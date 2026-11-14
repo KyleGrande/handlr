@@ -5,8 +5,12 @@ It adds dockable panels, floating native windows, panel layout persistence,
 workspace undo/redo, compact headers, and a choice of a separate or shared Herdr Core session.
 
 This is an early development fork. The current macOS build works locally;
-the complete release acceptance work remains unfinished. There is no public
-Handlr binary release yet.
+the complete release acceptance work remains unfinished. An Apple Silicon macOS
+prerelease is available from [GitHub Releases](https://github.com/KyleGrande/handlr/releases).
+Download and extract the ZIP, then move `Handlr.app` into Applications.
+The build is ad-hoc signed and is not Apple-notarized.
+It uses `~/Library/Application Support/Handlr` for its own data and Core session.
+Context, Toolbox and Rigs are separate optional mod installations.
 
 ## Development
 
