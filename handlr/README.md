@@ -2,14 +2,12 @@
 
 Layout/mod packaging rules and our file inventory are in
 [MODS-AND-LAYOUTS.md](MODS-AND-LAYOUTS.md). The native workspace reconstruction
-brief is [prototype/RECIPE.md](prototype/RECIPE.md); external panel recipes live
-in their separate local mod repositories.
-
-The original sibling `Herdr Context`, `Herdr Toolbox` and `Herdr Rigs` checkouts
-now use the pushed `fix/workspace-shared-headers` branches for Handlr. The
-temporary `handlr/mod-worktrees/` checkouts were removed; Handlr Dev's installed
-Rigs mod points to the original `Herdr Rigs` checkout. Ticket remains in its
-original sibling repository on `handlr-ui`.
+brief is [prototype/RECIPE.md](prototype/RECIPE.md). Toolbox, Context, Rigs and
+Ticket now live in the repository’s root [`mods/`](../mods/README.md) directory,
+including their recipes, screenshots, CLIs and tests. Their Git histories and
+local Context/Rigs changes were imported from the original sibling checkouts.
+Those checkouts remain available; existing installed panels continue using their
+configured CLI paths until explicitly reinstalled or migrated.
 
 Run commands here, inside the repository's `handlr/` subdirectory. The native
 host is one directory above, so Cargo commands use `--manifest-path ../Cargo.toml`.
@@ -54,7 +52,7 @@ installs first, saves/quits the Dev app and reopens it; Core and existing
 terminals remain alive. Reopen skips compilation. Only explicit button clicks
 run these actions; installing the integration does not build or restart an app.
 `HERDR_APP_HOME` selects the Dev configuration directory. The setup requires
-the sibling Herdr Rigs checkout with development-action support built.
+`mods/rigs` built (`npm run mods:build -- rigs` from this directory).
 
 The Dev packager records a content snapshot of native sources, bundled mods,
 assets, local dependencies and build configuration, including uncommitted and
@@ -94,8 +92,9 @@ cannot yet produce a configured release using this harness alone.
 The history documents describe the earlier outer workspace arrangement with
 native sources under `host/`; the fork keeps those native sources at repository
 root. Historical commands and absolute paths in those records are not fresh
-clone instructions. The external Context, Toolbox and Rigs mod branches are
-separate repositories, as noted in `IMPLEMENTATION.md`.
+clone instructions. The original external mod repository arrangement described
+in `IMPLEMENTATION.md` is historical; current mod development happens under
+root `mods/`.
 
 The complete release acceptance plan is still unfinished. This fork does not
 publish through Herdr's release infrastructure.

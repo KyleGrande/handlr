@@ -1,0 +1,19 @@
+{
+  "name": "herdr-toolbox",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node --import tsx scripts/build.ts",
+    "typecheck": "node --import tsx scripts/build.ts --noEmit",
+    "test": "npm run build && node --test dist/tests/*.test.js",
+    "check:native": "npm run build && herdr-app check dist/mods/toolbox && herdr-app check dist/mods/toolbox-tabs",
+    "prepare-install": "npm run build && node dist/scripts/prepare-install.js",
+    "install:local": "npm run build && node dist/scripts/install.js"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2"
+  }
+}

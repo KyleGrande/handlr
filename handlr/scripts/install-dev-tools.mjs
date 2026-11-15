@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 const handlr = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const repo = resolve(handlr, '..');
 const home = process.env.HERDR_APP_HOME || join(homedir(), '.config/handlr-dev');
-const cli = resolve(repo, '../Herdr Rigs/bin/rig');
+const cli = resolve(repo, 'mods/rigs/bin/rig');
 const profile = join(handlr, 'rig.handlr.json');
 const report = join(home, 'data/handlr-dev-build-status.json');
 function rig(args) {

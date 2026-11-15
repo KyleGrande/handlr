@@ -1,0 +1,87 @@
+{
+  "version": 1,
+  "repos": [
+    "frontend",
+    "backend"
+  ],
+  "services": {
+    "api": {
+      "repo": "backend",
+      "argv": [
+        "node",
+        "--experimental-strip-types",
+        "service.ts"
+      ],
+      "endpoints": {
+        "http": {
+          "range": [
+            4120,
+            4199
+          ]
+        },
+        "metrics": {
+          "protocol": "tcp",
+          "range": [
+            5120,
+            5199
+          ]
+        }
+      },
+      "env": {
+        "PORT": "${api.http.port}",
+        "CORS_ORIGIN": {
+          "endpoint": "web.http",
+          "origin": true
+        },
+        "METRICS_PORT": "${api.metrics.port}"
+      },
+      "readiness": {
+        "endpoint": "http",
+        "path": "/health",
+        "timeout": 5
+      },
+      "data_scope": "Disposable fixture; no database"
+    },
+    "web": {
+      "repo": "frontend",
+      "argv": [
+        "node",
+        "--experimental-strip-types",
+        "service.ts"
+      ],
+      "endpoints": {
+        "http": {
+          "range": [
+            3120,
+            3199
+          ]
+        }
+      },
+      "env": {
+        "PORT": "${web.http.port}",
+        "API_URL": {
+          "endpoint": "api.http",
+          "path": "/api"
+        }
+      },
+      "depends_on": [
+        "api"
+      ],
+      "readiness": {
+        "endpoint": "http",
+        "timeout": 5
+      }
+    },
+    "worker": {
+      "repo": "backend",
+      "argv": [
+        "node",
+        "--experimental-strip-types",
+        "service.ts"
+      ],
+      "env": {
+        "RIG_ID": "${rig.id}"
+      }
+    }
+  }
+}

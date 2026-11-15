@@ -1,0 +1,13 @@
+node_modules/
+dist/
+build/
+.host/
+.artifacts/
+.DS_Store
+.env
+.env.*
+!.env.example
+*.tsbuildinfo
+herdr.d.ts
+gpui-kit.d.ts
+jsconfig.json

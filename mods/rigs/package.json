@@ -1,0 +1,32 @@
+{
+  "name": "herdr-rigs",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "rig": "bin/rig"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "npm run build && node --test dist/tests/*.test.js",
+    "check:mod": "herdr-app check mods/rigs",
+    "check:mod:states": "npm run build:mod && node scripts/check-mod-states.mjs",
+    "build:mod": "node scripts/build-mod.mjs",
+    "watch:cli": "node node_modules/typescript/bin/tsc -p tsconfig.json --watch --preserveWatchOutput",
+    "watch:mod": "node scripts/watch-mod.mjs",
+    "watch:mod:installed": "npm run build && node scripts/watch-mod.mjs --sync",
+    "sync:mod": "npm run build && npm run build:mod && node dist/scripts/sync-mod.js",
+    "test:live": "npm run build && node dist/tests/live.js",
+    "install:mod": "npm run build && npm run build:mod && node dist/scripts/install-mod.js",
+    "test:crash": "npm run build && node dist/tests/crash-live.js",
+    "prepare:desktop": "npm run build && node dist/scripts/desktop-fixtures.js"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/proper-lockfile": "^4.1.4",
+    "typescript": "^5.9.0"
+  },
+  "dependencies": {
+    "proper-lockfile": "^4.1.2"
+  }
+}

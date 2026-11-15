@@ -3,6 +3,10 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "mods:install": "node scripts/mods.mjs install",
+    "mods:build": "node scripts/mods.mjs build",
+    "mods:test": "node scripts/mods.mjs test",
+    "mods:check": "node scripts/mods.mjs check",
     "dev:status": "node scripts/dev-build-status.mjs",
     "dev:tools": "node scripts/install-dev-tools.mjs",
     "release": "node scripts/release-macos.mjs",

@@ -176,7 +176,13 @@ the highlighted line shows where it will land.
 ## Local panel workspaces (opt-in development feature)
 
 In a Handlr development checkout, `cd handlr && npm run dev:tools` configures
-build status and Rebuild & reopen / Reopen buttons in Rigs. `npm run dev:status` compares
+build status and Rebuild & reopen / Reopen buttons using `mods/rigs` in that
+checkout. The optional Toolbox, Context, Rigs and Ticket source packages live
+under repository-root `mods/`; see `mods/README.md`. From `handlr/`, run
+`npm run mods:install`, then `npm run mods:test` or `npm run mods:check`.
+These commands do not install panels or change layouts. Native builds/checks
+use declarations from `HERDR_APP_HOME` (default `~/.config/herdr-app`).
+`npm run dev:status` compares
 source contents, the installed Dev bundle and running processes. Rebuild once
 to establish tracking for older bundles. Rigs actions run only on an explicit
 click and preserve Core and its terminals; no separate status mod is installed.

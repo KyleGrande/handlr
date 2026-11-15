@@ -1,0 +1,13 @@
+{
+  "name": "Ticket",
+  "title": "Ticket",
+  "place": "none",
+  "overlay": {
+    "width": 560,
+    "height": 720
+  },
+  "button": {
+    "label": "Ticket",
+    "opens": "panel"
+  }
+}
