@@ -153,6 +153,21 @@ original tab. Dragging one panel out of a multi-panel stack keeps that tab shown
 
 ## App-provided and user-owned panels
 
+**Settings → Mods** lists installed panels and layout components, with Toolbox,
+Context, Rigs and Ticket first when present. Open adds/reveals a panel in the
+current workspace, or opens its overlay in a regular layout. **In workspace**
+shows or hides a mod’s panels without uninstalling it, deleting data, or stopping
+running work. Disabling hides all open instances in one undoable transaction;
+enabling restores an existing panel identity. The controls appear only for panel
+mods in a panel workspace, and stay unavailable if workspace state cannot be
+read. Review panel updates opens the existing customization review flow.
+
+The mod list is read from this app’s home, independently of the source packages
+in root `mods/`. Refresh rereads installed files. Workspace membership refreshes
+every three seconds while this page is open; changes use a fresh revision and
+report conflicts. No global unload or package installation is performed by the
+workspace switches. Open this page with `app.settings {section:"mods"}`.
+
 Editing a bundled panel makes the copy in `mods/<name>/` user-owned. It stays
 active under the same identity across restarts. `app-provided/mods/` holds the
 latest bundled version outside the palette's installed panels. Future changes
