@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "repos": [
+    "app"
+  ],
+  "services": {
+    "api": {
+      "repo": "app",
+      "argv": [
+        "node",
+        "--experimental-strip-types",
+        "service.ts"
+      ],
+      "endpoints": {
+        "http": {
+          "range": [
+            4120,
+            4199
+          ]
+        },
+        "metrics": {
+          "protocol": "tcp",
+          "range": [
+            5120,
+            5199
+          ]
+        }
+      },
+      "env": {
+        "PORT": "${api.http.port}",
+        "METRICS_PORT": "${api.metrics.port}"
+      },
+      "readiness": {
+        "endpoint": "http",
+        "path": "/health",
+        "timeout": 5
+      },
+      "data_scope": "Disposable fixture; no database"
+    }
+  }
+}
