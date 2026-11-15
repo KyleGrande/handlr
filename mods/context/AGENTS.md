@@ -37,7 +37,7 @@ User decisions in the conversation take precedence over defaults here. Do author
 
 Keep README, agent guide, CLI help and implemented behavior consistent. Mark proposed commands/features as planned until they work. Add meaningful persistence/conflict/identity regressions as implementation arrives. Run checks appropriate to changes unless the user requests otherwise, and accurately report any unverified behavior.
 
-Keep this repository separate from `/Users/kylegrande/Documents/ChatGPT/Herdr Rigs`. Do not alter Rigs. Installation may apply the reviewed, minimal Context integration to the selected personal layout, preserving all other layout choices and shipped files.
+This package lives at `mods/context` in Handlr. Keep Context storage and behavior independent of the other mod packages. Installation may apply the reviewed, minimal Context integration to the selected personal layout, preserving all other layout choices and shipped files.
 
 ## Workspace header compatibility
 

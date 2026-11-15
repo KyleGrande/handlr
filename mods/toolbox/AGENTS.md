@@ -1,6 +1,6 @@
 # Herdr Toolbox
 
-Read README.md and ~/.config/herdr-app/AGENTS.md. Independent native GPUI mod. Button sits directly beside Context in the tab bar; tray opens ABOVE terminals. Match Context pane styling. Use Space naming, with no Agent/Worktree scope controls. Keep Context and Rigs files untouched; integrate with a personal tab-bar clone and separate layout.
+Read README.md and ~/.config/herdr-app/AGENTS.md. Independent native GPUI mod in Handlr’s `mods/toolbox` package. Button sits directly beside Context in the tab bar; tray opens ABOVE terminals. Match Context pane styling. Use Space naming, with no Agent/Worktree scope controls. Keep Context and Rigs files untouched; integrate with a personal tab-bar clone and separate layout.
 
 Capture Space owners for edits and launches; qualify IDs by permanent Core identity. Quote parameter values as shell data. Execute only on explicit Run, in a separate terminal. Use versioned shared storage and reject stale saves.
 

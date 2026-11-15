@@ -10,8 +10,12 @@ type Editor = { owner: string; revision: number; id: string; label: InputState; 
 const state = () => shared(KEY) as ToolboxState | undefined;
 import { View, div, svg } from 'gpui-kit';
 import { h_flex, v_flex, InputState, Input } from 'gpui-base';
-import { spaces, panes, terminals, theme, shared, setShared, exec, run, props, layout, readTextFile, openOverlay, closeOverlay, appHome } from 'herdr';
+import { spaces, panes, terminals as hostTerminals, theme, shared, setShared, exec, run, props, layout, readTextFile, openOverlay, closeOverlay, appHome } from 'herdr';
 import { parameters, expand, saveEntry, repoTools, spaceFolder } from './model.js';
+
+// The host documents Core's address/state fields but types only selection
+// metadata explicitly. Keep that boundary in one place for both host versions.
+const terminals = (): TerminalRecord[] => hostTerminals() as unknown as TerminalRecord[];
 
 // Namespace access keeps this mod compatible with Herdr versions without panel().
 import * as WorkspaceHost from 'herdr';

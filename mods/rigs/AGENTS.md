@@ -1,6 +1,6 @@
 # Herdr Rigs
 
-Rigs manages named, restartable development stacks. This repository contains the TypeScript CLI and a native Herdr sidebar mod. The CLI owns resolution, approval, reservations and lifecycle; the panel calls that same CLI. Services run in parentless herdr-core terminals and survive closing the panel or app.
+Rigs manages named, restartable development stacks. Handlr’s `mods/rigs` package contains the TypeScript CLI and a native Herdr sidebar mod. The CLI owns resolution, approval, reservations and lifecycle; the panel calls that same CLI. Services run in parentless herdr-core terminals and survive closing the panel or app.
 
 This is a tooling project. It has no application server, database, cache or queue. `fixtures/` contains disposable demos, not services needed to develop Rigs. A compiler watcher is optional and has no managed port or browser URL.
 

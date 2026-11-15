@@ -1,5 +1,9 @@
 # Herdr Rigs
 
+Maintained in Handlr at `mods/rigs`. Run this package’s commands from
+that directory. See [the mod development guide](../README.md) for commands
+covering all four mods and notes on existing installations.
+
 [RECIPE.md](RECIPE.md) describes how to reconstruct this mod and its dependencies;
 [preview.png](preview.png) is the dated native panel reference.
 
