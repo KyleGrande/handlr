@@ -1,5 +1,19 @@
 # Herdr changelog
 
+## [0.1.0-alpha.2] - 2026-11-14
+
+### New
+- Handlr: hide or restore individual docks and switch to terminal-only mode from the window controls. (#1, thanks @KyleGrande)
+- Handlr: create panel tab groups from the command palette or by dragging, with clearer drop targets and undo support. (#1, thanks @KyleGrande)
+- Handlr: review app-provided panel updates while keeping your edited panels and their identities. (#1, thanks @KyleGrande)
+- Handlr: blend panels into the app background with Seamless appearance and optionally hide panel buttons. (#1, thanks @KyleGrande)
+- Handlr: browse connected machines and their spaces in the Machines panel. (#1, thanks @KyleGrande)
+
+### Fixed
+- Handlr: existing settings and panels are preserved when moving the app home to `~/.config/handlr`. (#1, thanks @KyleGrande)
+- Handlr: changing panel visibility avoids redundant terminal resizes and keeps completed terminal frames visible during synchronized output. (#1, thanks @KyleGrande)
+- Handlr: dragging panels and tabs preserves neighboring stacks, supports pane ordering, and restores previews when canceled. (#1, thanks @KyleGrande)
+
 ## [0.1.15] - 2026-11-10
 
 ### New

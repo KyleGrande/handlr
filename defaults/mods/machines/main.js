@@ -108,7 +108,7 @@ export default class Machines extends View {
 
   render() {
     const t = theme();
-    return v_flex().size_full().min_h(0).bg(t.background).text_size(12)
+    return v_flex().size_full().min_h(0).bg(t.surface).text_size(12)
       .child(v_flex().id("machines-list").flex_1().min_h(0).px(6).overflow_y_scrollbar()
         .children(this.rows().map((m, i) => this.machineRow(t, m, i)))
         .when(this.list === null && !this.error, el => el.child(div().px(12).py(8).text_size(11).text_color(t.dim).child("Reading machines…")))

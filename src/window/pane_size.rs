@@ -1,4 +1,4 @@
-//! Geometry for panes that aren't drawn: programs starting, and tabs that are hidden.
+//! Geometry for panes that aren't drawn: startup, hidden tabs, and drop previews.
 //! Layout metrics are shared with the renderer; normal resize still handles pixel rounding.
 
 use super::*;
@@ -84,14 +84,14 @@ fn shares(children: &[&Node], available: f32, zoom: f32) -> Vec<f32> {
     sizes
 }
 
-fn block_bounds(n: &Node, bounds: Bounds<Pixels>, target: &str, frame: Option<&PaneFrame>, focused: &HashSet<String>, zoom: f32) -> Option<Bounds<Pixels>> {
+pub(super) fn block_bounds(n: &Node, bounds: Bounds<Pixels>, target: &str, frame: Option<&PaneFrame>, focused: &HashSet<String>, zoom: f32) -> Option<Bounds<Pixels>> {
     if n.hidden { return None; }
     let border = node_border(n, focused.contains(&n.id)).map_or(0.0, |line| line.width) * zoom;
     let mut origin = bounds.origin + point(px(border), px(border));
     let size = inset(bounds.size, 2.0 * border, 2.0 * border);
-    if n.content().is_some() {
-        return (n.id == target).then_some(Bounds::new(origin, size));
-    }
+    // The renderer measures the padding box for containers as well as blocks.
+    if n.id == target { return Some(Bounds::new(origin, size)); }
+    if n.content().is_some() { return None; }
     let (y, x) = padding(n);
     origin += point(px(x * zoom), px(y * zoom));
     let size = content_size(n, bounds.size, focused.contains(&n.id), zoom);

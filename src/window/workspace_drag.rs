@@ -11,22 +11,6 @@ pub(super) struct WorkspaceDrag {
     target: Option<(Target, Bounds<Pixels>)>,
 }
 
-/// Match terminal dragging: shade the half that receives the insertion.
-fn drop_area(mut b: Bounds<Pixels>, after: bool, horizontal: bool) -> Bounds<Pixels> {
-    if horizontal {
-        b.size.width /= 2.;
-        if after {
-            b.origin.x += b.size.width;
-        }
-    } else {
-        b.size.height /= 2.;
-        if after {
-            b.origin.y += b.size.height;
-        }
-    }
-    b
-}
-
 impl AppWindow {
     pub(super) fn workspace_press(
         &mut self,
@@ -156,13 +140,180 @@ impl AppWindow {
         .into_any_element()
     }
 
+    /// Reveal a neighbor when lifting a tab or its only panel, without saving a selection.
+    pub(super) fn workspace_drag_preview_view<'a>(&self, group: &'a panel_workspace::Group) -> &'a str {
+        if let Some(drag) = &self.workspace_drag {
+            let lifting_tab = match &drag.source {
+                Source::View(id) => id == &group.active_view_id,
+                Source::Section(id) => group.views.iter().find(|v| v.id == group.active_view_id)
+                    .is_some_and(|v| v.sections.len() == 1 && v.sections[0].id == *id),
+                Source::Group(_) => false,
+            };
+            if drag.moving && lifting_tab {
+                if let Some(view) = group.views.iter().find(|v| v.id != group.active_view_id) {
+                    return &view.id;
+                }
+            }
+        }
+        &group.active_view_id
+    }
+
+    pub(super) fn workspace_drag_layout(&self) -> Option<Node> {
+        let session = self.workspace.as_ref()?;
+        let group = session.engine.document().groups.iter()
+            .find(|g| self.workspace_drag_preview_view(g) != g.active_view_id)?;
+        let mut layout = self.chrome.clone();
+        layout.select(&group.id, self.workspace_drag_preview_view(group));
+        Some(layout)
+    }
+
+    pub(super) fn workspace_view_drop_targets(&self) -> Vec<(Target, Bounds<Pixels>, &'static str)> {
+        if self.person.no_headers { return vec![]; }
+        let Some(drag) = &self.workspace_drag else { return vec![] };
+        let Source::View(source) = &drag.source else { return vec![] };
+        let Some(session) = &self.workspace else { return vec![] };
+        let doc = session.engine.document();
+        let bounds = self.bounds.borrow();
+        let mut targets = vec![];
+        for zone in doc.zones.iter().filter(|z| !z.hidden) {
+            for (index, reference) in zone.groups.iter().enumerate() {
+                let Some(group) = doc.group(&reference.group_id) else { continue };
+                let Some(view) = doc.view(self.workspace_drag_preview_view(group)) else { continue };
+                let Some(section) = view.sections.first() else { continue };
+                let Some(header) = bounds.get(&format!("{}{}", crate::workspace::HEADER, section.id)) else { continue };
+                let width = settings::z(96.).min(((header.size.width - settings::z(28.)) / 2.).max(px(0.)));
+                if width < settings::z(40.) { continue; }
+                let title = crate::workspace::panel_title(&doc.panels[&section.panel_id]);
+                let offset = settings::z(28. + title.chars().count() as f32 * 7.)
+                    .min((header.size.width - width * 2. - settings::z(18.)).max(px(0.)));
+                let area = Bounds::new(header.origin + point(offset, settings::z(8.)), size(width, settings::z(26.)));
+                if &view.id != source {
+                    targets.push((Target::Sections { view: view.id.clone(), index: view.sections.len() }, area, "Stack Panels"));
+                }
+                let next = Bounds::new(area.origin + point(width + settings::z(4.), px(0.)), area.size);
+                targets.push((Target::Zone { edge: zone.edge, index: index + 1 }, next, "New Pane"));
+            }
+        }
+        targets
+    }
+
+    // Offer the same explicit target on native and mod-owned title rows.
+    pub(super) fn workspace_tab_group_targets(&self) -> Vec<(Target, Bounds<Pixels>)> {
+        if self.person.no_headers { return vec![]; }
+        let Some(drag) = &self.workspace_drag else { return vec![] };
+        let Source::Section(source) = &drag.source else { return vec![] };
+        let Some(session) = &self.workspace else { return vec![] };
+        let doc = session.engine.document();
+        let bounds = self.bounds.borrow();
+        doc.groups.iter().filter(|g| !doc.floating.iter().any(|f| f.group_id == g.id))
+            .filter_map(|g| doc.view(self.workspace_drag_preview_view(g))).flat_map(|v| &v.sections)
+            .filter_map(|section| {
+                if section.id == *source { return None; }
+                if drag::tab_group_commands(doc, source, &section.id, "preview").ok()?.is_empty() { return None; }
+                let header = *bounds.get(&format!("{}{}", crate::workspace::HEADER, section.id))?;
+                let title = crate::workspace::panel_title(&doc.panels[&section.panel_id]);
+                let width = settings::z(116.).min((header.size.width - settings::z(28.)).max(px(0.)));
+                if width <= px(0.) { return None; }
+                let offset = settings::z(28. + title.chars().count() as f32 * 7.)
+                    .min((header.size.width - width - settings::z(14.)).max(px(0.)));
+                let area = Bounds::new(header.origin + point(offset, settings::z(8.)), size(width, settings::z(26.)));
+                Some((Target::TabGroup { section: section.id.clone() }, area))
+            }).collect()
+    }
+
     fn workspace_target(&self, at: Point<Pixels>) -> Option<(Target, Bounds<Pixels>)> {
+        // Title chips describe tab grouping rather than a spatial insertion.
+        if let Some(target) = self.workspace_tab_group_targets().into_iter().find(|(_, b)| b.contains(&at)) {
+            return Some(target);
+        }
+        let target = self.workspace_hit_target(at)?;
+        let source = &self.workspace_drag.as_ref()?.source;
+        let doc = self.workspace.as_ref()?.engine.document();
+        // Run the release transaction on a private draft, including removal of
+        // empty source containers. Geometry then uses the renderer's sizing rules.
+        let mut seed = "workspace-preview".to_owned();
+        while self.chrome.walk().iter().any(|n| n.id.starts_with(&seed))
+            || doc.panels.keys().any(|id| id.starts_with(&seed))
+            || doc.groups.iter().any(|g| g.id.starts_with(&seed) || g.views.iter().any(|v|
+                v.id.starts_with(&seed) || v.sections.iter().any(|s| s.id.starts_with(&seed))))
+        {
+            seed.push('-');
+        }
+        let commands = drag::commands(doc, source, &target, &seed).ok()?;
+        if commands.is_empty() { return None; }
+        let mut draft = panel_workspace::Engine::new(doc.clone()).ok()?;
+        draft.apply(panel_workspace::Transaction { expected_revision: 0, commands }).ok()?;
+        let layout = self.workspace_projection(draft.document(), &self.file_chrome).ok()?;
+        let ids = match (&target, source) {
+            (Target::Zone { .. }, Source::Group(id)) => vec![id.clone()],
+            (Target::Zone { .. }, _) => vec![format!("{seed}-group")],
+            (Target::Sections { .. }, Source::Section(id)) => vec![id.clone()],
+            (Target::Sections { .. }, Source::View(id)) => doc.view(id)?.sections.iter().map(|s| s.id.clone()).collect(),
+            (Target::Views { group, .. }, _) => vec![group.clone()],
+            _ => return None,
+        };
+        let mut root = *self.bounds.borrow().get("@workspace/root")?;
+        // The measuring canvas has no inset, so its static position starts at
+        // the root's content origin while its size spans the padding box.
+        let (y, x) = pane_size::padding(&layout);
+        root.origin -= point(settings::z(x), settings::z(y));
+        let focused = HashSet::new();
+        let mut areas = ids.iter().map(|id| pane_size::block_bounds(&layout, root, id, None, &focused, settings::zoom()));
+        let mut preview = areas.next()??;
+        for area in areas {
+            preview = preview.union(&area?);
+        }
+        Some((target, preview))
+    }
+
+    pub(crate) fn workspace_hit_target(&self, at: Point<Pixels>) -> Option<Target> {
         let drag = self.workspace_drag.as_ref()?;
         let doc = self.workspace.as_ref()?.engine.document();
         let bounds = self.bounds.borrow();
         let root = *bounds.get("@workspace/root")?;
         if !root.contains(&at) {
             return None;
+        }
+        if let Some((target, _, _)) = self.workspace_view_drop_targets().into_iter().find(|(_, b, _)| b.contains(&at)) {
+            return Some(target);
+        }
+        // Tab labels take priority over spatial edge bands, including in the
+        // topmost dock where the tab row overlaps the outer window band.
+        for group in doc.groups.iter().filter(|g| doc.zones.iter().any(|z|
+            !z.hidden && z.groups.iter().any(|r| r.group_id == g.id)))
+        {
+            if group.views.len() < 2 || !bounds.get(&group.id).is_some_and(|b| b.contains(&at)) {
+                continue;
+            }
+            for (view_index, view) in group.views.iter().enumerate() {
+                if let Some(tab) = bounds.get(&format!("@workspace/tab/{}", view.id))
+                    .filter(|b| b.contains(&at))
+                {
+                    return Some(Target::Views {
+                        group: group.id.clone(),
+                        index: view_index + usize::from(at.x > tab.center().x),
+                    });
+                }
+            }
+        }
+        // Prefer a pane's insertion edge to a perpendicular window edge.
+        // Otherwise the leftmost top pane's left edge can only open a side dock.
+        for zone in doc.zones.iter().filter(|z| !z.hidden) {
+            for (index, reference) in zone.groups.iter().enumerate() {
+                let Some(b) = bounds.get(&reference.group_id).filter(|b| b.contains(&at)) else { continue };
+                let (position, start, length) = if matches!(zone.edge, Edge::Left | Edge::Right) {
+                    (at.y, b.origin.y, b.size.height)
+                } else {
+                    (at.x, b.origin.x, b.size.width)
+                };
+                let band = settings::z(48.).min(length / 4.);
+                if position < start + band || position > start + length - band {
+                    return Some(Target::Zone {
+                        edge: zone.edge,
+                        index: index + usize::from(position > start + length / 2.),
+                    });
+                }
+            }
         }
         // Edge bands remain reachable even when the zone is hidden or empty.
         let (distance, edge) = [
@@ -174,28 +325,19 @@ impl AppWindow {
         .into_iter()
         .min_by(|a, b| a.0.partial_cmp(&b.0).unwrap())
         .unwrap();
-        if distance < settings::z(24.) {
+        if distance < settings::z(40.) {
             let zone = doc.zones.iter().find(|z| z.edge == edge)?;
-            let extent = settings::z(zone.extent as f32);
-            let mut preview = root;
-            match edge {
-                Edge::Left => preview.size.width = extent.min(root.size.width / 2.),
-                Edge::Right => {
-                    preview.size.width = extent.min(root.size.width / 2.);
-                    preview.origin.x += root.size.width - preview.size.width;
-                }
-                Edge::Top | Edge::TopCenter => {
-                    preview.size.height = extent.min(root.size.height / 2.)
-                }
-                Edge::Bottom | Edge::BottomCenter => {
-                    preview.size.height = extent.min(root.size.height / 2.);
-                    preview.origin.y += root.size.height - preview.size.height;
-                }
-            }
-            let index = zone.groups.len();
-            return Some((Target::Zone { edge, index }, preview));
+            let horizontal = !matches!(edge, Edge::Left | Edge::Right);
+            let index = zone.groups.iter().position(|reference| {
+                bounds.get(&reference.group_id).is_some_and(|b| if horizontal {
+                    at.x <= b.center().x
+                } else {
+                    at.y <= b.center().y
+                })
+            }).unwrap_or(zone.groups.len());
+            return Some(Target::Zone { edge, index });
         }
-        // Inner bands choose center-only docks; the outer 24px bands above choose full width.
+        // Inner bands choose center-only docks; the outer 40px bands above choose full width.
         if let Some(center) = bounds
             .get("@workspace/center-stack")
             .filter(|b| b.contains(&at))
@@ -210,22 +352,12 @@ impl AppWindow {
             .into_iter()
             .min_by(|a, b| a.0.partial_cmp(&b.0).unwrap())
             .unwrap();
-            if distance < settings::z(56.) {
+            if distance < settings::z(96.) {
                 let zone = doc.zones.iter().find(|z| z.edge == edge);
-                let extent = settings::z(zone.map_or(200., |z| z.extent) as f32)
-                    .min(center.size.height / 2.);
-                let mut preview = *center;
-                preview.size.height = extent;
-                if edge == Edge::BottomCenter {
-                    preview.origin.y += center.size.height - extent;
-                }
-                return Some((
-                    Target::Zone {
-                        edge,
-                        index: zone.map_or(0, |z| z.groups.len()),
-                    },
-                    preview,
-                ));
+                return Some(Target::Zone {
+                    edge,
+                    index: zone.map_or(0, |z| z.groups.len()),
+                });
             }
         }
         for zone in doc.zones.iter().filter(|z| !z.hidden) {
@@ -234,27 +366,6 @@ impl AppWindow {
                 let Some(b) = bounds.get(&group.id).copied().filter(|b| b.contains(&at)) else {
                     continue;
                 };
-                // Views can be reordered by dropping on either half of a tab.
-                for (view_index, view) in group.views.iter().enumerate() {
-                    if let Some(tab) = bounds
-                        .get(&format!("@workspace/tab/{}", view.id))
-                        .filter(|b| b.contains(&at))
-                    {
-                        let target = if matches!(drag.source, Source::Section(_)) {
-                            Target::Sections {
-                                view: view.id.clone(),
-                                index: view.sections.len(),
-                            }
-                        } else {
-                            Target::Views {
-                                group: group.id.clone(),
-                                index: view_index
-                                    + usize::from(at.x > tab.origin.x + tab.size.width / 2.),
-                            }
-                        };
-                        return Some((target, b));
-                    }
-                }
                 if matches!(drag.source, Source::Group(_)) {
                     let horizontal = !matches!(zone.edge, Edge::Left | Edge::Right);
                     let after = if horizontal {
@@ -262,46 +373,28 @@ impl AppWindow {
                     } else {
                         at.y > b.origin.y + b.size.height / 2.
                     };
-                    return Some((
-                        Target::Zone {
-                            edge: zone.edge,
-                            index: group_index + usize::from(after),
-                        },
-                        drop_area(b, after, horizontal),
-                    ));
+                    return Some(Target::Zone {
+                        edge: zone.edge,
+                        index: group_index + usize::from(after),
+                    });
                 }
-                let view = doc.view(&group.active_view_id)?;
-                if matches!(drag.source, Source::View(_)) {
-                    return Some((
-                        Target::Views {
-                            group: group.id.clone(),
-                            index: group.views.len(),
-                        },
-                        b,
-                    ));
-                }
+                let view = doc.view(self.workspace_drag_preview_view(group))?;
                 for (index, section) in view.sections.iter().enumerate() {
                     if let Some(section_bounds) =
                         bounds.get(&section.id).copied().filter(|b| b.contains(&at))
                     {
                         let after =
                             at.y > section_bounds.origin.y + section_bounds.size.height / 2.;
-                        return Some((
-                            Target::Sections {
-                                view: view.id.clone(),
-                                index: index + usize::from(after),
-                            },
-                            drop_area(section_bounds, after, false),
-                        ));
+                        return Some(Target::Sections {
+                            view: view.id.clone(),
+                            index: index + usize::from(after),
+                        });
                     }
                 }
-                return Some((
-                    Target::Sections {
-                        view: view.id.clone(),
-                        index: view.sections.len(),
-                    },
-                    b,
-                ));
+                return Some(Target::Sections {
+                    view: view.id.clone(),
+                    index: view.sections.len(),
+                });
             }
         }
         None
@@ -370,26 +463,30 @@ impl AppWindow {
             return vec![];
         };
         [
-            ("Top · full width", *root, false, false),
-            ("Bottom · full width", *root, true, false),
-            ("Top · center", *center, false, true),
-            ("Bottom · center", *center, true, true),
+            ("Left", *root, false, false, true),
+            ("Right", *root, true, false, true),
+            ("Top · full width", *root, false, false, false),
+            ("Bottom · full width", *root, true, false, false),
+            ("Top · center", *center, false, true, false),
+            ("Bottom · center", *center, true, true, false),
         ]
         .into_iter()
-        .map(|(label, b, bottom, inner)| {
-            let width = settings::z(128.).min(b.size.width);
-            let inset = settings::z(if inner { 32. } else { 2. });
-            let y = if bottom {
-                b.origin.y + b.size.height - inset - settings::z(20.)
-            } else {
-                b.origin.y + inset
-            };
+        .map(|(label, b, end, inner, vertical)| {
+            let width = settings::z(if vertical { 32. } else { 160. }).min(b.size.width);
+            let height = settings::z(if vertical { 128. } else { 32. }).min(b.size.height);
+            let inset = settings::z(if inner { 48. } else { 4. });
+            let x = if vertical {
+                if end { b.origin.x + b.size.width - inset - width } else { b.origin.x + inset }
+            } else { b.origin.x + (b.size.width - width) / 2. };
+            let y = if vertical { b.origin.y + (b.size.height - height) / 2. }
+                else if end { b.origin.y + b.size.height - inset - height }
+                else { b.origin.y + inset };
             div()
                 .absolute()
-                .left(b.origin.x + (b.size.width - width) / 2.)
+                .left(x)
                 .top(y)
                 .w(width)
-                .h(settings::z(20.))
+                .h(height)
                 .flex()
                 .items_center()
                 .justify_center()
@@ -398,7 +495,7 @@ impl AppWindow {
                 .border_1()
                 .border_color(c("accent"))
                 .text_color(c("foreground"))
-                .text_size(settings::z(10.))
+                .text_size(settings::z(11.))
                 .child(label)
                 .into_any_element()
         })
@@ -425,11 +522,29 @@ impl AppWindow {
                     .border_color(c("accent"))
                     .into_any_element()
             });
-        let guides = if moving {
+        let mut guides = if moving {
             self.workspace_dock_guides()
         } else {
             vec![]
         };
+        if moving {
+            guides.extend(self.workspace_tab_group_targets().into_iter().map(|(target, b)| {
+                let Target::TabGroup { section } = target else { unreachable!() };
+                let id = format!("workspace-tab-group-target-{section}");
+                div().id(SharedString::from(id.clone())).debug_selector(move || id).absolute().left(b.origin.x).top(b.origin.y).w(b.size.width).h(b.size.height)
+                    .rounded(settings::z(5.)).bg(c("background")).border_1().border_color(c("accent"))
+                    .flex().items_center().justify_center().text_size(settings::z(11.)).text_color(c("accent"))
+                    .child("+ Tab Group").into_any_element()
+            }));
+        }
+        if moving {
+            guides.extend(self.workspace_view_drop_targets().into_iter().map(|(_, b, label)| {
+                div().absolute().left(b.origin.x).top(b.origin.y).w(b.size.width).h(b.size.height)
+                    .rounded(settings::z(5.)).bg(c("background")).border_1().border_color(c("accent"))
+                    .flex().items_center().justify_center().text_size(settings::z(11.)).text_color(c("accent"))
+                    .child(label).into_any_element()
+            }));
+        }
         let this = cx.entity().downgrade();
         div()
             .id("workspace-drag-layer")

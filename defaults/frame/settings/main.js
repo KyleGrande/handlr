@@ -2,7 +2,7 @@
 
 import { View, div, svg, image } from "gpui-kit";
 import { v_flex, h_flex, Scrollbar, InputState, Input, Popup } from "gpui-base";
-import { hc, run, theme, themes, fonts, updates, telemetry, settings, layouts, shared, appHome, readTextFile, writeTextFile, playSound, props, closeOverlay, notify, window } from "herdr";
+import { hc, run, theme, themes, fonts, updates, telemetry, settings, layouts, shared, setShared, appHome, readTextFile, writeTextFile, playSound, props, closeOverlay, notify, window } from "herdr";
 
 const I = (name) => `frame/settings/${name}.svg`;
 
@@ -25,6 +25,34 @@ const APPEARANCES = [
 // What the app uses when settings.json names no font (settings.rs).
 const DEFAULT_FONT = "JetBrains Mono";
 const DEFAULT_UI_FONT = "Geist";
+
+// Keep the app canvas intact; only panel layers and outlines become transparent.
+// Theme/appearance changes still apply. Keep custom colors for restoration.
+function toggleSeamless(person) {
+  const keys = ["chrome", "surface", "border"];
+  person.colors ??= {};
+  if (!person.seamless) {
+    person.seamless_colors = Object.fromEntries(keys.filter(key => Object.hasOwn(person.colors, key)).map(key => [key, person.colors[key]]));
+    for (const key of keys) person.colors[key] = "#00000000";
+    person.seamless = true;
+  } else {
+    // The earlier preset also cleared canvas. Restore it when disabling that
+    // version so existing settings do not retain its transparent app background.
+    if (person.colors.canvas === "#00000000") {
+      if (Object.hasOwn(person.seamless_colors ?? {}, "canvas")) person.colors.canvas = person.seamless_colors.canvas;
+      else delete person.colors.canvas;
+    }
+    for (const key of keys) {
+      // Preserve colors edited independently while the preset was enabled.
+      if (person.colors[key] !== "#00000000") continue;
+      if (Object.hasOwn(person.seamless_colors ?? {}, key)) person.colors[key] = person.seamless_colors[key];
+      else delete person.colors[key];
+    }
+    delete person.seamless;
+    delete person.seamless_colors;
+    if (!Object.keys(person.colors).length) delete person.colors;
+  }
+}
 
 export default class Settings extends View {
   init(_props, cx) {
@@ -517,6 +545,10 @@ export default class Settings extends View {
       .w_full()
       .child(this.heading(t, "Layout"))
       .child(this.layoutPicker(t, cx))
+      .child(this.row(t, "Hide panel buttons", "Hide dock and terminal-only buttons in the window bar and fullscreen tab bar.",
+        this.toggle(t, "st-hide-panel-buttons", Boolean(shared("tabs.hide-panel-buttons")), () => setShared("tabs.hide-panel-buttons", !shared("tabs.hide-panel-buttons")))))
+      .child(this.row(t, "Seamless", "Remove panel outlines and blend panels into the app background.",
+        this.toggle(t, "st-seamless", Boolean(p.seamless), (_e, cx) => this.change(toggleSeamless, cx))))
       .child(this.row(t, "No Headers", "Hide panel title rows. Turn off to restore panel controls and drag handles.",
         this.toggle(t, "st-no-headers", Boolean(p.no_headers), (_e, cx) => this.change(q => { q.no_headers = !q.no_headers; }, cx))))
       .child(div().h(18))

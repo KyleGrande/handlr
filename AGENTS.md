@@ -44,9 +44,10 @@ the full API.
 ## What ships in the box
 
 `defaults/` is built into the app: mods, `layouts/*.json`, `keys.json`
-(Linux, Windows) and `keys.macos.json` (Mac). Shipped layouts and mods are
-replaced on start; edited versions are moved to personal copies. Layout
-clicks are kept separately. `keys.json` is installed when missing; files matching
+(Linux, Windows) and `keys.macos.json` (Mac). Shipped layouts are replaced on
+start; edited layouts are moved to personal copies. Edited bundled mods become
+user-owned in place; later app-provided content changes are offered through
+Review Panel Updates instead of replacing them. Layout clicks are kept separately. `keys.json` is installed when missing; files matching
 an earlier shipped original byte-for-byte are upgraded to the current defaults.
 Edited keys files are never replaced. Keep release originals in
 `src/keys/shipped/` when changing defaults.

@@ -31,7 +31,7 @@ The development bundle uses `dev.handlr.app.dev`; the public app uses
 `assets/icons/handlr-source.png`.
 
 Development settings, layouts and mods live in
-`~/Library/Application Support/Handlr-Dev/`. The local packager migrates the
+`~/.config/handlr-dev/`. The local packager migrates the
 previous app home there and leaves a compatibility link at the old location
 so an already-running development window can keep saving its state. Core
 session paths remain unchanged to preserve running terminals. Personal Files
@@ -41,12 +41,47 @@ The macOS icon's enlarged artwork and editable clip are in the repository's
 `assets/icons/handlr-macos.*`; its image edit prompts are in
 `assets/icons/macos-edit-prompt.md` here.
 
+`npm run dev:tools` configures the **handlr-dev** Rigs row. Build sync appears
+there with Rigs’ usual hover-only **▶ Rebuild & reopen** and **↻ Reopen** icons; no separate status mod
+or bottom bar is installed. The row's dot is green only when running and in
+sync, red for rebuild/reopen requirements or unavailable status, and gray
+when stopped. Rigs runs a bounded read-only checker while polling and uses
+`$HERDR_APP_HOME/data/handlr-dev-build-status.json` as its atomic report.
+The checker refreshes at most once per ten seconds. Click the app row after
+starting an action to see its Core-owned terminal. Duplicate actions are
+rejected. A failed build leaves the existing app running. A successful build
+installs first, saves/quits the Dev app and reopens it; Core and existing
+terminals remain alive. Reopen skips compilation. Only explicit button clicks
+run these actions; installing the integration does not build or restart an app.
+`HERDR_APP_HOME` selects the Dev configuration directory. The setup requires
+the sibling Herdr Rigs checkout with development-action support built.
+
+The Dev packager records a content snapshot of native sources, bundled mods,
+assets, local dependencies and build configuration, including uncommitted and
+new files, in `Contents/Resources/dev-build-info.json` before signing. Generated
+build outputs and runtime declarations are excluded. Source changes during
+compilation prevent packaging an incorrectly attributed build. **Rebuild required**
+means inputs changed or the old bundle has no record; **Reopen Handlr Dev**
+means the installed build matches but a running process predates it; **Handlr
+Dev in sync** means both match. Missing access or inconsistent records show
+**Build status unavailable**, never a guessed success. The check observes only
+the configured Dev executable; it does not manage app/Core lifecycle. It does
+not compare personal mod edits, runtime settings, external toolchain versions,
+or build environment overrides. The initial untracked bundle needs one build
+and install to establish its baseline. `npm run dev:status` runs the same check
+in a terminal (nonzero unless in sync); `-- --json` provides structured status.
+
 After building `../target/release/herdr-app`, run `npm run package:macos` to
 produce the portable GitHub prerelease under `dist/public/`, with a SHA-256
 checksum. This packager uses a fresh plist and seeds only bundled panels,
 without copying any development data or machine-specific paths. Its launcher
-keeps user data in `~/Library/Application Support/Handlr`, seeds missing initial
+keeps user data in `~/.config/handlr` (or `$XDG_CONFIG_HOME/handlr`), seeds missing initial
 configuration files, and preserves existing files on subsequent launches.
+An explicit `HERDR_APP_HOME` takes precedence. On first launch, the public app
+moves an existing `~/Library/Application Support/Handlr` home into the new
+location if it does not already exist, leaving a compatibility link for running
+processes. Development builds similarly migrate their configured former home.
+Existing homes are never merged or overwritten by migration.
 
 This is the existing local packaging harness. It requires a previously prepared
 isolated app configuration at `.checks/Handlr.app/Contents/Info.plist`. That
@@ -108,3 +143,31 @@ put the two panels in separate tabs. Alternatively, use Cmd+Shift+P →
 **Create Tab Group…**, then choose two open docked panels. Other stacked panels
 stay in their current views. The group is saved across restarts; Cmd+Option+Z
 undoes the change. Escape cancels a pending drag or palette selection.
+
+When dragging a tab, a neighboring tab is temporarily revealed. Choose
+**Stack Panels** to show the panels together, or **New Pane** to detach it.
+Drop on a tab label to keep it as a tab; Escape cancels the preview.
+
+Dragging the only panel in the active tab also temporarily reveals a neighboring
+tab. Drop the panel into that visible stack or elsewhere; Escape restores the
+original tab. Dragging one panel out of a multi-panel stack keeps that tab shown.
+
+## App-provided and user-owned panels
+
+Editing a bundled panel makes the copy in `mods/<name>/` user-owned. It stays
+active under the same identity across restarts. `app-provided/mods/` holds the
+latest bundled version outside the palette's installed panels. Future changes
+to that bundled version appear in **Review Panel Updates** (Cmd+Shift+P): keep
+your version, review and merge text side by side, or use the complete update.
+Unmodified panels update automatically. No `-edited` mod copies are generated;
+existing personal variants and legacy copies remain intact.
+
+Drag a panel from a stack onto an existing panel-group tab label to add it as
+its own tab. Drop near the outside edges of a pane to insert a separate pane:
+left/right in top and bottom docks, above/below in side docks. The outer top
+and bottom window bands insert at the pointer's horizontal position, so a
+right-hand pane can be moved before the left-hand pane. These moves support undo.
+
+While dragging, the outer dock drop bands span 40px on all four sides,
+center-only top/bottom bands span 96px, and neighboring pane insertion bands
+span up to 48px. Dock guides appear only during the drag.

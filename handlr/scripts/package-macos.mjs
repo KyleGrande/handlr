@@ -53,7 +53,16 @@ for (const [name, value] of Object.entries({ 'settings.json': { core_session: 'o
 const launcher = `#!/bin/sh
 set -eu
 app_dir=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
-export HERDR_APP_HOME="\${HERDR_APP_HOME:-$HOME/Library/Application Support/Handlr}"
+if [ -z "\${HERDR_APP_HOME:-}" ]; then
+  HERDR_APP_HOME="\${XDG_CONFIG_HOME:-$HOME/.config}/handlr"
+  legacy_home="$HOME/Library/Application Support/Handlr"
+  if [ ! -e "$HERDR_APP_HOME" ] && [ -d "$legacy_home" ] && [ ! -L "$legacy_home" ]; then
+    mkdir -p "$(dirname -- "$HERDR_APP_HOME")"
+    mv "$legacy_home" "$HERDR_APP_HOME"
+    ln -s "$HERDR_APP_HOME" "$legacy_home"
+  fi
+fi
+export HERDR_APP_HOME
 export PATH="$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
 mkdir -p "$HERDR_APP_HOME/layouts" "$HERDR_APP_HOME/workspaces" "$HERDR_APP_HOME/core"
 for name in settings.json shared.json layouts/Handlr.json layouts/panel-workspace-native.svg workspaces/Handlr.json; do
@@ -67,7 +76,7 @@ writeFileSync(join(app, 'Contents/MacOS/Handlr'), launcher);
 chmodSync(join(app, 'Contents/MacOS/Handlr'), 0o755);
 const info = { CFBundleExecutable: 'Handlr', CFBundleIdentifier: 'dev.handlr.app', CFBundleName: 'Handlr',
   CFBundleDisplayName: 'Handlr', CFBundleIconFile: 'Handlr', CFBundlePackageType: 'APPL',
-  CFBundleShortVersionString: '0.1.0', CFBundleVersion: '1', NSPrincipalClass: 'NSApplication', NSHighResolutionCapable: true,
+  CFBundleShortVersionString: '0.1.0', CFBundleVersion: '2', NSPrincipalClass: 'NSApplication', NSHighResolutionCapable: true,
   NSMicrophoneUsageDescription: 'Terminal programs running in Handlr can use the microphone.',
   NSCameraUsageDescription: 'Terminal programs running in Handlr can use the camera.',
   NSAppleEventsUsageDescription: 'Terminal programs running in Handlr can use AppleScript to control other apps.' };

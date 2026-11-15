@@ -3,14 +3,68 @@ use panel_workspace::{Command as WorkspaceCommand, Transaction, Workspace};
 
 impl AppWindow {
     pub(super) fn panel_palette_entries(&self) -> Vec<Value> {
-        self.folders.iter().filter(|(id,_)|!id.starts_with("frame-")).filter_map(|(id,found)| {
+        let shipped: std::collections::BTreeSet<_> = mods::DEFAULT_MODS.iter()
+            .filter_map(|(path, _)| path.split('/').next()).collect();
+        let mut entries: Vec<Value> = self.folders.iter().filter(|(id,_)|!id.starts_with("frame-")).filter_map(|(id,found)| {
             let registered=self.workspace.as_ref().is_some_and(|s|s.engine.document().panels.values().any(|p|matches!(&p.content,panel_workspace::Content::Mod {name,..} if name==id)));
+            let automatic_backup = id.rsplit_once("-edited").is_some_and(|(base, suffix)| {
+                shipped.contains(base) && (suffix.is_empty() || suffix.strip_prefix('-')
+                    .is_some_and(|n| !n.is_empty() && n.bytes().all(|c| c.is_ascii_digit())))
+            });
+            if automatic_backup && !registered { return None; }
             let panel=found.hint.panel() || registered;
             if !panel && found.hint.overlay.is_none() {return None;}
             Some(json!({"name":if panel && self.workspace.is_some(){"workspace.open"}else{"mod.open"},
                 "args":{"name":id},"group":if panel{"Panel"}else{"App"},
-                "title":format!("Open {}",found.hint.label(id)),"words":format!("add show mod panel {id}")}))
-        }).collect()
+                "title":format!("Open {}",found.hint.label(id)),"words":format!("add show mod panel {id}"),"builtin":shipped.contains(id.as_str()) && !mods::updates::user_owned(&mods::app_dir(), id)}))
+        }).collect();
+        // Copies remain independently openable, but identical labels must be
+        // distinguishable before the user chooses one.
+        let mut counts = std::collections::BTreeMap::<String, (usize, usize)>::new();
+        for entry in &entries {
+            let count = counts.entry(entry["title"].as_str().unwrap().to_lowercase()).or_default();
+            count.0 += 1;
+            if entry["builtin"] != true { count.1 += 1; }
+        }
+        for entry in &mut entries {
+            let title = entry["title"].as_str().unwrap().to_owned();
+            let (total, personal) = counts[&title.to_lowercase()];
+            if total > 1 {
+                let suffix = if entry["builtin"] == true { "Built-in".to_owned() }
+                    else if personal == 1 { "Personal".to_owned() }
+                    else { format!("Personal: {}", entry["args"]["name"].as_str().unwrap()) };
+                entry["title"] = json!(format!("{title} ({suffix})"));
+            }
+        }
+        if let Some(session) = &self.workspace {
+            let doc = session.engine.document();
+            let sections: Vec<_> = doc.groups.iter()
+                .filter(|g| !doc.floating.iter().any(|f| f.group_id == g.id))
+                .flat_map(|g| &g.views).flat_map(|v| &v.sections).collect();
+            let mut sources = vec![];
+            for source in &sections {
+                let mut targets = vec![];
+                for target in &sections {
+                    let seed = format!("tab-group-{}-{}-{}", session.engine.revision(), source.id, target.id);
+                    if let Ok(commands) = crate::workspace::drag::tab_group_commands(doc, &source.id, &target.id, &seed) {
+                        if !commands.is_empty() {
+                            targets.push(json!({"name":"workspace.apply", "group":"Choose second panel",
+                                "title":crate::workspace::panel_title(&doc.panels[&target.panel_id]), "words":"tab group shelf",
+                                "args":{"transaction":{"expected_revision":session.engine.revision(),"commands":commands}}}));
+                        }
+                    }
+                }
+                if !targets.is_empty() {
+                    sources.push(json!({"id":source.id,"name":"workspace.apply","args":{},"group":"Choose first panel",
+                        "title":crate::workspace::panel_title(&doc.panels[&source.panel_id]),"words":"tab group shelf","choices":targets}));
+                }
+            }
+            if !sources.is_empty() {
+                entries.push(json!({"id":"create-tab-group","name":"workspace.apply","args":{},"group":"Panel",
+                    "title":"Create Tab Group…","words":"shelf combine group panels tabs","choices":sources}));
+            }
+        }
+        entries
     }
 
     pub(super) fn workspace_picker_panels(&self) -> Vec<Value> {
@@ -330,6 +384,11 @@ impl AppWindow {
             "workspace.apply" | "workspace.import" => {}
             _ => return Err("unknown workspace command".into()),
         }
+        // A drop back into the same place need not rebuild the visible tree.
+        // Still validate the transaction/revision above before accepting it.
+        if candidate.document() == session.engine.document() {
+            return Ok(session.inspect());
+        }
         let projected = self.workspace_preflight_for(candidate.document(), &self.file_chrome)?;
         if let Err(error) = self.workspace_open_floats(candidate.document(),window,cx) {
             let _ = self.workspace_sync_floats(window,cx);
@@ -506,7 +565,7 @@ impl AppWindow {
             .gap(settings::z(4.))
             .group("workspace-section-header")
             .when(!embedded, |d| {
-                d.bg(c("background")).border_b_1().border_color(c("border"))
+                d.bg(c("surface")).border_b_1().border_color(c("border"))
             })
             .child(
                 canvas(

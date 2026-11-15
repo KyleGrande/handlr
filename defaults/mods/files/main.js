@@ -167,7 +167,7 @@ export default class Files extends View {
     if (key() !== this.context?.key) this.refresh(cx);
     const dock=panel();
     const t = theme();
-    return v_flex().id("files").size_full().min_h(0).rounded(10).overflow_hidden().bg(t.background).border_1().border_color(t.border).text_color(t.foreground).text_size(13)
+    return v_flex().id("files").size_full().min_h(0).rounded(10).overflow_hidden().bg(t.surface).border_1().border_color(t.border).text_color(t.foreground).text_size(13)
       .child(h_flex().id("files-header").on_hover((on, cx) => { this.headerHovered = on; cx.notify(); }).h(42).flex_none().pl(14).pr(dock?.embedded_header ? 82 : 14).gap(8).items_center().border_b(1).border_color(t.border)
         .when(Boolean(this.file), el => el.child(div().id("files-back").opacity(this.headerHovered ? 1 : 0).w(20).cursor_pointer().text_color(t.muted).on_click((_e, cx) => { this.show(null); cx.notify(); }).child("←")))
         .child(div().font_semibold().on_click((e,cx)=>{ if(dock && e.click_count>=2) {cx.stop_propagation();run("workspace.rename",{panel:dock.id});} }).child(dock?.title ?? "Files"))
