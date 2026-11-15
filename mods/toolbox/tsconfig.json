@@ -1,0 +1,26 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "strict": true,
+    "skipLibCheck": true,
+    "rootDir": ".",
+    "outDir": "dist",
+    "paths": {
+      "herdr": [
+        "./.types/herdr.d.ts"
+      ]
+    },
+    "types": [
+      "node"
+    ],
+    "noEmitOnError": true
+  },
+  "include": [
+    "mods/**/*.ts",
+    "scripts/**/*.ts",
+    "tests/**/*.ts",
+    ".types/**/*.d.ts"
+  ]
+}
