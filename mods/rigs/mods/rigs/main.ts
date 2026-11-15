@@ -23,7 +23,7 @@ type LayoutNode = { id?:string; type?:string; hidden?:boolean; active?:string; c
 type Service = { id: string; repo: string; cwd?: string; state: string; readiness: string; terminal?: string; error?: string; exit_code?: number; endpoints: Record<string,{url:string; protocol:string; port:number}>; env: Record<string,string>; assignments: string; external_dependencies?: {key:string;url:string;readiness:string}[]; degraded_dependencies: string[]; checkout_match?: boolean };
 type Rig = { id: string; name: string; profile?: string; claimed: boolean; review_required?: boolean; error?: string; checkouts: Record<string,{root:string; repository?:string; branch?:string; unborn?:boolean; stale?:boolean}>; services: Record<string,Service>; observed_apps?: Record<string,AppObservation> };
 type Status = { core: string; rigs: Rig[]; observed_at: string; connections?: RigConnection[] };
-type Indicator = {kind:'working' | 'idle' | 'done' | 'blocked'; label:string};
+type Indicator = {kind:'working' | 'idle' | 'done' | 'blocked' | 'outdated'; label:string};
 type ProfileChoice = {path:string;label:string;selections:Record<string,string>;services:number};
 type RigDefinition = {id:string;name:string;profile:string;checkouts:Record<string,string>;active:boolean;revision:string};
 type ProfileDocument = {path:string;content:string|null;revision:string;missing:boolean;rigs:{id:string;name:string;active:boolean;checkouts:Record<string,string>}[]};
@@ -46,6 +46,16 @@ export default class Rigs extends View {
   profileEditor!: EditorState; loadedProfile = ''; managementLoading = false;
   profileRigNames: string[] = [];
   collapsed = new Set<string>();
+  appOutput: Record<string,string> = {};
+  async startAppTool(rig: Rig, app: AppObservation, action: 'rebuild' | 'relaunch', cx: AsyncContext) {
+    if (this.busy) return;
+    this.busy = true; this.actionError = ''; this.controlKey = `app-${rig.id}-${app.id}`; cx.notify();
+    try {
+      const result = await this.call(['app-tool',rig.id,app.id,'--action',action]);
+      this.appOutput[`${rig.id}/${app.id}`] = result.terminal;
+    } catch (error) { this.actionError = String(error); }
+    finally { this.busy = false; this.controlKey = ''; cx.notify(); }
+  }
   init(_props: unknown, cx: AsyncContext) {
     this.cli = String(props()?.cli ?? 'rig');
     this.cliArgs = []; // Installer supplies the absolute CLI module.
@@ -435,22 +445,38 @@ export default class Rigs extends View {
     const next = hovered ? key : this.hoveredRow === key ? '' : this.hoveredRow;
     if (next !== this.hoveredRow) { this.hoveredRow = next; cx.notify(); }
   }
-  controls(rig: Rig, service?: Service) {
+  iconControl(id: string, label: string, glyph: string, enabled: boolean, action: (cx: Context) => void) {
     const t = theme() as { [K in keyof ReturnType<typeof theme>]: `#${string}` };
+    return div().id(id).size(22).rounded(5).flex().items_center().justify_center().text_size(12)
+      .text_color(t.muted).opacity(enabled && !this.busy ? 1 : 0.3).tooltip(label)
+      .when(enabled && !this.busy, el => el.cursor_pointer().hover(style => style.bg(t.hover).text_color(t.foreground)))
+      .child(glyph).on_click((_event,cx) => { cx.stop_propagation(); if (enabled && !this.busy) action(cx); });
+  }
+  controlTray(key: string) {
+    return h_flex().gap(1).items_center().flex_none().opacity(this.hoveredRow === key || this.controlKey === key ? 1 : 0);
+  }
+  controls(rig: Rig, service?: Service) {
     const key = service ? `service-${rig.id}-${service.id}` : `rig-${rig.id}`;
     const services = service ? [service] : Object.values(rig.services);
     const active = service ? ['running','starting','unknown'].includes(service.state) : rig.claimed;
     const unknown = services.some(item => item.state === 'unknown');
     const canStart = !unknown && services.some(item => !['running','starting'].includes(item.state));
     const control = (command: 'up' | 'down' | 'restart', label: string, glyph: string, enabled: boolean) =>
-      div().id(`${key}-${command}`).size(22).rounded(5).flex().items_center().justify_center().text_size(12)
-        .text_color(t.muted).opacity(enabled && !this.busy ? 1 : 0.3).tooltip(`${label} ${service ? service.id : 'rig'}`)
-        .when(enabled && !this.busy, el => el.cursor_pointer().hover(style => style.bg(t.hover).text_color(t.foreground)))
-        .child(glyph).on_click((_event,cx) => { cx.stop_propagation(); if (enabled && !this.busy) this.control(command,rig,service,cx); });
-    return h_flex().gap(1).items_center().flex_none().opacity(this.hoveredRow === key || this.controlKey === key ? 1 : 0)
+      this.iconControl(`${key}-${command}`,`${label} ${service ? service.id : 'rig'}`,glyph,enabled,cx => this.control(command,rig,service,cx));
+    return this.controlTray(key)
       .child(control('up','Start','▶',canStart))
       .child(control('down','Stop','■',active))
       .child(control('restart','Restart','↻',active && !unknown));
+  }
+  appControls(rig: Rig, app: AppObservation) {
+    const key = `app-${rig.id}-${app.id}`;
+    const action = (name: 'rebuild' | 'relaunch', label: string, glyph: string) =>
+      this.iconControl(`${key}-${name}`,label,glyph,Boolean(app.development?.[name]),cx => {
+        cx.spawn(async task => this.startAppTool(rig,app,name,task));
+      });
+    return this.controlTray(key)
+      .child(action('rebuild','Rebuild & reopen · build and install before reopening; Core terminals stay alive','▶'))
+      .child(action('relaunch','Reopen · use the installed build without compiling; Core terminals stay alive','↻'));
   }
   connectionRows(rig: Rig) {
     const t = theme() as { [K in keyof ReturnType<typeof theme>]: `#${string}` };
@@ -516,6 +542,8 @@ export default class Rigs extends View {
   }
   rigIndicator(rig: Rig): Indicator {
     const services = Object.values(rig.services), indicators = [...services.map(service => this.serviceIndicator(service)), ...Object.values(rig.observed_apps ?? {}).map(app => this.appIndicator(app))];
+    const outdated = indicators.find(status => status.kind === 'outdated');
+    if (outdated) return outdated;
     if (rig.error || indicators.some(status => status.kind === 'blocked')) return {kind:'blocked',label:rig.error ?? 'Rig needs attention · inspect its services'};
     if (indicators.some(status => status.kind === 'working')) return {kind:'working',label:'Running'};
     if (rig.claimed) return {kind:'blocked',label:'Reservations retained · inspect and reconcile stopped services'};
@@ -524,6 +552,10 @@ export default class Rigs extends View {
   }
   appIndicator(app: AppObservation): Indicator {
     if (app.state === 'unknown') return {kind:'blocked',label:app.error ?? 'App observation unavailable'};
+    if (app.state === 'running' && app.build_status) return {
+      kind:app.build_status.state === 'current' ? 'working' : 'outdated',
+      label:`Running · ${app.build_status.label} · ${app.build_status.reason}`,
+    };
     if (app.state === 'running') return {kind:'working',label:`Observed running · ${app.matches.length} process${app.matches.length === 1 ? '' : 'es'} · readiness not checked`};
     return {kind:'idle',label:'Not running · externally launched app'};
   }
@@ -531,7 +563,7 @@ export default class Rigs extends View {
     const t = theme() as { [K in keyof ReturnType<typeof theme>]: `#${string}` };
     // Quiet theme-colored indicators; running processes do not animate the sidebar.
     const color = status.kind === 'working' ? (status.label.endsWith('…') || status.label === 'Starting' ? t.working : t.ansi2)
-      : status.kind === 'blocked' ? t.blocked : status.kind === 'done' ? t.done : t.dim;
+      : status.kind === 'outdated' ? t.ansi1 : status.kind === 'blocked' ? t.blocked : status.kind === 'done' ? t.done : t.dim;
     const glyph = div().size(7).mx(3).flex_none().rounded(4)
       .when(status.kind === 'idle', el => el.border(1.5).border_color(color))
       .when(status.kind !== 'idle', el => el.bg(color));
@@ -627,6 +659,7 @@ export default class Rigs extends View {
           .child(field('Executable', app.executable ?? 'Any path with this exact executable name'))
           .child(field('Machine', `${app.machine ?? 'This computer'} · ${app.platform}`))
           .child(field('Repo slot', app.repo))
+          .when(Boolean(app.build_status_file), el => el.child(field('Build status report', app.build_status_file!.path)))
           .child(field('Status', observation ? this.appIndicator(observation).label : this.observationError || 'Checking…'))
           .child(field('Ownership', 'External · monitored only. Rig controls do not start, stop or restart this app. Process presence does not prove readiness or a Metro connection.'));
         for (const match of observation?.matches ?? []) block.child(field(`PID ${match.pid} · started ${match.started_at}`, match.executable ?? 'Executable path unavailable'));
@@ -734,13 +767,17 @@ export default class Rigs extends View {
       }
       for (const app of this.collapsed.has(rig.id) ? [] : Object.values(rig.observed_apps ?? {})) {
         const source = this.serviceSource(rig, app);
+        const appKey = `app-${rig.id}-${app.id}`;
+        const terminal = this.appOutput[`${rig.id}/${app.id}`];
         const details = `${source.tooltip}\nObserved app: ${app.process_name}\nMachine: ${app.machine ?? 'this computer'} (${app.platform})\n${app.executable ?? 'Any executable path'}\nExternal · rig controls do not manage this app\n${app.matches.map(match => `PID ${match.pid} · ${match.started_at}\n${match.executable ?? 'Path unavailable'}`).join('\n')}`;
         card.child(h_flex().id(`observed-app-${rig.id}-${app.id}`).w_full().h(32).pl(20).pr(8).gap(6).rounded(6).items_center().cursor_pointer()
           .hover(style => style.bg(t.hover)).tooltip(details)
-          .on_click(() => this.openPreview(undefined, rig.id, rig.name))
+          .on_hover((hovered,cx) => this.hoverRow(appKey,hovered,cx))
+          .on_click(() => terminal ? run('terminal.peek',{terminal}) : this.openPreview(undefined, rig.id, rig.name))
           .child(svg('mods/workspace-chrome/server.svg').size(14).text_color(t.muted))
           .child(div().truncate().text_size(12).text_color(t.muted).child(app.id))
-          .child(div().flex_1().min_w(0).truncate().text_size(11).text_color(t.dim).child(`${source.label} · observed`))
+          .child(div().flex_1().min_w(0).truncate().text_size(11).text_color(t.dim).child(app.build_status ? app.build_status.label : `${source.label} · observed`))
+          .when(Boolean(app.development), el => el.child(this.appControls(rig,app)))
           .child(this.statusIcon(this.appIndicator(app))));
       }
       content.child(card);

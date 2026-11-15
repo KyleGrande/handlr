@@ -168,3 +168,48 @@ workspace.rename with the supplied panel ID. Access panel through an optional
 namespace property so older Herdr installations keep their original UI.
 Never change owner selection, props, storage keys, process lifecycle or layouts
 merely to adopt this header. Test standalone and workspace presentations.
+
+## Local app build reports
+
+An observed local app may set `build_status_file: {path, max_age_seconds?}`.
+Paths resolve against its repo slot; the default report age limit is 90 seconds
+(allowed range 1–3600). Remote build reports are unsupported. Without development tools, Rigs only reads this JSON file. Explicit development
+tools described below may supply its checker and button actions.
+The independent project checker must atomically publish `schema_version: 1`,
+`observed_at` (ISO timestamp), `state` (`current`, `untracked`,
+`rebuild_required`, `restart_required`, `not_running`, or `unknown`), `label`,
+`reason`, and `processes: [{pid, started_at}]` covering every matching running
+instance. Both PID and start time must match. A current, fresh report permits
+a green running indicator; all other build states and missing, expired or
+invalid reports produce red app and aggregate rig indicators. Stopped apps
+retain gray rings. Hover the dot or open Preview for the reason. App report
+rows display the build label; unconfigured app observations retain their
+existing process-only behavior. Report files are personal runtime data and
+must not be committed or distributed with profiles.
+
+
+## Explicit app development tools
+
+A local observed app with `build_status_file` may add
+`development: {check: [program, ...args], rebuild?: [program, ...args], relaunch?: [program, ...args]}`.
+Commands are foreground argv arrays, run in that app's mapped repo checkout.
+The `check` command must be a reviewed, read-only checker that atomically
+publishes the build report. Rigs bounds it to ten seconds and 1 MiB of output,
+and reuses a valid report for at most ten seconds. Normal polling may run only
+this checker; it never runs rebuild/relaunch actions.
+
+The observed app row reuses the standard hover-only Rigs icon controls before
+its rightmost status dot: **▶** means Rebuild & reopen, **↻** means Reopen
+without compiling. Tooltips explain the action. There is no stop control for
+an externally launched app. After an action starts, click its row to open
+output; the rig name still opens Preview. Clicking an icon explicitly
+authorizes that configured action. The panel calls
+`rig app-tool <rig> <app> --action rebuild|relaunch`; agents must obtain the
+same explicit action authorization. These one-shot tools run in parentless
+Core terminals, survive app quit, and do not become managed services, reserve
+resources, adopt the observed process, or gain generic kill authority.
+Duplicate tools for one rig/app are rejected while its helper is running.
+Any shutdown/reopen behavior belongs to the reviewed project helper.
+Handlr's helper builds/installs before quitting, never quits after a failed
+build, uses the exact Dev home and app quit command, waits for exit and opens
+only that installed bundle. Core and unrelated terminals stay alive.

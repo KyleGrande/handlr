@@ -196,3 +196,51 @@ Live verification below concerns header presentation only; the broader desktop
 acceptance items above remain separate.
 
 Verified in the isolated Workspace Native app on 2026-11-13: all seven restored panels show one title row. Context, Toolbox and Rigs retain their original header actions; the app status reports no rendering errors. Screenshot: workspace `.checks/native/shared-mod-headers.png`. This verifies header presentation only.
+
+## Observed app build reports — 2026-11-14
+
+Added an optional local JSON build report to process observations, retaining
+process state and external ownership. Freshness and PID/start-time identity
+checks prevent stale or unrelated green indicators. Native app and aggregate
+rig dots use red for build attention or unavailable status; unconfigured apps
+and stopped apps retain their existing behavior. No lifecycle operations or
+managed services were added. Verification results are recorded below after
+running the resolver/report tests, native build, and eager state fixtures.
+
+Follow-up: the Handlr user requested all status and action controls inside
+Rigs, so the independent badge was removed. Optional `development.check`
+refreshes the report under a bounded read-only subprocess; rebuild/relaunch
+argv run only on explicit app-tool invocation in a parentless Core terminal.
+34 resolver/observer/lifecycle tests pass, including duplicate tool exclusion,
+no launches while planning, report identity/freshness and checker caching.
+The native TypeScript build and all 21 eager state fixtures pass, including
+red outdated/unknown reports, green current reports and both development
+action buttons. The installed panel passes the native checker. Handlr's
+three action-sequencing tests confirm no quit after failed compilation and
+no second instance on quit timeout. Actual rebuild/relaunch verification
+is recorded separately after its helper finishes. No service ownership or
+Core shutdown operations were introduced.
+
+Actual Handlr Dev action verification (2026-11-14): invoked the configured
+rebuild action via `rig app-tool handlr-dev desktop --action rebuild` after
+the user explicitly requested rebuild/relaunch. Its parentless Core helper
+`t69` completed with exit 0, installed the signed Dev bundle, sent app.quit,
+waited for exit, and opened the replacement. The PID changed; both the project
+checker and Rigs status report `current` / “Handlr Dev in sync.” All 25 prior
+Core terminal addresses remain present (26 including the finished helper).
+The reopened app reports no errors and the separate badge node/mod is absent.
+The native eager fixtures verified the buttons and red/green states. The live
+frame API retained the initial “Loading rigs…” frame while backgrounded, so
+fresh screenshot confirmation of the row/buttons remains unverified; live
+report timestamps do demonstrate that Rigs is polling the new checker.
+No native click was simulated and no Core process was stopped.
+
+
+2026-11-14 control consistency follow-up: replaced the app-specific text action
+row with the same shared iconControl/controlTray implementation as existing
+service and rig controls. App controls appear on row hover, use the existing
+22px ▶ / ↻ glyph buttons, disabled treatment, tooltips and click-propagation
+rules, and sit before the rightmost status dot. App row clicks open action
+output when available; the rig name retains Preview. Native TypeScript and
+eager state fixtures were rerun for the presentation change; no native app
+rebuild or lifecycle action is needed for this mod update.

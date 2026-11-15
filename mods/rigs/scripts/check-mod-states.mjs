@@ -13,7 +13,7 @@ const preview = {
   setup:{approved:false,questions:['commands','data_isolation'],decisions:{commands:'Optional compiler watcher',data_isolation:''},evidence:[]},
 };
 try {
-  for (const state of ['workspace-header','new-menu','create','draft','approved','preview-error','services-with-output','services-without-output','services-portless','apps-running','apps-unknown','apps-preview','rig-menu','profile-menu','edit-rig','profile-editor','delete-profile','delete-shared-profile']) {
+  for (const state of ['workspace-header','new-menu','create','draft','approved','preview-error','services-with-output','services-without-output','services-portless','apps-running','apps-unknown','apps-outdated','apps-build-current','apps-build-unknown','apps-preview','rig-menu','profile-menu','edit-rig','profile-editor','delete-profile','delete-shared-profile']) {
     const directory = path.join(root,state); await fs.mkdir(directory);
     // Real popups always have props; the checker starts with null props.
     const fixtureProps={rig:'checker',profilePath:'/tmp/example-profile.json',target:'profile',label:'Checker fixture',overlay:'checker-only'};
@@ -33,7 +33,16 @@ try {
       data.rigs[0].claimed = false; data.rigs[0].services = {};
       data.rigs[0].observed_apps = {desktop:{...fixture.observed_apps.desktop,id:'desktop',ownership:'external',state:state === 'apps-unknown' ? 'unknown' : 'running',observed_at:'checker',matches:state === 'apps-unknown' ? [] : [{pid:42,name:'MyApp.exe',started_at:'2026-11-10T12:00:00.000Z',executable:'C:\\work\\MyApp.exe'}]}};
     }
+    if (['apps-outdated','apps-build-current','apps-build-unknown'].includes(state)) {
+      data.rigs[0].observed_apps.desktop.development = {check:['node','check.mjs'],rebuild:['node','rebuild.mjs'],relaunch:['node','reopen.mjs']};
+      data.rigs[0].observed_apps.desktop.build_status = {
+        state: state === 'apps-build-current' ? 'current' : state === 'apps-outdated' ? 'attention' : 'unknown',
+        label: state === 'apps-build-current' ? 'Handlr Dev in sync' : state === 'apps-outdated' ? 'Rebuild required' : 'Build status unavailable',
+        reason: 'Read-only build report fixture',
+      };
+    }
     let initialize = state === 'workspace-header' || state.startsWith('services-') || state.startsWith('apps-') && state !== 'apps-preview' ? `this.data = ${JSON.stringify(data)};` : state === 'new-menu' ? `this.menuMode = true; this.menuLoaded = true; this.profiles = [{path:'/tmp/example-profile.json',label:'Example profile',selections:{app:'/tmp/disposable-checkout'},services:1}];` : state === 'create' ? `this.createMode = true; this.repoSlots = ['app']; this.selections = {app:'/tmp/disposable-checkout'};` : `this.previewMode = true; this.setPreview(${JSON.stringify(fixture)},'checker'); ${state === 'apps-preview' ? `this.data = ${JSON.stringify(data)};` : ''} ${state === 'preview-error' ? "this.actionError = 'Preview changed; close and reopen to review the current configuration.';" : ''}`;
+    if (['apps-outdated','apps-build-unknown'].includes(state)) initialize += `if (this.appIndicator(this.data.rigs[0].observed_apps.desktop).kind !== 'outdated' || this.rigIndicator(this.data.rigs[0]).kind !== 'outdated') throw new Error('Outdated builds must use the red indicator');`;
     const definition = {id:'checker',name:'checker-rig',profile:'/tmp/example-profile.json',revision:'checker-revision',active:false,checkouts:{app:'/tmp/disposable-checkout'}};
     const document = {path:definition.profile,content:'{"version":1,"repos":["app"],"services":{"compiler":{"repo":"app","argv":["tsc","--watch"]}}}',revision:'checker-revision',missing:false,rigs:state === 'delete-shared-profile' ? [{...definition,active:true}] : []};
     if (state === 'rig-menu' || state === 'profile-menu') initialize = `this.contextMode = '${state}';`;

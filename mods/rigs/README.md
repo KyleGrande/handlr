@@ -201,3 +201,44 @@ The workspace API is optional and read through the `herdr` module namespace.
 Released Herdr versions without `panel()` retain the original standalone header.
 Dialogs and popups retain their own titles. This integration does not change
 installation layout choices or any service, command, context or data ownership.
+
+### Build sync for observed local apps
+
+Set `build_status_file: {"path":"/absolute/build-status.json","max_age_seconds":90}`
+on a local observed app to include its project's build checker in the dot.
+A running process is green only with a fresh `current` report matching every
+PID and process start time. Rebuild/reopen requirements and unavailable,
+expired or invalid reports make both app and rig dots red. Stopped apps remain
+gray; observations without this field keep their existing process-only status.
+The row shows the build label and its tooltip/Preview explains the result.
+Relative report paths resolve against the mapped repo checkout. This field
+is local-only and does not launch a checker or change lifecycle ownership.
+The report format and allowed ages are documented in AGENTS.md under
+“Local app build reports.” Optional development tools can publish these reports.
+
+
+## Explicit app development tools
+
+A local observed app with `build_status_file` may add
+`development: {check: [program, ...args], rebuild?: [program, ...args], relaunch?: [program, ...args]}`.
+Commands are foreground argv arrays, run in that app's mapped repo checkout.
+The `check` command must be a reviewed, read-only checker that atomically
+publishes the build report. Rigs bounds it to ten seconds and 1 MiB of output,
+and reuses a valid report for at most ten seconds. Normal polling may run only
+this checker; it never runs rebuild/relaunch actions.
+
+The observed app row reuses the standard hover-only Rigs icon controls before
+its rightmost status dot: **▶** means Rebuild & reopen, **↻** means Reopen
+without compiling. Tooltips explain the action. There is no stop control for
+an externally launched app. After an action starts, click its row to open
+output; the rig name still opens Preview. Clicking an icon explicitly
+authorizes that configured action. The panel calls
+`rig app-tool <rig> <app> --action rebuild|relaunch`; agents must obtain the
+same explicit action authorization. These one-shot tools run in parentless
+Core terminals, survive app quit, and do not become managed services, reserve
+resources, adopt the observed process, or gain generic kill authority.
+Duplicate tools for one rig/app are rejected while its helper is running.
+Any shutdown/reopen behavior belongs to the reviewed project helper.
+Handlr's helper builds/installs before quitting, never quits after a failed
+build, uses the exact Dev home and app quit command, waits for exit and opens
+only that installed bundle. Core and unrelated terminals stay alive.

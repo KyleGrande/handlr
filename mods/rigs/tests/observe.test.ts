@@ -65,3 +65,61 @@ test('observed apps support monitor-only profiles and cannot contain lifecycle c
   assert.throws(() => validateObservedApp({...app, executable:'relative.exe'}, 'desktop'), /absolute Windows path/);
   assert.throws(() => validate({version:1, repos:['app'], services:{desktop:{repo:'app',argv:['app']}}, observed_apps:{desktop:app}}), /conflicts/);
 });
+
+test('build reports validate freshness and every running process identity before allowing green', async () => {
+  const {parseBuildStatus, resolveObservedApp} = await import('../src/observe.js');
+  const time = Date.parse('2026-11-14T12:01:00Z');
+  const local = resolveObservedApp({repo:'app',process_name:'Herdr',build_status_file:{path:'build-status.json',max_age_seconds:90}}, '/tmp/source');
+  assert.equal(local.build_status_file!.path, '/tmp/source/build-status.json');
+  const observation = matchObservedApp('desktop', local, [{pid:42,name:'Herdr',started_at:'2026-11-14T12:00:00Z'}]);
+  const report = {schema_version:1,observed_at:'2026-11-14T12:00:45Z',state:'current',label:'In sync',reason:'Matches',processes:observation.matches};
+  assert.equal(parseBuildStatus(report, observation, time).state, 'current');
+  for (const state of ['untracked','rebuild_required','restart_required']) assert.equal(parseBuildStatus({...report,state}, observation,time).state,'attention');
+  assert.equal(parseBuildStatus({...report,state:'unknown'},observation,time).state,'unknown');
+  assert.throws(() => parseBuildStatus({...report,observed_at:'2026-11-14T11:58:00Z'},observation,time),/expired/);
+  assert.throws(() => parseBuildStatus({...report,observed_at:'2026-11-14T12:02:00Z'},observation,time),/expired/);
+  assert.throws(() => parseBuildStatus({...report,processes:[]},observation,time),/does not cover/);
+  assert.throws(() => parseBuildStatus({...report,processes:[{pid:42,started_at:'2026-11-14T11:59:00Z'}]},observation,time),/does not cover/);
+  assert.throws(() => parseBuildStatus({...report,state:'green'},observation,time),/Invalid/);
+  assert.throws(() => validateObservedApp({...app,build_status_file:{path:'status.json'}},'desktop'),/local observation/);
+  assert.throws(() => validateObservedApp({...local,build_status_file:{path:'status.json',max_age_seconds:0}},'desktop'),/status age/);
+});
+
+test('local report failures keep process presence but never present it as a current build', async () => {
+  const fs = await import('node:fs/promises'), os = await import('node:os'), path = await import('node:path');
+  const folder = await fs.mkdtemp(path.join(os.tmpdir(),'rig-build-report-'));
+  try {
+    const file = path.join(folder,'status.json');
+    const local: ResolvedObservedApp = {repo:'app',process_name:'Herdr',platform:process.platform as 'darwin',build_status_file:{path:file}};
+    const rows = [{pid:42,name:'Herdr',started_at:'2026-11-14T12:00:00Z'}];
+    const snapshot = () => new ProcessObserver(async () => rows).session()({desktop:local});
+    let result = (await snapshot()).desktop;
+    assert.equal(result.state,'running'); assert.equal(result.build_status!.state,'unknown');
+    await fs.writeFile(file,JSON.stringify({schema_version:1,observed_at:new Date().toISOString(),state:'rebuild_required',label:'Rebuild required',reason:'Source changed',processes:rows}));
+    result = (await snapshot()).desktop;
+    assert.equal(result.state,'running'); assert.equal(result.build_status!.state,'attention');
+    await fs.writeFile(file,'bad JSON');
+    assert.equal((await snapshot()).desktop.build_status!.state,'unknown');
+    assert.equal((await new ProcessObserver(async () => []).session()({desktop:local})).desktop.build_status,undefined,'stopped apps keep their existing stopped indicator');
+  } finally { await fs.rm(folder,{recursive:true,force:true}); }
+});
+
+test('Rigs runs the configured bounded checker for missing reports and reuses fresh reports', async () => {
+  const fs = await import('node:fs/promises'), os = await import('node:os'), path = await import('node:path');
+  const folder=await fs.mkdtemp(path.join(os.tmpdir(),'rig-development-check-'));
+  try {
+    const file=path.join(folder,'status.json'), script=path.join(folder,'check.mjs'), count=path.join(folder,'count');
+    const rows=[{pid:42,name:'Herdr',started_at:'2026-11-14T12:00:00Z'}];
+    await fs.writeFile(script,`import fs from 'node:fs';fs.appendFileSync(${JSON.stringify(count)},'x');fs.writeFileSync(${JSON.stringify(file)},JSON.stringify({schema_version:1,observed_at:new Date().toISOString(),state:'current',label:'In sync',reason:'Matches',processes:${JSON.stringify(rows)}}));`);
+    const local: ResolvedObservedApp={repo:'app',process_name:'Herdr',platform:process.platform as 'darwin',cwd:folder,
+      build_status_file:{path:file},development:{check:[process.execPath,script],rebuild:['must-never-run']}};
+    const snapshot=()=>new ProcessObserver(async()=>rows).session()({desktop:local});
+    assert.equal((await snapshot()).desktop.build_status!.state,'current');
+    assert.equal((await snapshot()).desktop.build_status!.state,'current');
+    assert.equal(await fs.readFile(count,'utf8'),'x','only the read-only checker ran, once');
+    await fs.rm(file);
+    local.development!.check=[process.execPath,'-e','process.exit(1)'];
+    const failed=(await snapshot()).desktop;
+    assert.equal(failed.state,'running');assert.equal(failed.build_status!.state,'unknown');
+  } finally {await fs.rm(folder,{recursive:true,force:true});}
+});

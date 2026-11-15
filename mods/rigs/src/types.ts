@@ -12,10 +12,11 @@ export interface RigConnection {
   state: 'live' | 'unavailable' | 'unknown';
 }
 export type ProcessPlatform = 'win32' | 'darwin' | 'linux';
-export interface ObservedApp { repo: string; process_name: string; executable?: string; platform?: ProcessPlatform; machine?: string }
-export interface ResolvedObservedApp extends ObservedApp { platform: ProcessPlatform }
+export interface ObservedApp { repo: string; process_name: string; executable?: string; platform?: ProcessPlatform; machine?: string; build_status_file?: {path: string; max_age_seconds?: number}; development?: {check: string[]; rebuild?: string[]; relaunch?: string[]} }
+export interface ResolvedObservedApp extends ObservedApp { platform: ProcessPlatform; cwd?: string }
 export interface ObservedProcess { pid: number; started_at: string; name: string; executable?: string }
-export interface AppObservation extends ResolvedObservedApp { id: string; ownership: 'external'; state: 'running' | 'stopped' | 'unknown'; observed_at: string; matches: ObservedProcess[]; error?: string }
+export interface BuildStatus { state: 'current' | 'attention' | 'unknown'; label: string; reason: string }
+export interface AppObservation extends ResolvedObservedApp { id: string; ownership: 'external'; state: 'running' | 'stopped' | 'unknown'; observed_at: string; matches: ObservedProcess[]; error?: string; build_status?: BuildStatus }
 export interface Profile { version: 1; repos: string[]; services: Record<string, Service>; observed_apps?: Record<string, ObservedApp>; setup?: SetupReview }
 export interface Checkout { root: string; repository: string; branch: string; unborn?: boolean }
 export interface ResolvedService { id: string; repo: string; cwd: string; argv: string[]; env: Record<string, string>; secrets: Record<string, Binding>; endpoints: Record<string, Endpoint>; depends_on: string[]; readiness?: Probe; data_scope: string; fingerprint: string; external_checks?: ExternalCheck[]; external_bindings?: {key:string;url:string}[] }

@@ -71,6 +71,20 @@ export class Rigs {
     const rig = await this.get(name);
     return {id:rig.id,name:rig.name,profile:rig.profile,checkouts:rig.checkouts,active:isActive(rig),revision:rigRevision(rig)};
   }
+  async appTool(name: string, appId: string, action: string) {
+    check(action === 'rebuild' || action === 'relaunch', 'Use an explicit rebuild or relaunch action');
+    const rig = await this.get(name);
+    return this.store.lock(rig.id, async () => {
+      const plan = await this.plan(name), app = plan.observed_apps?.[appId];
+      check(app?.development && app.cwd && !app.machine, 'No local development actions configured for this app');
+      const argv = app.development[action];
+      check(argv?.length, 'This development action is not configured');
+      const terminals = await this.core.terminals();
+      check(!terminals.some(t => t.state === 'live' && t.labels?.['rig.app-tool'] === rig.id && t.labels?.['rig.app'] === appId), 'An app development action is already running');
+      const terminal = await this.core.start(argv, app.cwd, {}, {'rig.app-tool':rig.id,'rig.app':appId,'rig.app-action':action});
+      return {terminal:terminal.address,action,app:appId};
+    });
+  }
   async delete(name: string, expected?: string) {
     const initial = await this.get(name);
     return this.store.lock(initial.id, async () => this.store.lock('registry', async () => {

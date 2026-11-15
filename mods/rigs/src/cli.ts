@@ -15,6 +15,7 @@ rig up|restart <name> [--review <fingerprint>] [--service <id>]
 rig down <name> [--service <id>]
 rig status [<name>] [--checkout <directory>] [--json]
 rig logs <name> <service> [--json]
+rig app-tool <name> <app> --action rebuild|relaunch
 rig show <name>
 rig configure <name> [--name <new-name>] [--profile <file>] [--repo <slot>=<checkout> ...] [--revision <from-show>]
 rig delete <name> [--revision <from-show>]
@@ -28,6 +29,7 @@ rig observe --process-name <executable-name> [--executable <path>] [--platform w
 Profiles contain executable project configuration. Review rig plan before rig up.
 RIG_HOME selects the durable local registry. Managed endpoints bind to loopback.
 observed_apps are read-only process matches; they never grant launch/stop ownership.
+Local observed apps may use build_status_file {path,max_age_seconds?} to require a fresh PID/start-time matched build report for a green dot. Optional development.check refreshes it; rebuild/relaunch commands run only through explicit app-tool actions.
 observe reports one snapshot without creating a rig or reserving resources.`;
 export async function main(argv = process.argv.slice(2)) {
   const command = argv.shift();
@@ -39,7 +41,7 @@ export async function main(argv = process.argv.slice(2)) {
     if (arg.startsWith('--')) { check(argv[0] && !argv[0].startsWith('--'), `Missing value for ${arg}`); (options[arg] ??= []).push(argv.shift()!); }
     else positional.push(arg);
   }
-  check(Object.keys(options).every(k => ['--profile','--repo','--checkout','--output','--review','--decision','--service','--process-name','--executable','--platform','--machine','--name','--revision','--input','--consume-input'].includes(k)), 'Unknown option; run rig help');
+  check(Object.keys(options).every(k => ['--profile','--repo','--checkout','--output','--review','--decision','--service','--process-name','--executable','--platform','--machine','--name','--revision','--input','--consume-input','--action'].includes(k)), 'Unknown option; run rig help');
   const selections: Record<string,string> = {};
   for (const value of options['--repo'] ?? []) {
     const at = value.indexOf('='); check(at > 0 && at < value.length - 1, 'Use --repo slot=/concrete/worktree');
@@ -99,6 +101,7 @@ export async function main(argv = process.argv.slice(2)) {
     case 'down': result = await rigs.down(name, options['--service']?.[0]); break;
     case 'status': result = await rigs.status(name, options['--checkout']?.[0]); break;
     case 'logs': check(positional[1], 'Select a service'); result = await rigs.logs(name, positional[1]); break;
+    case 'app-tool': check(positional[1] && options['--action']?.[0], 'Select an app and --action rebuild|relaunch'); result = await rigs.appTool(name,positional[1],options['--action'][0]); break;
     case 'init': {
       check(options['--checkout']?.[0] && options['--output']?.[0], 'Use init --checkout <directory> --output <new-file>');
       const proposed = await propose(options['--checkout'][0]);

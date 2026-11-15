@@ -1,21 +1,38 @@
 import path from 'node:path';
 import * as fs from 'node:fs/promises';
+import { constants } from 'node:fs';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { Core } from './core.js';
-import { now, requireValue as check, type AppObservation, type ObservedApp, type ObservedProcess, type ProcessPlatform, type ResolvedObservedApp } from './types.js';
+import { now, requireValue as check, type AppObservation, type BuildStatus, type ObservedApp, type ObservedProcess, type ProcessPlatform, type ResolvedObservedApp } from './types.js';
 
 const exec = promisify(execFile);
 const platforms = ['win32', 'darwin', 'linux'];
 export function validateObservedApp(app: ObservedApp, id: string) {
   check(app && typeof app === 'object' && !Array.isArray(app), `${id}: invalid observed app`);
-  check(Object.keys(app).every(key => ['repo','process_name','executable','platform','machine'].includes(key)), `${id}: unknown observed app field; observations cannot declare lifecycle commands`);
+  check(Object.keys(app).every(key => ['repo','process_name','executable','platform','machine','build_status_file','development'].includes(key)), `${id}: unknown observed app field; observations cannot declare lifecycle commands`);
   check(typeof app.process_name === 'string' && app.process_name.trim() && app.process_name.length <= 255 && !/[\\/\x00-\x1f*?]/.test(app.process_name), `${id}: process_name must be an exact executable name`);
   check(app.platform === undefined || platforms.includes(app.platform), `${id}: unsupported process platform`);
   check(app.machine === undefined || typeof app.machine === 'string' && /^[a-zA-Z0-9_.-]{1,128}$/.test(app.machine), `${id}: invalid Herdr machine name`);
   check(!app.machine || app.platform === 'win32', `${id}: remote observations currently require platform win32`);
   check(app.executable === undefined || typeof app.executable === 'string' && app.executable.trim() && !/[\x00-\x1f]/.test(app.executable), `${id}: invalid executable path`);
   if (app.machine && app.executable) check(path.win32.isAbsolute(app.executable), `${id}: remote executable must be an absolute Windows path`);
+  if (app.build_status_file !== undefined) {
+    const report = app.build_status_file;
+    check(report && typeof report === 'object' && !Array.isArray(report)
+      && Object.keys(report).every(key => ['path','max_age_seconds'].includes(key)), `${id}: invalid build status file`);
+    check(!app.machine && (!app.platform || app.platform === process.platform), `${id}: build status files require a local observation`);
+    check(typeof report.path === 'string' && report.path.trim() && !/[\x00-\x1f]/.test(report.path), `${id}: invalid build status path`);
+    check(report.max_age_seconds === undefined || Number.isFinite(report.max_age_seconds) && report.max_age_seconds >= 1 && report.max_age_seconds <= 3600, `${id}: invalid build status age`);
+  }
+  if (app.development !== undefined) {
+    const tools = app.development;
+    check(!app.machine && !!app.build_status_file, `${id}: development tools require a local build status file`);
+    check(tools && typeof tools === 'object' && !Array.isArray(tools) && Object.keys(tools).every(key => ['check','rebuild','relaunch'].includes(key)), `${id}: invalid development tools`);
+    for (const [key, argv] of Object.entries(tools)) check(Array.isArray(argv) && argv.length > 0 && argv.length <= 128
+      && argv.every(arg => typeof arg === 'string' && arg.length > 0 && arg.length <= 8192 && !arg.includes('\0')), `${id}: ${key} requires an argv array`);
+    check(Array.isArray(tools.check) && tools.check.length > 0, `${id}: development tools require a read-only check command`);
+  }
 }
 
 export function resolveObservedApp(app: ObservedApp, root: string): ResolvedObservedApp {
@@ -23,7 +40,54 @@ export function resolveObservedApp(app: ObservedApp, root: string): ResolvedObse
   check(platforms.includes(platform), 'Process observation supports Windows, macOS and Linux');
   const executable = app.executable && (app.machine || platform !== process.platform
     ? app.executable : path.resolve(root, app.executable));
-  return {...app, platform: platform as ProcessPlatform, ...(executable ? {executable} : {})};
+  return {...app, platform: platform as ProcessPlatform, ...(executable ? {executable} : {}),
+    ...(app.build_status_file ? {build_status_file: {...app.build_status_file, path:path.resolve(root, app.build_status_file.path)}} : {}),
+    ...(app.development ? {cwd:root} : {})};
+}
+
+/** Reports are data only: no profile-supplied commands are executed. */
+export function parseBuildStatus(value: unknown, observation: AppObservation, time = Date.now()): BuildStatus {
+  check(value && typeof value === 'object', 'Invalid build status report');
+  const report = value as Record<string, unknown>;
+  check(report.schema_version === 1 && typeof report.observed_at === 'string', 'Invalid build status report');
+  const observed = Date.parse(report.observed_at);
+  check(Number.isFinite(observed) && observed <= time + 5000 && time - observed <= (observation.build_status_file?.max_age_seconds ?? 90) * 1000, 'Build status report expired; refresh the build checker');
+  check(['current','untracked','rebuild_required','restart_required','not_running','unknown'].includes(String(report.state)), 'Invalid build status state');
+  check(typeof report.label === 'string' && report.label.length > 0 && report.label.length <= 128
+    && typeof report.reason === 'string' && report.reason.length <= 2048, 'Invalid build status details');
+  check(Array.isArray(report.processes), 'Build status process identities unavailable');
+  const identities = report.processes as Record<string, unknown>[];
+  check(observation.matches.every(process => identities.some(identity => identity && identity.pid === process.pid
+    && typeof identity.started_at === 'string' && Date.parse(identity.started_at) === Date.parse(process.started_at))), 'Build status does not cover the running process; refresh the build checker');
+  return { state:report.state === 'current' ? 'current' : report.state === 'unknown' ? 'unknown' : 'attention', label:report.label, reason:report.reason };
+}
+
+export async function observeBuildStatus(observation: AppObservation): Promise<AppObservation> {
+  if (!observation.build_status_file || observation.state === 'unknown') return observation;
+  try {
+    if (observation.development) {
+      let fresh = false;
+      try {
+        const report = JSON.parse(await fs.readFile(observation.build_status_file.path, 'utf8'));
+        parseBuildStatus(report, observation);
+        fresh = Date.now() - Date.parse(report.observed_at) < 10000;
+      } catch { /* Missing/stale reports trigger the configured read-only checker. */ }
+      if (!fresh) {
+        const [program, ...args] = observation.development.check;
+        await exec(program, args, {cwd:observation.cwd,timeout:10000,maxBuffer:1024 * 1024});
+      }
+    } else if (observation.state !== 'running') return observation;
+    const file = await fs.open(observation.build_status_file.path, constants.O_RDONLY | constants.O_NONBLOCK);
+    let content: string;
+    try {
+      const stat = await file.stat();
+      check(stat.isFile() && stat.size <= 1024 * 1024, 'Build status report must be a regular file no larger than 1 MiB');
+      content = await file.readFile('utf8');
+    } finally { await file.close(); }
+    return {...observation, build_status:parseBuildStatus(JSON.parse(content), observation)};
+  } catch (error) {
+    return {...observation, build_status:{state:'unknown',label:'Build status unavailable',reason:error instanceof Error ? error.message : 'Cannot read build status report'}};
+  }
 }
 
 export type ProcessQuery = (apps: ResolvedObservedApp[]) => Promise<ObservedProcess[]>;
@@ -109,7 +173,7 @@ export class ProcessObserver {
           const group = allApps.filter(peer => peer.machine === app.machine && peer.platform === app.platform);
           snapshot = Promise.resolve().then(() => this.query(group)); snapshots.set(key, snapshot);
         }
-        try { return [id, matchObservedApp(id, app, await snapshot)] as const; }
+        try { return [id, await observeBuildStatus(matchObservedApp(id, app, await snapshot))] as const; }
         catch { return [id, {...app, id, ownership:'external' as const, state:'unknown' as const, observed_at:now(), matches:[], error:`Process observation unavailable on ${app.machine ?? 'this computer'}; check access, platform and process tools`}] as const; }
       }));
       return Object.fromEntries(entries);

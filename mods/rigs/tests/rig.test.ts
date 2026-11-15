@@ -400,3 +400,27 @@ test('discovery excludes demo scripts and reports no_services through the CLI wi
   assert.deepEqual((await f.rigs.store.load()).rigs,{});
   assert.equal(f.core.starts,0);
 });
+
+test('app development buttons launch only the configured one-shot tool and reject duplicate actions', async t => {
+  const f = await fixture(t);
+  f.profile.services = {};
+  f.profile.observed_apps = {desktop:{repo:'app',process_name:'Herdr',platform:process.platform as 'darwin',
+    build_status_file:{path:'build-status.json'},development:{check:['node','check.js'],rebuild:['node','rebuild.js'],relaunch:['node','reopen.js']}}};
+  await f.save();
+  await f.rigs.create('native-dev',f.profilePath,{app:f.roots[0]});
+  await f.rigs.plan('native-dev');
+  assert.equal(f.core.starts,0,'planning does not run the checker or development actions');
+  const before = await f.rigs.get('native-dev');
+  const action = await f.rigs.appTool('native-dev','desktop','rebuild');
+  assert.equal(action.terminal,'t1');
+  assert.equal(f.core.list[0].labels['rig.app-action'],'rebuild');
+  assert.equal(f.core.list[0].labels['rig.app-tool'],before.id);
+  assert.equal((await f.rigs.get('native-dev')).claimed,false);
+  assert.deepEqual((await f.rigs.get('native-dev')).launches,{});
+  await assert.rejects(f.rigs.appTool('native-dev','desktop','relaunch'),/already running/);
+  await assert.rejects(f.rigs.appTool('native-dev','desktop','stop'),/explicit/);
+  await assert.rejects(f.rigs.appTool('native-dev','missing','rebuild'),/No local/);
+  f.core.list[0].state='finished';
+  assert.equal((await f.rigs.appTool('native-dev','desktop','relaunch')).terminal,'t2');
+  assert.deepEqual(f.core.killed,[],'Rigs never adopts or kills the externally launched app');
+});
