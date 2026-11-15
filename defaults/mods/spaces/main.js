@@ -537,7 +537,7 @@ export default class Spaces extends View {
       if (this.activeAt >= 0) this.scroll.scroll_to_item(this.activeAt);
     }
     return v_flex().size_full().min_h(0).bg(t.chrome).text_size(13)
-      .when(embedded,el=>el.bg(t.background).rounded(10).overflow_hidden().border_1().border_color(t.border))
+      .when(embedded,el=>el.bg(t.surface).rounded(10).overflow_hidden().border_1().border_color(t.border))
       .child(h_flex().id("spaces-header").on_hover((on, cx) => { this.headerHovered = on; cx.notify(); }).h(embedded ? 42 : 31).pl(embedded ? 14 : 16).pr(embedded ? 82 : 10).flex_none().items_center().gap(8).text_size(embedded ? 13 : 11.5).text_color(embedded ? t.foreground : t.dim)
         .when(embedded,el=>el.border_b(1).border_color(t.border))
         .when(collapsed, el => el.pl(0).pr(0).justify_center())

@@ -419,7 +419,7 @@ export default class Agents extends View {
       .border_t(1)
       .border_color(t.border)
       .text_size(13)
-      .when(embedded,el=>el.bg(t.background).rounded(10).overflow_hidden().border_1())
+      .when(embedded,el=>el.bg(t.surface).rounded(10).overflow_hidden().border_1())
       .when(!collapsed, (el) =>
         el.child(
           h_flex()

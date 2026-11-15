@@ -1,0 +1,62 @@
+{
+  "id": "@workspace/center",
+  "workspace": "panel-workspace-native",
+  "type": "column",
+  "resizable": false,
+  "preview": "layouts/panel-workspace-native.svg",
+  "background": "canvas",
+  "terminal_padding": [
+    14,
+    12
+  ],
+  "children": [
+    {
+      "id": "@workspace/tabs",
+      "type": "block",
+      "size": {
+        "px": 42
+      },
+      "window_drag": true,
+      "content": {
+        "mod": "tabs"
+      }
+    },
+    {
+      "id": "@workspace/terminal-body",
+      "type": "row",
+      "padding": 8,
+      "gap": 8,
+      "children": [
+        {
+          "id": "@workspace/active-tab",
+          "type": "block",
+          "content": {
+            "tab": "active",
+            "pane": {
+              "gap": 8,
+              "radius": 10,
+              "background": "background",
+              "lone": true,
+              "border": {
+                "width": 1,
+                "color": "border"
+              },
+              "focus": {
+                "width": 1,
+                "color": "accent"
+              },
+              "header": {
+                "content": {
+                  "mod": "pane"
+                },
+                "height": 30,
+                "position": "top",
+                "reveal": "always"
+              }
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

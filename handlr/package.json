@@ -3,6 +3,8 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "dev:status": "node scripts/dev-build-status.mjs",
+    "dev:tools": "node scripts/install-dev-tools.mjs",
     "release": "node scripts/release-macos.mjs",
     "install:release": "node scripts/release-macos.mjs --install",
     "package:macos": "node scripts/package-macos.mjs",

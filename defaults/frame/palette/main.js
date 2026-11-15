@@ -42,6 +42,7 @@ const NAMED = [
   ["layout.reset", {}, "Layout", "Reset layout", "new version default restore herdr's"],
   ["layout.clone", {}, "Layout", "Duplicate layout", "clone copy customize"],
   ["mod.clone", {}, "Layout", "Duplicate mod", "clone copy customize"],
+  ["mod.update", {}, "Panel", "Review Panel Updates", "update app provided user custom keep merge"],
   ["terminal.open", {}, "Terminal", "New terminal", "shell"],
   ["terminal.copy", {}, "Terminal", "Copy", "clipboard"],
   ["terminal.paste", {}, "Terminal", "Paste", "clipboard"],
@@ -94,7 +95,7 @@ function entries() {
     if (named.has(c.name) || HIDDEN.has(c.name) || c.args.some((a) => a.required && a.name !== "name")) continue;
     list.push({ name: c.name, args: {}, ...titleOf(c.name), words: c.about });
   }
-  return list.map((e) => ({ ...e, id: `${e.name}:${JSON.stringify(e.args)}` }));
+  return list.map((e) => ({ ...e, id: e.id ?? `${e.name}:${JSON.stringify(e.args)}` }));
 }
 
 // The key bound to an entry: `name` or `name:value` in keys.json.
@@ -134,7 +135,7 @@ export default class Palette extends View {
     this.query = "";
     this.input = InputState.new({ placeholder: "Type a command…" });
     this.input.on("change", (_e, cx) => { this.query = this.input.value(); this.at = 0; cx.notify(); });
-    this.input.on("submit", () => this.go(this.rows()[this.at]?.e));
+    this.input.on("submit", (_e, cx) => this.go(this.rows()[this.at]?.e, cx));
     this.input.focus();
     cx.timer.after(600, () => this.input.focus());
     this.at = 0;
@@ -148,8 +149,16 @@ export default class Palette extends View {
     closeOverlay(props().overlay);
   }
 
-  go(e) {
+  go(e, cx) {
     if (!e) return;
+    if (e.choices) {
+      this.options = e.choices.map((choice) => ({ ...choice, id: choice.id ?? `${choice.name}:${JSON.stringify(choice.args)}` }));
+      this.query = ""; this.at = 0; this.scroll = 0;
+      this.input.set_value("");
+      this.input.focus();
+      cx?.notify();
+      return;
+    }
     this.recent = [e.id, ...this.recent.filter((r) => r !== e.id)].slice(0, 20);
     localStorage.setItem("recent", JSON.stringify(this.recent));
     this.close();
@@ -165,7 +174,7 @@ export default class Palette extends View {
 
   // The rows to show: grouped when empty, ranked while typing.
   rows() {
-    const all = entries();
+    const all = this.options ?? entries();
     const q = this.query.trim().toLowerCase().replace(/\s+/g, "");
     if (!q) {
       const recent = this.recent.map((id) => all.find((e) => e.id === id)).filter(Boolean).slice(0, 5);
@@ -258,7 +267,7 @@ export default class Palette extends View {
           .text_size(12.8)
           .when(on, (el) => el.bg(t.selected))
           .hover((s) => s.bg(t.hover))
-          .on_click(() => this.go(r.e))
+          .on_click((_e, cx) => this.go(r.e, cx))
           .child(div().flex_1().min_w(0).child(this.title(t, r.e.title, r.hits, on)))
           .when(Boolean(this.query), (el) => el.child(div().text_size(11.5).text_color(t.dim).child(r.e.group)))
           .when(Boolean(k), (el) => el.child(key(k))),

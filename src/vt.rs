@@ -1380,7 +1380,17 @@ impl Vt {
         self.cols = cols;
         self.rows = rows;
         self.shared.size = GhosttySizeReportSize { rows, columns: cols, cell_width: cell_w.max(1), cell_height: cell_h.max(1) };
+        let held_since = self.shared.held_since;
         unsafe { ghostty_terminal_resize(self.term, cols, rows, cell_w.max(1), cell_h.max(1)) };
+        if let Some(since) = held_since {
+            // Ghostty ends synchronized output on resize. Keep the completed
+            // render snapshot until the program finishes its pending frame;
+            // exposing an in-progress screen clear here produces a flash.
+            // Setting the mode directly does not recapture the unfinished frame.
+            let cfg = GhosttyTerminalModeConfig { mode: SYNC_OUTPUT, value: true };
+            unsafe { ghostty_terminal_set(self.term, GHOSTTY_TERMINAL_OPT_MODE, &cfg as *const _ as *const c_void) };
+            self.shared.held_since = Some(since);
+        }
         self.feed_search();
     }
 
@@ -2169,6 +2179,22 @@ mod tests {
         assert!(f.rows[0][0].wide, "also after a reset");
         assert_eq!(f.rows[0][0].text, "\u{270d}\u{fe0f}");
         assert_eq!(f.rows[0][2].text, "!");
+    }
+
+    #[test]
+    fn resizing_during_synchronized_output_keeps_the_completed_frame() {
+        let mut vt = Vt::new(20, 3);
+        vt.write(b"completed frame");
+        vt.frame();
+        // A layout change can arrive between the program clearing its screen
+        // and finishing the replacement frame.
+        vt.write(b"\x1b[?2026h\x1b[2J\x1b[H");
+        vt.resize(30, 4, 9, 18);
+        let text = |frame: Frame| frame.rows[0].iter().map(|c| c.text.as_str()).collect::<String>();
+        assert!(text(vt.frame()).starts_with("completed frame"), "layout changes must not expose the unfinished clear");
+        vt.write(b"replacement\x1b[?2026l");
+        assert!(text(vt.frame()).starts_with("replacement"));
+        assert_eq!(vt.render_hold_deadline(), None);
     }
 
     #[test]

@@ -549,6 +549,37 @@ fn tabs_leave_room_for_macos_traffic_lights(cx: &mut TestAppContext) {
 }
 
 #[gpui::test]
+fn tabs_offer_visibility_controls_for_occupied_docks(cx: &mut TestAppContext) {
+    cx.update(gpui_shell::init);
+    let staged = Staged::new();
+    let mut values = fixture(true, props(), updates("current", "current"));
+    values.insert("layout".into(), json!({"id":"@workspace/root","children":[
+        {"id":"@workspace/zone/left","children":[{"id":"files"}]},
+        {"id":"@workspace/zone/right","hidden":true,"children":[{"id":"changes"}]},
+        {"id":"@workspace/zone/top","hidden":true,"children":[]},
+        {"id":"@workspace/zone/bottom_center","children":[{"id":"tools"}]}
+    ]}));
+    for (fullscreen, window_controls, zoom, expected) in [(false, false, 1., false), (true, false, 1., true), (false, true, 1., true), (false, true, 2., true)] {
+        values.insert("window".into(), json!({"platform":"macos","titlebar":"system","fullscreen":fullscreen,"buttons":false}));
+        values.insert("props".into(), json!({"windowControls":window_controls}));
+        values.get_mut("settings").unwrap()["zoom"] = json!(zoom);
+        let tree = describe_with_values(cx, &staged, "mods/tabs", values.clone(), None).unwrap();
+        for id in ["dock-left", "dock-right", "dock-bottom", "terminal-only"] {
+            assert_eq!(tree.contains(id), expected, "{fullscreen}/{window_controls}: {tree}");
+        }
+        assert!(!tree.contains("dock-top"), "empty docks have no toggle: {tree}");
+        if expected {
+            assert!(tree.contains("Hide left panels") && tree.contains("Show right panels"), "{tree}");
+        }
+        if window_controls {
+            let size = 20. / zoom;
+            let control = tree.lines().find(|line| line.contains("dock-left")).unwrap();
+            assert!(control.contains(&format!(".size[Number({size:.1})]")), "{control}");
+        }
+    }
+}
+
+#[gpui::test]
 fn windows_tab_buttons_use_matching_vector_icons(cx: &mut TestAppContext) {
     cx.update(gpui_shell::init);
     let staged = Staged::new();
@@ -783,6 +814,48 @@ fn long_space_names_use_the_sidebar_width(cx: &mut TestAppContext) {
     assert!(empty.contains(".min_w[Number(0.0)]"), "an empty git tail must not take room from the name: {empty}");
     let icon = lines.iter().find(|l| l.contains("branch.svg")).expect("the worktree space is nested");
     assert!(icon.contains(".flex_none"), "a worktree's icon keeps its size while the name gives way: {icon}");
+}
+
+#[gpui::test]
+fn machines_panel_handles_connection_and_layout_states(cx: &mut TestAppContext) {
+    cx.update(gpui_shell::init);
+    let staged = Staged::new();
+    // Run the CLI checker's actual load/render/materialization path using the
+    // test display; AppKit's hidden-window checker is unavailable in a sandbox.
+    let mut previous = None;
+    let calls = Rc::new(RefCell::new(Calls::default()));
+    let check_policy = Policy::new()
+        .with_capabilities(Capabilities::new().read_roots([staged.0.clone()]))
+        .with_host_module(module(fixture(true, props(), updates("current", "current")), calls.clone())).unwrap();
+    gpui_shell::policy::update_default(|policy| { previous = Some(policy); check_policy });
+    let runtime = ShellRuntime::new_isolated().unwrap();
+    let window = cx.add_window(|_, _| Empty);
+    let checked = window.update(cx, |_, window, cx| runtime.check(staged.0.join("mods/machines"), window, cx)).unwrap();
+    gpui_shell::policy::set_default(previous.unwrap());
+    assert!(checked.unwrap().contains("This computer"));
+    gpui::AnyWindowHandle::from(window).update(cx, |_, window, _| window.remove_window()).unwrap();
+    cx.run_until_parked();
+    assert!(calls.borrow().unexpected.is_empty());
+    for (state, layout, can_open) in [
+        ("connected", "ready", true),
+        ("connected", "loading", false),
+        ("connected", "unavailable", false),
+        ("needs_login", "unavailable", false),
+        ("unreachable", "unavailable", false),
+    ] {
+        let mut values = fixture(true, props(), updates("current", "current"));
+        values.insert("machines".into(), json!([
+            {"name":null,"layout":"ready"}, {"name":"remote","layout":layout}
+        ]));
+        let setup = format!("this.list = [{{name:'remote', target:'user@host', state:{}, why:'Connection details', keeps_running_after_logout:false}}];", json!(state));
+        let tree = describe_with_values(cx, &staged, "mods/machines", values, Some(&setup)).unwrap();
+        assert!(tree.contains("This computer"), "{tree}");
+        assert!(tree.contains("machine-1-space-0"), "{tree}");
+        assert!(tree.contains("Connection details"), "{tree}");
+        assert!(tree.contains("Agents stop when you disconnect"), "{tree}");
+        assert_eq!(tree.contains("machine-new-1"), can_open, "{state}/{layout}: {tree}");
+        assert_eq!(tree.contains("Run hc machine login remote"), state == "needs_login", "{tree}");
+    }
 }
 
 #[gpui::test]
@@ -1292,4 +1365,30 @@ fn palette_searches_openable_mods_and_picker_only_goes_to_placed_panels(cx: &mut
     let tree=describe_with_values(cx,&staged,"mods/picker",values,Some("this.filter='review';")).unwrap();
     assert!(tree.contains("My review"),"{tree}");
     assert!(tree.contains("pk-panel-one"),"{tree}");
+}
+
+#[gpui::test]
+fn panel_update_review_describes_both_versions_and_actions(cx: &mut TestAppContext) {
+    cx.update(gpui_shell::init);
+    let staged = Staged::new();
+    let check = staged.0.clone();
+    std::fs::create_dir_all(&check).unwrap();
+    std::fs::write(check.join("main.js"), r#"
+import Review from './frame/mod-updates/main.js';
+import { EditorState } from 'gpui-base';
+export default class Scenario extends Review {
+  init(props, cx) {
+    super.init(props, cx);
+    this.updates = [{ name: 'files', title: 'Files', files: ['main.js'], version: 'new', user_version: 'user' }];
+    this.selected = this.updates[0]; this.file = 'main.js';
+    this.user = EditorState.new({ language: 'js', value: 'const user = true;' });
+    this.app = EditorState.new({ language: 'js', value: 'const updated = true;', readonly: true });
+  }
+}
+"#).unwrap();
+    let tree = describe_with_values(cx, &staged, "", fixture(false, props(), updates("current", "current")), None).unwrap();
+    for label in ["Your Version", "App-provided Update", "Keep Mine", "Use Update", "Save User Version", "updates-discard"] {
+        if label == "updates-discard" { assert!(!tree.contains(label)); }
+        else { assert!(tree.contains(label), "missing {label}: {tree}"); }
+    }
 }

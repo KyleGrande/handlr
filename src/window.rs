@@ -1224,10 +1224,31 @@ impl AppWindow {
 
     /// What installing layouts kept of the person's own, as toasts.
     fn show_layout_notes(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if mods::updates::pending(&mods::app_dir()).is_ok_and(|u| !u.is_empty()) {
+            let n = json!({"title":"Panel updates available","body":"Your customized panels are still active. Review the new app-provided versions.",
+                "level":"info","timeout":12000,"action":{"name":"mod.update","args":{}}});
+            self.open_overlay(mods::new_overlay_id(), json!({"kind":"toast","notification":n}), window, cx);
+        }
         for clone in mods::take_sync_notes() {
-            let n = json!({ "title": format!("Your edits are in {clone}"), "body": "Herdr's own layouts and mods can't be changed: clone one to make it yours.", "level": "info", "timeout": 12000 });
+            let n = json!({ "title": format!("Your edits are in {clone}"), "body": "Your edited layout was preserved separately from the app-provided layout.", "level": "info", "timeout": 12000 });
             self.open_overlay(mods::new_overlay_id(), json!({ "kind": "toast", "notification": n }), window, cx);
         }
+    }
+
+    fn show_mod_updates(&mut self, name: Option<&str>, window: &mut Window, cx: &mut Context<Self>) {
+        let mut updates = match mods::updates::pending(&mods::app_dir()) {
+            Ok(updates) => updates,
+            Err(error) => { self.command_error("Panel Updates", &error.to_string(), window, cx); return; }
+        };
+        if let Some(name) = name { updates.retain(|u| u["name"] == name); }
+        for update in &mut updates {
+            let id = update["name"].as_str().unwrap();
+            let label = self.folders.get(id).map(|f| f.hint.label(id)).unwrap_or_else(|| id.into());
+            update["title"] = json!(label);
+        }
+        self.close_overlay("mod-updates", window, cx);
+        self.open_overlay("mod-updates".into(), json!({"mod":"frame-mod-updates","kind":"dialog",
+            "width":1100,"height":0.85,"props":{"updates":updates}}), window, cx);
     }
 
     /// Writes the clicks, with the file they were made on (so a later change
@@ -1281,6 +1302,8 @@ impl AppWindow {
     fn visible(&self) -> (Vec<(String, String)>, Vec<(String, Instance)>) {
         let mut terms = Vec::new();
         let mut mods = Vec::new();
+        #[cfg(target_os = "macos")]
+        if let Some(controls) = self.titlebar_controls_mod() { mods.push(controls); }
         let visit = |n: &Node, terms: &mut Vec<(String, String)>, mods: &mut Vec<(String, Instance)>| match n.content() {
             Some(Content::Terminal { terminal }) => terms.push((n.id.clone(), terminal.clone())),
             Some(Content::Mod { name, props }) => mods.push((n.id.clone(), Instance::new(name.clone(), props.clone()))),
@@ -1367,6 +1390,8 @@ impl AppWindow {
     /// tab (zoomed or not shown), and the overlays.
     fn owned_mods(&self) -> HashMap<String, Instance> {
         let mut out = HashMap::new();
+        #[cfg(target_os = "macos")]
+        if let Some((slot, instance)) = self.titlebar_controls_mod() { out.insert(slot, instance); }
         let inst = |name: &String, props: &Value| Instance::new(name.clone(), props.clone());
         for n in self.chrome.walk() {
             if let Some(Content::Mod { name, props }) = n.content() {
@@ -3107,6 +3132,24 @@ impl AppWindow {
             self.answer(result);
             return;
         }
+        // Workspace visibility must survive projection in the same transaction.
+        // Otherwise mods re-hide a dock a frame after a panel action reveals it.
+        if matches!(name, "layout.toggle" | "layout.show" | "layout.hide")
+            && let Some(edge) = Self::arg(a, "id").and_then(|id| id.strip_prefix("@workspace/zone/"))
+            && let Some(zone) = self.workspace.as_ref().and_then(|s| s.engine.document().zones.iter().find(|z| z.edge.name() == edge))
+        {
+            let command = panel_workspace::Command::HideZone {
+                edge: zone.edge,
+                hidden: match name { "layout.toggle" => !zone.hidden, "layout.hide" => true, _ => false },
+            };
+            let transaction = panel_workspace::Transaction {
+                expected_revision: self.workspace.as_ref().unwrap().engine.revision(),
+                commands: vec![command],
+            };
+            let result = self.workspace_command("workspace.apply", &json!({"transaction":transaction}), window, cx);
+            self.answer(result);
+            return;
+        }
         if name == "layout.select" && self.workspace.as_ref().is_some_and(|s|
             Self::arg(a, "stack").and_then(|id| s.engine.document().group(id)).is_some()) {
             let group = self.workspace.as_ref().unwrap().engine.document().group(Self::arg(a,"stack").unwrap()).unwrap();
@@ -3493,6 +3536,23 @@ impl AppWindow {
                     return self.fail(format!("cannot clone layout: {e}"));
                 }
                 self.switch_layout(Some(&to), window, cx);
+                return;
+            }
+            "mod.update" => {
+                let action = Self::arg(a, "action").unwrap_or("review");
+                if action == "review" {
+                    self.show_mod_updates(Self::arg(a, "name"), window, cx);
+                    return;
+                }
+                let name = Self::arg(a, "name").unwrap_or_default();
+                if let Err(error) = mods::updates::resolve(&mods::app_dir(), name, action,
+                    Self::arg(a, "version").unwrap_or_default(), Self::arg(a, "user_version")) {
+                    return self.fail(error.to_string());
+                }
+                if action == "use" {
+                    self.files_changed(vec![std::path::PathBuf::from(format!("mods/{name}/main.js"))], window, cx);
+                }
+                self.show_mod_updates(None, window, cx);
                 return;
             }
             "mod.clone" => {
@@ -5332,7 +5392,8 @@ impl Render for AppWindow {
             self.refresh_snapshot_mods(cx);
         }
         let focused = self.focused_path(window, cx);
-        let tree = self.render_node(&self.chrome, &focused, None, cx);
+        let drag_layout = self.workspace_drag_layout();
+        let tree = self.render_node(drag_layout.as_ref().unwrap_or(&self.chrome), &focused, None, cx);
         let tree = self.window_frame(tree, window, cx);
         let overlays = self.render_overlays(window.viewport_size(), window.window_handle(), cx);
         let tracker = self.float_tracker(cx);
@@ -6096,6 +6157,50 @@ mod tests {
         let (view, cx) = cx.add_window_view(|window, cx| super::AppWindow::with_file_events(crate::hc::offline(), requests, Some(crate::files::FileEvents::for_test(home.clone())), window, cx));
         assert_eq!(view.update(cx, |this, _| this.layout_name.clone()), "test");
         (view, cx)
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn macos_fullscreen_reclaims_button_strip() {
+        in_own_process("macos_fullscreen_frame_geometry");
+    }
+
+    #[cfg(target_os = "macos")]
+    #[gpui::test]
+    fn macos_fullscreen_frame_geometry(cx: &mut gpui::TestAppContext) {
+        use std::{cell::Cell, rc::Rc};
+        if !running_alone("macos_fullscreen_frame_geometry") { return; }
+        let (view, cx) = open_window(cx, "unused", "", serde_json::json!({
+            "id": "body", "type": "column", "titlebar": "system", "children": []
+        }));
+        for (fullscreen, top) in [(false, 28.), (true, 0.), (false, 28.)] {
+            let bounds = Rc::new(Cell::new(gpui::Bounds::default()));
+            let observed = bounds.clone();
+            cx.update(|window, _| {
+                if window.is_fullscreen() != fullscreen { window.toggle_fullscreen(); }
+            });
+            cx.draw(point(px(0.), px(0.)), size(px(800.), px(600.)), |window, cx| {
+                view.update(cx, |this, cx| {
+                    let content = div().size_full().child(gpui::canvas(
+                        move |bounds, _, _| observed.set(bounds), |_, _, _, _| {}
+                    ).size_full()).into_any_element();
+                    this.window_frame(content, window, cx)
+                })
+            });
+            assert_eq!(bounds.get().origin.y, px(top), "fullscreen={fullscreen}");
+            assert_eq!(bounds.get().size.height, px(600. - top));
+        }
+        view.update(cx, |this, _| {
+            this.workspace = Some(crate::workspace::Session::load(
+                crate::mods::app_dir().join("workspaces/titlebar-test.json")
+            ).unwrap());
+            let (slot, instance) = this.titlebar_controls_mod().unwrap();
+            assert_eq!(instance.props, serde_json::json!({"windowControls":true}));
+            assert!(this.visible().1.iter().any(|(id, _)| id == &slot));
+            assert!(this.owned_mods().contains_key(&slot));
+            this.chrome.titlebar = Some(crate::layout::Titlebar::Layout);
+            assert!(this.titlebar_controls_mod().is_none());
+        });
     }
 
     /// A mod whose every version keeps `mib` MiB alive at module scope, in

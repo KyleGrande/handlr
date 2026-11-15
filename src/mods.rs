@@ -21,6 +21,7 @@ include!(concat!(env!("OUT_DIR"), "/frame_mods.rs"));
 mod render_tests;
 #[cfg(test)]
 mod lifecycle_tests;
+pub(crate) mod updates;
 
 /// The frame's own mods (welcome, ...): the app's, not the person's. Written
 /// from the binary on every start, so no edit or broken mod can break them.
@@ -60,7 +61,7 @@ pub fn mods_dir() -> PathBuf {
 const AGENTS_MD: &str = include_str!("../defaults/AGENTS.md");
 
 /// Writes the agent guide and API types, and installs or updates the default
-/// mods. Shipped mods are replaced whole; edits are first moved to a clone.
+/// mods. Edited bundled mods stay active and become user-owned.
 pub fn write_workspace() -> std::io::Result<()> {
     let dir = app_dir();
     std::fs::create_dir_all(mods_dir())?;
@@ -97,42 +98,7 @@ fn edited_name(parent: &Path, name: &str, suffix: &str) -> String {
 }
 
 fn sync_defaults(mods: &Path, installed_path: &Path, shipped_mods: &[(&str, &[u8])]) -> std::io::Result<()> {
-    let text = std::fs::read_to_string(installed_path).unwrap_or_default();
-    let mut installed: Installed = serde_json::from_str(&text).unwrap_or_default();
-    let names: std::collections::BTreeSet<&str> = shipped_mods.iter().filter_map(|(p, _)| p.split('/').next()).collect();
-    let dropped: Vec<String> = installed.keys().filter(|n| !n.starts_with("layout:") && !names.contains(n.as_str())).cloned().collect();
-    for name in dropped {
-        let target = mods.join(&name);
-        if installed.get(&name).is_some_and(|was| target.exists() && as_shipped(&target, was)) {
-            std::fs::remove_dir_all(&target)?;
-        }
-        installed.remove(&name);
-    }
-    for name in names {
-        let target = mods.join(name);
-        let shipped: Files = shipped_mods.iter()
-            .filter_map(|(p, bytes)| Some((p.strip_prefix(&format!("{name}/"))?.to_owned(), fingerprint(bytes))))
-            .collect();
-        if installed.get(name) == Some(&shipped) && target.exists() && as_shipped(&target, &shipped) {
-            continue;
-        }
-        if target.exists() {
-            if !as_shipped(&target, installed.get(name).unwrap_or(&shipped)) {
-                let clone = edited_name(mods, name, "");
-                std::fs::rename(&target, mods.join(&clone))?;
-                edited_note(&clone);
-            } else {
-                std::fs::remove_dir_all(&target)?;
-            }
-        }
-        for (path, bytes) in shipped_mods.iter().filter(|(p, _)| p.starts_with(&format!("{name}/"))) {
-            let file = mods.join(path);
-            std::fs::create_dir_all(file.parent().unwrap())?;
-            std::fs::write(&file, bytes)?;
-        }
-        installed.insert(name.to_owned(), shipped);
-    }
-    write_if_changed(installed_path, serde_json::to_string_pretty(&installed).unwrap() + "\n")
+    updates::sync(mods, installed_path, shipped_mods)
 }
 
 pub fn sync_layouts(home: &Path, layouts: &[(&str, &str)]) -> std::io::Result<()> {
@@ -1677,7 +1643,7 @@ mod tests {
     }
 
     #[test]
-    fn default_mods_restore_shipped_and_move_edits_to_clones() {
+    fn default_mods_preserve_user_versions_and_offer_bundled_updates() {
         let root = std::env::temp_dir().join(format!("herdr-app-sync-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
         let (mods, record) = (root.join("mods"), root.join("installed.json"));
@@ -1696,8 +1662,9 @@ mod tests {
         sync_defaults(&mods, &record, v2).unwrap();
         assert_eq!(read("a/main.js"), "a2", "untouched mods update");
         assert!(!mods.join("a/old.js").exists(), "files the update dropped go");
-        assert_eq!(read("b/main.js"), "b2", "edited mods are restored");
-        assert_eq!(read("b-edited/main.js"), "mine", "edits become a clone");
+        assert_eq!(read("b/main.js"), "mine", "user version stays active");
+        assert!(!mods.join("b-edited").exists(), "no backup mods are created");
+        assert_eq!(updates::pending(&root).unwrap().len(), 1);
         assert_eq!(read("c/main.js"), "c2", "deleted mods are restored");
         std::fs::write(mods.join("b/main.js"), "changed again").unwrap();
 
@@ -1710,7 +1677,6 @@ mod tests {
         sync_defaults(&mods, &record, v4).unwrap();
         assert!(!mods.join("a").exists(), "untouched dropped defaults go");
         assert_eq!(read("b/main.js"), "changed again", "edited dropped defaults stay");
-        assert_eq!(read("b-edited/main.js"), "mine", "clones stay untouched");
         assert_eq!(read("d/notes.md"), "my notes", "a dropped default with an added file stays");
 
         std::fs::remove_dir_all(&root).unwrap();

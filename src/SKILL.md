@@ -144,15 +144,32 @@ the screen.
 
 ## Move local workspace panels
 
+Native dock visibility is saved with the workspace. `layout.hide`,
+`layout.show` and `layout.toggle` accept `@workspace/zone/<edge>`; opening a
+panel through `workspace.open` reveals its dock without resetting other docks.
+Dropping a panel back into the same position leaves the layout unchanged.
+
+Handlr development checkouts provide `handlr/scripts/dev-build-status.mjs` and
+`cd handlr && npm run dev:tools` to configure build status and explicit Rebuild & reopen / Reopen buttons in
+Rigs. The status distinguishes changed build inputs from a current installation
+that needs reopening. Builds and relaunches run only on explicit action.
+
 In an opt-in panel workspace, drag the centered six-dot grip in a section header to move that
 section. Drag a view tab to move the view, or the centered six-dot grip in the tab
-row to move the whole group. A translucent area highlight shows the destination, matching terminal dragging. Window
+row to move the whole group. A translucent area highlight shows the panel's resulting
+position and size, including its share of an occupied dock. Window
 edges accept new groups, including hidden top/bottom zones. Horizontal drops
 show separate **full width** and **center** targets: the outer target spans the
 window, while the inner target only spans the terminal column and preserves the
 side panes' full height. Engine edge values are `top`/`bottom` for full width and
 `top_center`/`bottom_center` for center-only docks. Dropping a section
 on a view tab inserts it there; dropping a group on a view tab merges its views.
+To make a Tab Group from standalone or stacked panels, drag a section's grip
+onto the **+ Tab Group** target beside another panel's title. Those two panels
+become separate tabs; other stacked panels stay in their existing views.
+Cmd+Shift+P → **Create Tab Group…** offers the same operation: choose the first
+panel, then the second. Escape cancels. Grouping is one undoable workspace
+transaction and persists across restart.
 Hover a panel header for float/redock, expand/restore and close buttons on the right.
 Mod actions sit beside the title on the left and appear on hover.
 Double-click its title or a view tab to rename; Enter saves, Escape cancels.
@@ -189,8 +206,9 @@ those files or the generated guide. The app rewrites them on start.
   `"focus"` from `nextCommand()` and focuses its own keyboard handle.
 - A mod's `watchFolder(dir)` promise has `cancel()`; cancel it when the folder
   is no longer shown. It resolves with `[]` and releases only that call.
-- Shipped mods belong to Herdr: duplicate with `mod.clone` before editing.
-  Shipped layouts likewise use `layout.clone` for a personal copy.
+- Editing a bundled mod makes its active copy user-owned; startup keeps it
+  in place. Use `mod.clone` only for an additional independent variant.
+  Shipped layouts still use `layout.clone` for a personal copy.
   Discover required arguments with `herdr-app commands`.
 - Save to reload. A broken save keeps the old version running and reports
   an error in `status`; a still-working screen is not proof the edit worked.
@@ -240,7 +258,61 @@ In a panel workspace, use `do workspace.open '{"name":"files"}'` to add or revea
 
 Closed workspace panels remember their last dock, group/view, order and size across restart. `workspace.open` restores that placement before falling back to the mod default.
 
+Settings → Look → Seamless removes panel outlines and blends panel layers into the
+app background, preserving the app canvas and terminal background colors.
+Panel shells and title rows use the `surface` color so seamless mode clears
+their own fills as well as the surrounding frame.
+The Settings mod manages this color preset and restores previous colors when disabled.
+In macOS fullscreen, content uses the height normally reserved for window buttons.
+
+In macOS panel workspaces, left/top/bottom/right controls sit on the window-button
+row, moving into the terminal tab bar only in fullscreen. They hide and restore
+docked panels without closing them or changing sizes or placement. Top/bottom
+include the center-only docks. **Terminal only** hides all docked panels;
+**Restore panels** restores the previous visibility. The Tabs mod remembers
+this per layout across restart. Detached floating windows stay independent.
+Settings → Look → **Hide panel buttons** hides the dock and terminal-only controls
+in both locations, preserving panel visibility and the restore snapshot.
+
 For panel workspaces, `no_headers: true` in settings.json (Settings → Look → No Headers)
 hides title rows and their controls in docked and floating panels. Group tabs remain;
 turn the setting off to restore headers and drag handles. This changes presentation
 only and preserves saved panel collapse state.
+
+Dragging an active panel-group tab temporarily reveals a neighboring tab.
+Drop on **Stack Panels** beside its panel title to show both panels together,
+or **New Pane** to detach the dragged tab into its own pane. Dropping on a
+tab label still keeps/reorders tabs. Escape cancels and restores the original
+visible tab; stacking and detaching are saved as undoable workspace changes.
+
+Dragging the only panel in the active tab also temporarily reveals a neighboring
+tab. Drop the panel into that visible stack or elsewhere; Escape restores the
+original tab. Dragging one panel out of a multi-panel stack keeps that tab shown.
+
+The command palette hides unused automatic `<shipped-mod>-edited[-N]` backups.
+Backups already registered in the workspace remain openable. When multiple
+mods share a display title, Open entries distinguish Built-in and Personal
+versions (and identify individual copies when needed); the underlying mod IDs
+and workspace bindings remain unchanged.
+
+## Bundled panel updates
+
+`mod.update` opens Review Panel Updates. Customized bundled panels remain active
+under the same mod/panel IDs. The latest app-provided files are separate under
+`app-provided/mods/`. A later bundled content change offers Keep Mine, manual
+side-by-side review/merge, or Use Update. Keep Mine dismisses that update only;
+a later content change is offered again. Use Update replaces the user version
+and returns the mod to app ownership. Its arguments are `name`, `action`
+(`review`, `keep`, `use`), `version` and `user_version`; use the UI's current
+fingerprints for destructive replacement, which rejects stale reviews or new
+external edits. No automatic `-edited` mod clones are made.
+
+Drag a panel from a stack onto an existing panel-group tab label to add it as
+its own tab. Drop near the outside edges of a pane to insert a separate pane:
+left/right in top and bottom docks, above/below in side docks. The outer top
+and bottom window bands insert at the pointer's horizontal position, so a
+right-hand pane can be moved before the left-hand pane. These moves support undo.
+
+While dragging, the outer dock drop bands span 40px on all four sides,
+center-only top/bottom bands span 96px, and neighboring pane insertion bands
+span up to 48px. Dock guides appear only during the drag.

@@ -172,7 +172,7 @@ pub fn group_node_with_headers(
                 }
             };
             let embedded = embedded_header_with(panel, headers) && !section.collapsed;
-            sections.push(json!({"id":section.id, "type":"column", "resizable":false,"background":"background",
+            sections.push(json!({"id":section.id, "type":"column", "resizable":false,"background":"surface",
                 "radius":10,"border":if embedded {Value::Null} else {json!({"width":1,"color":"border"})},
                 "size": if section.collapsed { json!({"px":SECTION_HEADER_HEIGHT}) } else { json!({"weight":section.weight}) },
                 "min":if section.collapsed {SECTION_HEADER_HEIGHT} else {SECTION_HEADER_HEIGHT+section.min_extent},

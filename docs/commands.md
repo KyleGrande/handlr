@@ -491,6 +491,17 @@ Duplicate a layout as <name>-copy (or as), then show it.
 | `name` | yes |
 | `as` | no |
 
+## `mod.update`
+
+Review bundled panel updates; keep your version or use an app-provided update without changing panel identities.
+
+| Argument | Required |
+|---|---|
+| `name` | no |
+| `action` | no |
+| `version` | no |
+| `user_version` | no |
+
 ## `mod.clone`
 
 Duplicate a mod as <name>-copy (or as).

@@ -5,8 +5,9 @@
 This folder is **the Herdr app's whole interface, as files**. The Herdr app
 is a desktop app for terminals and coding agents, and it redraws itself from
 these files while it runs: change a layout, a key or a panel here and the
-window follows within a second. Shipped layouts and mods are Herdr's:
-change settings for look, or clone before editing structure/code (see Layouts).
+window follows within a second. Bundled panels become user-owned when edited
+and keep their paths and workspace identities. Shipped layouts still require
+a clone for structure/code changes (see Layouts).
 When someone asks for something ("a sidebar
 of my PRs", "give ctrl+1 back to the shell", "make it warmer", "move the
 agents list to the right"), you do it by editing these files or writing a
@@ -92,6 +93,11 @@ If `shared.json` is invalid, Herdr logs a warning and keeps it as
 
 ## The model: spaces, tabs, terminals
 
+The **Machines** panel (`workspace.open {name:"machines"}`) shows this computer
+and saved remote machines with connection status, space and terminal counts.
+Expand a machine to select or create spaces. Its footer opens Add machine and
+Settings → Machines. It refreshes every five seconds and omits temporary machines.
+
 Every layout shows the same world; a layout may show less, never a
 different one. Each machine keeps its spaces, tabs and splits in its core's
 `herdr-app` document. Connected screens share that layout and live terminals,
@@ -169,6 +175,12 @@ the highlighted line shows where it will land.
 
 ## Local panel workspaces (opt-in development feature)
 
+In a Handlr development checkout, `cd handlr && npm run dev:tools` configures
+build status and Rebuild & reopen / Reopen buttons in Rigs. `npm run dev:status` compares
+source contents, the installed Dev bundle and running processes. Rebuild once
+to establish tracking for older bundles. Rigs actions run only on an explicit
+click and preserve Core and its terminals; no separate status mod is installed.
+
 `workspace.activate {name?, document?}` creates or selects a separate personal
 layout with a `workspace` document name on its root. Existing layouts stay intact.
 On macOS, panel workspaces use a 22px draggable title bar with native window
@@ -205,7 +217,25 @@ window edge, or **Top/Bottom · center** just inside the central column.
 The same edge values work with `new_group`, `move_group`, `resize_zone` and
 `hide_zone`. Center docks are created on first use in older four-zone documents.
 They resize and persist independently of the outer docks.
-Translucent highlights show the receiving area. Escape cancels. Panel headers
+In macOS panel workspaces, the window-button strip has controls to hide/show
+each occupied dock (left, top, bottom, right). In fullscreen the controls move
+into the terminal tab bar. Top/bottom buttons include outer and center-only docks.
+Settings → Look → **Hide panel buttons** hides these controls in both locations
+without changing panel visibility. It defaults off and persists in the mod-owned
+`shared("tabs.hide-panel-buttons")` preference; turn it off to restore the buttons.
+**Terminal only** hides all docked side panels; click **Restore panels** to
+restore exactly the visibility from before, without closing panels or changing
+their sizes, tabs, or placement. A side button exits terminal-only mode and
+changes that side, leaving the others as-is. Detached floating windows remain
+independent. Native dock visibility persists in the workspace document;
+`layout.hide`, `layout.show` and `layout.toggle` on `@workspace/zone/<edge>`
+use the existing `hide_zone` transaction. Opening a panel reveals its dock.
+The Tabs mod owns the restore snapshot and legacy-layout visibility in
+`shared("tabs.dock-visibility")`, per layout (migrated from its
+`dock-visibility` localStorage). Existing native visibility preferences migrate
+once; they are not replayed after panel actions.
+Translucent highlights show the panel's resulting position and size: only its
+share of an occupied dock or stack is shaded. Escape cancels. Panel headers
 show float/redock, expand/restore and close controls on the right on hover.
 Mod-specific controls sit beside the title on the left and appear on hover. Close hides a panel and keeps its data;
 there are no collapse controls. Expand enlarges the current view.
@@ -269,7 +299,21 @@ parentheses and apostrophes, and preserves Unicode file and folder names
 (including Chinese). Directory links expand as folders; their contents load
 only when expanded.
 
-**Herdr's own layouts and mods are read-only.** They are replaced whole
+**Bundled panels have an app-provided version and a user version.** Editing
+`mods/<name>/` makes the active copy user-owned. It stays active across restarts;
+its path, state and panel placement do not change. The latest app-provided files
+live in `app-provided/mods/<name>/`, outside the installed mod list.
+
+When a later app update changes a customized panel, Cmd+Shift+P →
+**Review Panel Updates** (`mod.update`) offers **Keep Mine**, side-by-side
+review/manual merge, and **Use Update**. Save merged text into the user version
+before choosing Keep Mine. Use Update replaces the user files and returns the
+panel to app ownership. Unedited bundled panels update automatically. Only
+actual app-provided content changes produce an update offer; restarting alone
+does not. Ownership and pending decisions are kept in `mod-ownership.json`.
+Do not edit that bookkeeping file. No `-edited` mod copies are generated.
+
+**Herdr's shipped layouts are read-only.** They are replaced whole
 on every start. Use settings.json for look (fonts, sizes, theme, colors,
 sounds), where the layout leaves them unset. Herdr (main) has no look of
 its own, so your settings decide it; Herdr 98 and Terminals bring their own
@@ -286,13 +330,14 @@ The default clone name is `<name>-copy`; an existing name is refused.
 or Duplicate mod. Clones are yours and never updated. They record
 `cloned_from: {name, version}` and copy the layout and its clicks as-is,
 including its look. A cloned layout keeps its mod references:
-clone a mod too and point your layout's `content.mod` to it to change code.
+clone a mod too and point your layout's `content.mod` to it when you want an
+additional independent variant. Editing the existing mod in place is also supported.
 Mod clones rewrite their own `mods/<name>/` asset paths and self-opening
 overlay names to the new name.
 
-If you edit a shipped file anyway, the next start moves it to
-`<name>-edited` (a mod folder or layout JSON; a number is added if taken),
-copies its layout clicks, restores Herdr's version and shows a toast.
+If you edit a shipped layout file anyway, the next start moves it to
+`<name>-edited.json` (a number is added if taken), copies its layout clicks,
+restores the app-provided layout and shows a toast. Bundled mod edits stay in place.
 No-longer-shipped things go if
 untouched, otherwise they stay.
 
@@ -344,6 +389,8 @@ Properties any node can have:
   Windows), the bar draws them with `window.minimize`, `window.maximize`, `window.close`.
   Windows' shipped tab bar and system strip use vector window icons, with a
   restore icon when maximized, rather than font glyphs.
+  In macOS fullscreen, the system button strip disappears and the layout uses
+  the reclaimed height.
 - Root only: `"window_blur": true` blurs what's behind the window where the
   system can (macOS, Windows, some Wayland compositors). Colors with alpha
   then show the desktop through frosted glass: make `background` and
@@ -790,6 +837,13 @@ What's about the user, never a look:
 
 - `zoom` scales the whole app: terminals, mods, the layout's px sizes
   (0.5 to 3; the zoom keys change it). Write sizes as designed at zoom 1.
+- `seamless`: Settings → Look → Seamless hides panel outlines and blends panel layers
+  using transparent `colors.chrome`, `colors.surface`, and `colors.border` overrides.
+  It preserves the app canvas and background colors. Panel shells and title rows
+  use `surface` (rather than the terminal `background`) so their fills become
+  transparent too; keep popup, selection and input colors for their controls.
+  The Settings mod owns this preset and saves previous overrides in `seamless_colors`;
+  turning it off restores them. Theme and appearance changes continue to work.
 - `no_headers`: `true` enables Settings → Look → No Headers for panel workspaces.
   Panel title rows and their controls disappear, reclaiming their height; group
   navigation tabs remain. Applies live to docked and floating panels. Turn it off
@@ -1004,8 +1058,8 @@ has 124 programs (agents, editors, runtimes, tools, databases, infra);
   `<worktrees.directory>/<repo>/<branch>` on the space's machine (default
   `~/.herdr/worktrees`; see settings.json above); the
   `spaces` sidebar nests worktree spaces under their repo's and shows each
-  space's repo, branch, ahead/behind and uncommitted changes). Shipped mods
-  are Herdr's; duplicate with `mod.clone` before editing.
+  space's repo, branch, ahead/behind and uncommitted changes). Editing bundled
+  mods makes them user-owned; `mod.clone` creates an additional independent variant.
 
 ### Check before you finish
 
@@ -1249,3 +1303,41 @@ Cmd+Shift+P (the command palette) includes Open entries for installed panels and
 Cmd+P also lists currently placed workspace panels by their display titles; selecting one runs `workspace.reveal {panel}`. It never reopens a closed panel. Use Cmd+Shift+P to open or restore one.
 
 Closing a workspace panel saves its last placement in `closed_panels` in the workspace document. `workspace.open {name}` restores that placement (dock, group/view, order and weights), including after restart; an existing destination is reused. The mod default is used only when no saved placement exists. Explicit `show_panel` placement replaces the saved destination.
+
+Create a Tab Group by dragging a panel's six-dot grip onto the **+ Tab Group**
+target beside another panel title. Cmd+Shift+P → **Create Tab Group…** also
+lets the user choose two open docked panels. Each panel becomes a separate
+tab; other stacked panels retain their views. This uses existing workspace
+transactions, preserves panel identities and state, supports undo, and persists
+across restart. Escape cancels the palette or drag before it is applied.
+
+While dragging a panel-group tab, the neighboring tab is temporarily shown.
+The **Stack Panels** target beside a panel title merges the dragged tab's
+panels into the visible stack; **New Pane** detaches it. Tab labels keep/reorder
+tabs. Escape restores the original selection without saving the preview.
+
+Dragging the only panel in the active tab also temporarily reveals a neighboring
+tab. Drop the panel into that visible stack or elsewhere; Escape restores the
+original tab. Dragging one panel out of a multi-panel stack keeps that tab shown.
+
+Packaged Handlr keeps configuration and personal mods in `~/.config/handlr/`
+(`$XDG_CONFIG_HOME/handlr` when set); Handlr Dev uses `~/.config/handlr-dev/`.
+`HERDR_APP_HOME` overrides the public launcher default. Former Application Support
+homes are migrated with compatibility links so existing running windows keep
+access to the same files. Herdr's own `~/.config/herdr-app/` stays separate.
+
+The command palette hides unused automatic `<shipped-mod>-edited[-N]` backups.
+Backups already registered in the workspace remain openable. When multiple
+mods share a display title, Open entries distinguish Built-in and Personal
+versions (and identify individual copies when needed); the underlying mod IDs
+and workspace bindings remain unchanged.
+
+Drag a panel from a stack onto an existing panel-group tab label to add it as
+its own tab. Drop near the outside edges of a pane to insert a separate pane:
+left/right in top and bottom docks, above/below in side docks. The outer top
+and bottom window bands insert at the pointer's horizontal position, so a
+right-hand pane can be moved before the left-hand pane. These moves support undo.
+
+While dragging, the outer dock drop bands span 40px on all four sides,
+center-only top/bottom bands span 96px, and neighboring pane insertion bands
+span up to 48px. Dock guides appear only during the drag.

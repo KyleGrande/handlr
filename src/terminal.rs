@@ -81,6 +81,8 @@ pub enum TerminalEvent {
 
 /// What the canvas closures need, shared outside the entity so prepaint can resize.
 struct Grid {
+    #[cfg(test)]
+    resize_history: Vec<(u16, u16)>,
     vt: Vt,
     core: Arc<Core>,
     channel: Option<u32>,
@@ -227,6 +229,8 @@ impl Grid {
         if (cols, rows) == (self.vt.cols, self.vt.rows) && dev == self.vt_cell {
             return;
         }
+        #[cfg(test)]
+        self.resize_history.push((cols, rows));
         self.vt.resize(cols, rows, dev.0, dev.1);
         self.vt_cell = dev;
         if let Some(chan) = self.channel {
@@ -278,6 +282,8 @@ impl TerminalView {
             link: None,
             right_click_to_program: false,
             grid: Rc::new(RefCell::new(Grid {
+                #[cfg(test)]
+                resize_history: Vec::new(),
                 vt: Vt::new(size_hint.0.max(2), size_hint.1.max(1)),
                 core: core.clone(),
                 channel: None,
@@ -475,6 +481,11 @@ impl TerminalView {
             self.title = shown.into_owned();
             cx.emit(TerminalEvent::TitleChanged);
         }
+    }
+
+    #[cfg(test)]
+    pub(crate) fn take_resize_history(&self) -> Vec<(u16, u16)> {
+        std::mem::take(&mut self.grid.borrow_mut().resize_history)
     }
 
     #[cfg(test)]
