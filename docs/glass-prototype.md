@@ -5,6 +5,12 @@ The Settings control is implemented in `defaults/frame/settings/main.js`.
 `glass.json` file. A copy runs inside bundled tabs so theme/accessibility changes
 continue to update the material after Settings closes. No native settings,
 commands, layout-schema fields, mod APIs or Core state were added.
+The native workspace adapter now carries the file root's existing look and
+`window_blur` onto the displayed wrapper root, including maximized groups.
+Previously it kept those fields only on the nested center, so root material and
+blur changes had no effect in Handlr. This restores existing layout behavior
+without adding native fields. A regression test covers normal/maximized layouts
+and reverting to opaque defaults.
 
 Settings → Look → Glass starts off. It is available on macOS layouts using
 bundled tabs, including Handlr. Shipped layouts are copied before enabling;
@@ -132,7 +138,8 @@ regression coverage. Tests cover palette preservation, independent edits/deletio
 appearance refresh, opaque fallback, Seamless transitions, restoring all layouts,
 guarded-write conflicts, journal recovery, prototype isolation, platform gating,
 valid workspace references and synchronized module copies. Native module checks
-pass for Settings and tabs. The optimized macOS app build passes.
+pass for Settings and tabs. The optimized macOS app build and all 44 native
+layout/adapter tests pass, including the root-material regression.
 
 Quit only the scratch window when done; its Core/terminal lifetime is independent.
 Never stop or restart another app/Core to test the material.

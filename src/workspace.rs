@@ -230,9 +230,17 @@ pub fn project_with_headers(
             }
         }
     }
+    // The file describes the window root before docking wraps its center.
+    // Keep its existing look and native blur on the displayed root as well:
+    // Settings and apply_blur read that root, not the nested terminal center.
+    let inherit_look = |mut root: Node| {
+        root.look = center.look.clone();
+        root.window_blur = center.window_blur;
+        root
+    };
     if let Some(id) = &document.maximized_group_id {
         return node(json!({"id":format!("{PREFIX}root"),"type":"column","background":"canvas","padding":PANEL_GAP,
-            "children":[group_node_with_headers(document,id,headers)?]}));
+            "children":[group_node_with_headers(document,id,headers)?]})).map(inherit_look);
     }
     let mut zones = std::collections::BTreeMap::new();
     for zone in &document.zones {
@@ -268,7 +276,7 @@ pub fn project_with_headers(
                         "children":[zones[&Edge::TopCenter],center,zones[&Edge::BottomCenter]]},
                     zones[&Edge::Right]]},
             zones[&Edge::Bottom]]}),
-    )
+    ).map(inherit_look)
 }
 
 pub fn default_center() -> Node {
