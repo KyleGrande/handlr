@@ -175,6 +175,21 @@ the highlighted line shows where it will land.
 
 ## Local panel workspaces (opt-in development feature)
 
+**Settings → Mods** lists installed mods, with Toolbox, Context, Rigs and Ticket
+first when installed. Open shows a panel in the current workspace (or as an
+overlay in a regular layout). Layout components are listed without an Open
+action. Refresh rereads this app home; Review panel updates opens the existing
+review flow for customized bundled panels. **In workspace** enables a panel
+with `workspace.open`, or disables all of that mod’s open panel instances in
+one revision-checked `hide_panel` transaction. Disabling preserves panel
+identities, stored data and running work; it does not uninstall a mod. Re-enable
+restores an existing panel identity. These controls apply to panel workspaces;
+layout components and regular layouts do not get a workspace toggle. Discovery
+uses bounded read-only commands and reports read errors without discarding the
+last loaded mod list. Workspace state refreshes while the section is open;
+an unavailable state never appears as disabled. Open it directly with
+`app.settings {section:"mods"}`.
+
 In a Handlr development checkout, `cd handlr && npm run dev:tools` configures
 build status and Rebuild & reopen / Reopen buttons using `mods/rigs` in that
 checkout. The optional Toolbox, Context, Rigs and Ticket source packages live
