@@ -369,10 +369,15 @@ fn resolve(p: &Palette, overrides: &BTreeMap<String, String>) -> Theme {
 pub struct Person {
     /// How big the whole app is drawn (1 = as designed). The zoom keys change it.
     pub zoom: f32,
+    /// Hide panel title rows in local panel workspaces.
+    pub no_headers: bool,
     pub sounds: Sounds,
     /// The herdr-core to use, when it isn't where Herdr looks (core_bin.rs).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub core: Option<String>,
+    /// Handlr Core connection, applied to every child at the next app launch.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub core_session: Option<CoreSession>,
     /// Fonts for layouts that don't set their own.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub font: Option<String>,
@@ -418,6 +423,13 @@ pub struct Person {
     pub colors: BTreeMap<String, String>,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum CoreSession {
+    Own,
+    Shared,
+}
+
 #[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Appearance {
@@ -458,8 +470,10 @@ impl Default for Person {
     fn default() -> Self {
         Person {
             zoom: 1.0,
+            no_headers: false,
             sounds: Sounds::default(),
             core: None,
+            core_session: None,
             font: None,
             font_size: None,
             font_weight: None,
@@ -1080,7 +1094,7 @@ mod tests {
     /// settings.json key.
     #[test]
     fn the_guide_explains_every_setting() {
-        let all = Person { core: Some(String::new()), font: Some(String::new()), font_size: Some(1.0), font_weight: Some(400), ui_font: Some(String::new()), telemetry: false, clipboard_write: false, copy_on_select: false, appearance: Appearance::Light, theme: Some(crate::layout::ThemeChoice::One(String::new())), colors: [("text".into(), String::new())].into(), ..Person::default() };
+        let all = Person { core_session: Some(CoreSession::Own), core: Some(String::new()), font: Some(String::new()), font_size: Some(1.0), font_weight: Some(400), ui_font: Some(String::new()), telemetry: false, clipboard_write: false, copy_on_select: false, appearance: Appearance::Light, theme: Some(crate::layout::ThemeChoice::One(String::new())), colors: [("text".into(), String::new())].into(), ..Person::default() };
         let keys: Vec<String> = serde_json::to_value(&all).unwrap().as_object().unwrap().keys().cloned().collect();
         let guide = include_str!("../defaults/AGENTS.md");
         let section = guide.split("## The person").nth(1).and_then(|s| s.split("\n## ").next()).unwrap_or_default();

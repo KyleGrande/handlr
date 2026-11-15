@@ -1,6 +1,7 @@
 import { View, div, svg, image } from "gpui-kit";
 import { h_flex, ScrollHandle } from "gpui-base";
-import { spaces, panes, run, openOverlay, theme, window, shared, layout, settings } from "herdr";
+import { spaces, panes, run, openOverlay, theme, window, shared, setShared, layout, settings, props } from "herdr";
+import { startGlass } from "./glass.js";
 
 function find(node, id) {
   if (node?.id === id) return node;
@@ -9,6 +10,96 @@ function find(node, id) {
     if (found) return found;
   }
   return null;
+}
+
+// Native docks persist visibility with workspace transactions. This mod owns
+// the terminal-only restore snapshot and visibility for legacy layouts.
+class DockVisibility {
+  constructor() {
+    try { this.saved = JSON.parse(localStorage.getItem("dock-visibility") ?? "{}"); } catch { this.saved = {}; }
+    if (!this.saved || typeof this.saved !== "object" || Array.isArray(this.saved)) this.saved = {};
+    if (!shared("tabs.dock-visibility") && Object.keys(this.saved).length) setShared("tabs.dock-visibility", this.saved);
+  }
+  docks(root) {
+    return [
+      ["left", ["@workspace/zone/left", "sidebar"]],
+      ["top", ["@workspace/zone/top", "@workspace/zone/top_center"]],
+      ["bottom", ["@workspace/zone/bottom", "@workspace/zone/bottom_center"]],
+      ["right", ["@workspace/zone/right", "panel"]],
+    ].map(([edge, ids]) => ({ edge, nodes: ids.map(id => find(root, id)).filter(n => n && n.children?.length) }));
+  }
+  state(root) {
+    // The window strip and fullscreen tab bar are two copies of this mod.
+    this.saved = shared("tabs.dock-visibility") ?? this.saved;
+    const key = String(shared("layout") ?? root?.workspace ?? root?.id ?? "main");
+    const state = this.saved[key];
+    if (!state || typeof state !== "object" || !state.hidden || typeof state.hidden !== "object") {
+      this.saved[key] = { hidden: {}, restore: null };
+    }
+    return this.saved[key];
+  }
+  save() {
+    setShared("tabs.dock-visibility", this.saved);
+    localStorage.setItem("dock-visibility", JSON.stringify(this.saved));
+  }
+  sync(root) {
+    const state = this.state(root);
+    let changed = false;
+    for (const { nodes } of this.docks(root)) for (const node of nodes) {
+      const native = node.id.startsWith("@workspace/zone/");
+      if (native && state.workspaceVisibility) {
+        // Opening a panel deliberately reveals its dock. Replaying an old
+        // preference would hide it again and resize terminals twice.
+        continue;
+      }
+      if (state.restore && !(node.id in state.restore)) {
+        state.restore[node.id] = Boolean(node.hidden);
+        state.hidden[node.id] = true;
+        this.save();
+      }
+      const hidden = state.hidden[node.id];
+      if (typeof hidden === "boolean" && hidden !== Boolean(node.hidden)) run(hidden ? "layout.hide" : "layout.show", { id: node.id });
+    }
+    if (find(root, "@workspace/root") && !state.workspaceVisibility) {
+      // Preserve saved visibility from builds where it lived only in the mod.
+      state.workspaceVisibility = true;
+      changed = true;
+    }
+    if (changed) this.save();
+  }
+  toggle(root, edge) {
+    const state = this.state(root);
+    const nodes = this.docks(root).find(d => d.edge === edge)?.nodes ?? [];
+    const hidden = nodes.some(n => !n.hidden);
+    // A side button exits terminal-only mode, keeping the other sides as-is.
+    state.restore = null;
+    for (const node of nodes) {
+      state.hidden[node.id] = hidden;
+      run(hidden ? "layout.hide" : "layout.show", { id: node.id });
+    }
+    this.save();
+  }
+  terminalOnly(root) {
+    const state = this.state(root);
+    const nodes = this.docks(root).flatMap(d => d.nodes);
+    if (state.restore) {
+      for (const node of nodes) {
+        const hidden = state.restore[node.id] ?? Boolean(node.hidden);
+        state.hidden[node.id] = hidden;
+        run(hidden ? "layout.hide" : "layout.show", { id: node.id });
+      }
+      state.restore = null;
+    } else {
+      state.restore = Object.fromEntries(nodes.map(n => [n.id, Boolean(n.hidden)]));
+      for (const node of nodes) {
+        state.hidden[node.id] = true;
+        run("layout.hide", { id: node.id });
+      }
+      const terminal = panes().find(p => p.terminal && p.focused) ?? panes().find(p => p.terminal && spaces().some(s => s.active && s.tabs.some(t => t.active && t.id === p.tab)));
+      if (terminal) run("pane.focus", { pane: terminal.pane });
+    }
+    this.save();
+  }
 }
 
 // Same as the agents mod: drops a status glyph, keeps a leading bracket or quote.
@@ -28,7 +119,9 @@ function label(tab, lead) {
 }
 
 export default class Tabs extends View {
-  init() {
+  init(_props, cx) {
+    startGlass(cx);
+    this.dockVisibility = new DockVisibility();
     this.pressed = null;
     this.scroll = ScrollHandle.new();
     try { this.panels = JSON.parse(localStorage.getItem("panels") ?? "{}"); } catch { this.panels = {}; }
@@ -124,6 +217,23 @@ export default class Tabs extends View {
         .when(c.active, el => el.child(div().id(`close-${c.id}`).text_color(t.dim).on_mouse_down("left", stop).on_click((_e, cx) => { cx.stop_propagation(); run("tab.close", { id: c.id }); }).child(svg("mods/pane/close.svg").size(12))));
     };
     const root = layout(), sidebar = find(root, "sidebar"), w = window();
+    this.dockVisibility.sync(root);
+    const docks = this.dockVisibility.docks(root);
+    const terminalOnly = Boolean(this.dockVisibility.state(root).restore);
+    const hidePanelButtons = Boolean(shared("tabs.hide-panel-buttons"));
+    // Match native traffic-light geometry even when the workspace is zoomed.
+    const controlScale = props()?.windowControls ? 1 / settings().zoom : 1;
+    const dockButton = (id, icon, tip, on, action) => button(id, svg(`mods/tabs/${icon}.svg`).size(15 * controlScale), action)
+      .when(Boolean(props()?.windowControls), el => el.size(20 * controlScale))
+      .tooltip(tip).bg(on ? t.selected : "#00000000").text_color(on ? t.foreground : t.dim);
+    const controls = () => h_flex().id("dock-controls").h_full().gap(2 * controlScale).items_center()
+      .children(docks.filter(d => d.nodes.length).map(d => {
+        const visible = d.nodes.some(n => !n.hidden);
+        return dockButton(`dock-${d.edge}`, `dock-${d.edge}`, `${visible ? "Hide" : "Show"} ${d.edge} panels`, visible, () => this.dockVisibility.toggle(layout(), d.edge));
+      }))
+      .when(docks.some(d => d.nodes.length), el => el.child(dockButton("terminal-only", "terminal-only", terminalOnly ? "Restore panels" : "Terminal only", terminalOnly, () => this.dockVisibility.terminalOnly(layout()))));
+    if (props()?.windowControls) return h_flex().size_full().justify_end().pr(6 * controlScale)
+      .when(!hidePanelButtons, el => el.child(controls()));
     // Old saved rails and a dragged-narrow sidebar can be smaller than the window buttons.
     const lightsPadding = w?.platform === "macos" && w.titlebar === "none" && !w.fullscreen && root?.traffic_lights
       ? Math.max(10, (root.traffic_lights[0] + 64) / settings().zoom - (sidebar?.hidden ? 0 : sidebar?.size?.px ?? 0))
@@ -148,8 +258,9 @@ export default class Tabs extends View {
         .on_size_change((_size, cx) => { if (active >= 0) { this.scroll.scroll_to_item(active); cx.notify(); } })
         .children(shown.map(item)))
       .child(button("tab-new", "+", () => openOverlay({ mod: "new-menu", kind: "popup", width: 250, height: 512 })))
-      .when(enabled.includes("files"), el => el.child(panelButton("files", "Files", "mods/files/file.svg")))
-      .when(enabled.includes("changes"), el => el.child(panelButton("changes", "Changes", "mods/changes/changes.svg")))
+      .when(Boolean(panel) && enabled.includes("files"), el => el.child(panelButton("files", "Files", "mods/files/file.svg")))
+      .when(Boolean(panel) && enabled.includes("changes"), el => el.child(panelButton("changes", "Changes", "mods/changes/changes.svg")))
+      .when(!hidePanelButtons && (w?.fullscreen || w?.platform !== "macos" || w?.titlebar !== "system"), el => el.child(controls()))
       .when(w?.buttons, el => el.child(button("minimize", w.platform === "windows" ? svg("mods/tabs/win-min.svg").size(16) : "−", () => run("window.minimize")))
         .child(button("maximize", w.platform === "windows" ? svg(`mods/tabs/${w.maximized ? "win-restore" : "win-max"}.svg`).size(16) : "□", () => run("window.maximize")))
         .child(button("close-window", w.platform === "windows" ? svg("mods/tabs/win-close.svg").size(16) : svg("mods/pane/close.svg").size(13), () => run("window.close"))));

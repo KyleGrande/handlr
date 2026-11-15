@@ -1,0 +1,246 @@
+# Current verification — 2026-11-10
+
+## Focused versus all rig filtering
+
+- Focused is now the sidebar default. It uses the focused local pane/terminal CWD, falling back to the current space folder; the existing CLI checkout filter canonicalizes Git subdirectories. Options switch between Show all rigs and Show focused rigs and persist the preference. Focus changes request fresh status, hide stale-scope rows and reject late responses for old scopes. No saved definitions, mappings, reservations or processes are changed by filtering. Empty/no-local-folder/paused views have explicit hints.
+- Compared the installed Files/Changes location helpers and native render refresh pattern. Updated existing native fixture initialization to keep its synthetic all-rigs data deterministic without spawning CLI calls. Generated and synced the mod without tests, type/native checks or interactive focus-switch acceptance under the user's continuing preference to skip checks.
+
+## Context menu sizing
+
+- Removed the fixed content height that left blank space below rig/profile context menu items. Matched Herdr's native context-menu width (200px), padding (5px), row height (31px), corners (7px) and text size (12.8px), with intrinsic content height and bounded popup limits. Loading/error placeholders retain the same row height.
+- Generated and installed without tests/native checks or live UI verification, continuing the user's request to skip checks.
+
+## Rig and profile management
+
+- Added right-click rig menus and Preview Edit/Delete actions, an instance editor for name/profile/worktree mappings, a native profile JSON editor, and explicit deletion dialogs. Renaming retains identity/launches while running; material rig edits and definition deletion require stopped/reconciled ownership. Profile edits require stopped referencing rigs and reject incompatible mappings/stale revisions. Profile deletion refuses every canonical-file reference, including symlinks. Rig deletion keeps profile/worktree/data; profile deletion removes its file separately.
+- Added shared CLI `show`, extended `configure`, `delete`, and `profile list|show|import|update|delete`. Saved profiles now have an optional registry catalog, so imported/previously used profiles survive deletion of the last rig. Registry format remains version 1. The editor passes a temporary draft path to the CLI rather than JSON contents in process arguments. Candidate profiles are validated before atomic replacement. Configured fixed ports/ranges replace incompatible saved preferences, and material rig edits retain the requirement for renewed approval on previously approved manual profiles.
+- Added regression cases for running rename/ownership, stopped-only edits/deletion, stale revisions, shared/symlink profile references, retained files/catalog entries, incompatible profile mappings, renewed approval and edited port preferences. Added native render fixtures for context menus, rig/profile editors and profile deletion states; updated the guide, README and desktop acceptance steps.
+- Generated CLI/native JavaScript with TypeScript transpilation and synced the owned `~/.config/herdr-app/mods/rigs` installation. No actual rigs or profile files were edited/deleted, and layouts/services were not changed. Tests, type checks, native checks and live click-through were skipped under the user's continuing preference; the new regressions/fixtures and dialog workflows remain unexecuted.
+
+## Observed native app processes
+
+- Added optional profile `observed_apps`, versioned `rig observe` snapshots and per-rig process observations in `status`. Local Windows uses PowerShell/CIM; local macOS/Linux uses process inspection. Remote Windows uses the installed Core `machine.exec` API with an existing connected machine. Executable names and optional paths select processes; every match retains PID/start-time identity. Queries omit command lines/environment and report unavailable observations as unknown.
+- Added sidebar rows, live Preview details, monitor-only profiles and explicit separation from managed service controls/ownership/reservations. Observed apps have no lifecycle buttons or terminal peeks. Native-app questions apply only to requested/relevant native app setup. Existing web/API rig setup is unaffected.
+- Read the installed `hc exec --help`, `hc schema` and native API declarations to implement against their actual interfaces. Added regression coverage for path selection, PID reuse, multiple instances, unavailable hosts/paths, query batching, encoded Windows inputs and preserving external processes through rig lifecycle actions. Added native render fixtures for observed rows and monitor-only Preview.
+- Generated CLI/native JavaScript with TypeScript transpilation and synced the owned `~/.config/herdr-app/mods/rigs` installation. Layouts and rig services were not changed. Tests, type checks, native render checks and desktop acceptance were skipped at the user's request; added regressions/fixtures have not been run. No Windows machine or actual user app was queried/configured, and Windows/Linux collectors and new native states remain unverified at runtime.
+
+## Collapse cross-rig links with services
+
+- Link rows use the same per-rig collapse state as service rows. Updated the guide and installed the mod. Checks were skipped under the user’s continuing preference.
+
+## Profile popup and port ownership
+
+- Reproduced an empty profile list in Herdr while the CLI returned six saved profile paths. Set the popup's content height explicitly and preserved row heights. Reopened the installed popup and visually confirmed that all six profiles were visible.
+- `test-full-unit` was the only claimed rig. Local listeners occupied its allocated ports 3320, 4320 and 5320. The three stopped examples had overlapping preferred ports. Preview and start now use the same registry reservation lookup. Verified that the active rig's plan still resolves and that each stopped example's conflicting plan names `test-full-unit` as the owner.
+- Synced the installed mod. The investigation used read-only port and rig queries, with no service lifecycle actions or test suite runs.
+
+## Hide metrics and port-only endpoint icons
+
+- Removed the metrics icon from the sidebar through mod presentation rules: TCP endpoints and endpoints named metrics are kept in Preview rather than rendered as service-row shortcuts. Live HTTP app/API shortcuts remain beside the status dot. Profile endpoints and running services are unchanged.
+- Generated and installed without tests/native checks as requested.
+
+## Right-edge status ordering
+
+- Service row trailing items now run left-to-right as port/metrics icons, HTTP open-URL arrows, then the status dot at the far right. Endpoint icons remain live-only and lifecycle controls remain hover-only.
+- The fixture metrics endpoint reports pending/processing/done job counts; it is a second optional API endpoint, not an additional owned service.
+- Generated/installed without tests/native checks under the user’s continuing preference.
+
+## Match individual rig entries to Space entries
+
+- Compared the shipped Spaces row builder with the rig row. The rig name was still 12px semibold/muted, unlike Space entries using inherited regular 13px foreground text. The earlier styling update changed only the section heading.
+- Matched the individual row: 30px height, 8px horizontal padding and corners, 9px icon gap, regular 13px foreground name, max-width/truncation behavior, selected fill, and right-aligned 11.5px dim summary. Lifecycle controls/status remain on the right.
+- Generated and installed without tests/native checks as requested; no screenshot comparison was performed for this update.
+
+## Quiet dependency state for stopped services
+
+- Diagnosis of test-full-stack found API, worker and web all stopped. Status still populated degraded_dependencies for stopped consumers because their API readiness was unavailable.
+- Dependency degradation now applies only to running consumers. External health probes are not checked for stopped consumers, so an intentionally stopped rig does not look unhealthy solely because providers are stopped. Genuine running-consumer dependency failures remain reported.
+- Generated and installed without running test/native-check suites, continuing the user’s preference.
+
+## Connected rigs, component context, profile menu and full-unit example
+
+- Added derived cross-rig connection metadata to status. Structured external bindings match uniquely reserved endpoint authorities in peer rigs; same-rig links, ambiguous providers and unowned URL targets do not invent ownership. URL matching never authorizes lifecycle actions. New metadata is outside launch fingerprints to preserve existing configuration identities. Existing allocations with external probes can supply a compatibility fallback.
+- The sidebar shows grouped ↔ peer rows on both rigs, with service/address/state tooltips and preview navigation. Raw API_URL/external/readiness lines are removed. Component rows now show repo/worktree, branch and app-directory context; rig headings show compact service/checkout counts.
+- Replaced the inline + onboarding form with a native popup containing Agent Setup Prompt, unique saved-profile paths and Import profile…. Profile selection opens a New rig dialog with an unused-name suggestion and editable checkout mappings. Saving remains stopped and opens Preview. Saved profiles are those referenced by registry definitions; arbitrary undiscovered JSON files are not scanned.
+- Prepared `test-full-unit` as a stopped example using `rigs-test-backend/rig.full-unit.json`: API in apps/api, two workers in apps/worker, and web in the sibling frontend's apps/web. Added and committed those example app entry points in the two separate fixture repos. No services were launched for this update.
+- Updated native fixture states for the new menu/form, but did not run them. Generated and installed the update without tests, type/native checks or interactive verification, continuing the user's request to skip checks. Earlier test evidence below does not validate this batch.
+
+## Live-only endpoint icons beside status
+
+- Moved service endpoint icons into the status cluster immediately beside the dot, after the hover-only lifecycle controls. Render them only for observed running services with allocated endpoints; stopped, starting and unknown services have no endpoint icons.
+- Generated and installed without checks, continuing the user’s preference.
+
+## Portless-service render fix and Spaces header styling
+
+- The reported runtime error at installed main.js line 538 came from `.child(endpointIcons(...))` receiving null for compiler/worker services without endpoints. The helper now always returns an element, and endpoint icons are only attached when endpoints exist. Added a portless-service state to the native harness for future runs.
+- Matched the shipped Spaces header: 31px height, 16px left/10px right padding, regular 11.5px dim text and right-aligned icon controls.
+- Generated and synced the fix without running checks, continuing the user’s preference. The source cause is identified; an actual native re-render has not been verified in this update.
+
+## Full-row clicks and endpoint icons
+
+- Set explicit full widths on cards and rig/service headers. Moved output/preview click handling to the full header bars, including whitespace and status; removed the narrower service-name click target. Lifecycle and disclosure controls stop propagation.
+- Replaced endpoint URL lines with compact service-bar icons. Running allocated HTTP endpoints open their URLs; TCP icons expose port information only. Endpoint controls also stop propagation. Raw environment URL lines are removed from the sidebar and remain in Preview.
+- Presentation is enforced by the mod. Profiles only declare endpoints/ports/bindings; the agent guide documents this boundary. Generated/installed without checks under the user’s continuing instruction.
+
+## Stopped-rig filter cleanup
+
+- Removed the duplicate Show/Hide stopped definitions shortcut below the rig list. The filter remains available in the Rigs options menu.
+- Generated and installed without tests/native checks as requested.
+
+## Collapsible rigs
+
+- Added an independent disclosure chevron to each rig header. Collapsing hides all service rows, endpoints and bindings, while the rig name, aggregate status, errors and whole-rig hover controls remain visible. Rig-name clicks still open Preview.
+- Collapse preferences are saved by immutable rig ID in mod-local storage, so polling, filtering and mod reloads preserve them. Folding has no CLI or lifecycle action.
+- Generated and installed without tests, type/native checks or interactive verification, continuing the user’s request to skip checks.
+
+## Remove manual refresh controls
+
+- Removed the sidebar refresh icon and the preview Refresh button. Sidebar polling and refresh after actions remain automatic. Reopening a preview loads its current plan. Updated popup recovery text accordingly. Generated and synced without tests/native checks at the user’s request.
+
+## Static status and scoped hover controls — latest update
+
+- Replaced animated running status with theme-green static dots. Added hover-only Start/Stop/Restart controls to rig and service rows and removed the separate stop-services line. Clicking names still opens preview/output independently of the controls. Rig names use prominent text with a gray single-worktree/branch label or a compact checkout count.
+- Added CLI service targeting (`up|down|restart --service`) and restart support. Service start includes the declared prerequisite closure; service stop leaves other processes running. Restart holds the rig lease across stop/start and retains reservations until replacement or explicit down. Partial launches retain conservative whole-profile reservations. The existing labels/address ownership checks, durable launch intents and rollback filtering remain in use.
+- Explicit sidebar Start/Restart clicks approve the saved configuration and launch without opening Preview. Missing decisions remain errors; no values are fabricated.
+- The user requested speed and skipping checks. This update was generated and installed without running tests, type checks, native checks, or service launch/stop verification. The earlier evidence below does not validate these new lifecycle paths.
+
+## Rig preview popup and status-icon update
+
+- Rig-name clicks now open a centered native preview popup. Removed the separate Preview action and inline sidebar plan. Save and preview opens the same popup. The popup keeps review decisions, refresh/error handling, a scrollable plan, an explicit launch footer, and independent Close/Escape dismissal. Opening/closing has no service lifecycle action.
+- Status indicators reuse the Agents spinner asset, 900ms native animation, idle ring, done dot and compact warning styling with matching theme colors. Rig/service tooltips state the specific lifecycle or health condition. No shipped Herdr files were edited. Custom mod installation names are propagated when opening preview overlays.
+- An intermediate implementation passed 20 unit tests and seven native render states before the final immediate-open and status-icon edits. The user then explicitly requested skipping checks. Final files were generated and synced without tests, type checks, native checks or interactive verification. The final popup/icon behavior remains unverified; earlier results below do not validate these latest edits.
+- This repository had no commits. The user explicitly requested a commit; local machine-specific rig proposal JSON is excluded through .gitignore.
+
+## Service-row output update
+
+- Clicking the service header (icon, name or state) now opens its existing terminal with `terminal.peek`. Removed the separate **Live output** button. Headers without a terminal remain inactive with a no-output tooltip; endpoint links stay separate sibling controls, so they do not bubble into the peek action.
+- Updated the agent guide, README and desktop acceptance instructions. Added native checker fixtures for service rows with and without terminal output.
+- Fresh native checks passed for all six fixture states, the source mod and the installed mod; both TypeScript builds passed. Synced the update into the existing `rigs` installation. Herdr reports `rigs-workspace` with no errors. No rig launch/stop or layout mutation was needed. Native rendering is checked; an actual click opening the peek remains unverified. The earlier unit/live results below were not rerun for this UI-only change.
+
+## Setup and agent-guide update — latest run
+
+- Added the editable root `AGENTS.md` covering setup, profile rules, CLI commands, approval, ownership/recovery, demos, development and verification. `build:mod` packages it as `mods/rigs/AGENTS.md`; installation/sync adds exact local CLI and source-reference paths. The copied prompt is one sentence pointing to the installed guide with the selected checkout (or explicit demo context); workflow rules and exact CLI paths live in that guide.
+- Setup now proposes defaults and saves an unapproved draft before launch approval, asking only about material uncertainty. Discovery distinguishes application commands, an optional compiler watcher and a successful `no_services` result; ordinary discovery excludes recognized demo/fixture scripts. Evidence remains heuristic and needs agent review, especially infrastructure references in documentation.
+- Git validation supports unborn branches without changing history. The regression covers discovery, create, preview, approval, lookup, fake-Core launch/stop and unchanged Git HEAD/status.
+- `approve --review` stores approval and reviewed notes in the registry. The fingerprint covers profile configuration, rig identity and checkout/branch metadata. Stale commands, branches and mappings reject launch before claims/processes. `setup.approved` alone no longer authorizes a discovered draft. Existing manual profiles without `setup` remain compatible until a recorded approval requires review to stay current.
+- Drafts stay visible in the panel. Previews show editable review notes and **Approve and start**. Executable configuration changes still belong in the profile, followed by a fresh preview. The first-run control is now a compact **Agent Setup Prompt** row with a copy icon; checkout selection, demos and import live behind its **Setup options** gear.
+- Added guarded `sync:mod` and separate CLI/native watchers. Sync updates only this checkout's installed mod and guide, preserving layouts. A temp-install regression verifies exact paths/guide packaging, layout preservation and refusal to overwrite an unrelated personal mod.
+- Fresh `npm test`: **20 passing tests**. Fresh `npm run test:live`: passed the single fixture and concurrent mono/split stacks, ownership, labels, API bindings, duplicate-up behavior, checkout overlap/lookup, stable ports and stop isolation. Fixture launches were cleaned up.
+- Fresh native mod build/type check and checker runs passed for the source and installed mod. The eager state harness checks onboarding, setup options/import, draft review with a blank decision, and approved portless/unborn previews. These render checks do not click approval or prove every async state.
+- Ran `npm run sync:mod` into `~/.config/herdr-app/mods/rigs`. The new installed `AGENTS.md` and prompt helper are present. `herdr-app status` reports the existing `rigs-workspace` layout and **no errors**. A native screenshot confirms the Rigs sidebar remains present beneath Spaces and Agents. Layout files were not rewritten by sync.
+- Native app observation is available now, but attempts to open the setup control through computer-use coordinates timed out; the compact setup row has checker evidence, not a completed native click-through. Full launch/peek/endpoint/polling and app quit/reopen acceptance below remains pending. No app quit/reopen was performed for this update. The crash harness was not rerun; its prior result below is historical.
+
+The older evidence and acceptance audit below describe the preceding implementation and remain historical where superseded by this update.
+
+The original PLAN.md scope remains active. The user additionally required TypeScript, a stacked left sidebar matching Spaces and Agents, Git initialization, and a first-run prompt for the user's existing agent rather than requiring a prewritten profile.
+
+## Direct evidence collected
+
+- `npm test`: 15 passing resolver/lifecycle/setup tests. These cover deterministic previews, canonical checkout lookup, detached HEAD, invalid references/cycles/directories, secret redaction, duplicate starts, checkout overlap, distinct concurrent rigs, stop isolation, accepted launch with lost response, unavailable Core, changed ownership labels, readiness rollback, configured external probes, external listener/data preservation, missing checkout repair, TCP origin/path derivation, cleanup with unavailable history, dependency degradation, setup for a non-Node project without a profile, and rejection of IDs that would disappear from JSON ownership maps.
+- `npm run test:live`: passed on installed hc 0.1.19. A single HTTP fixture, then concurrent monorepo/multi-repo fixtures started through separate CLI processes. Verified parentless Core terminals, rig/service/launch labels, overlapping-checkout refusal, actual web-to-API binding, multiple named endpoints including port-only metrics, output, duplicate-up reuse, registry reopening, contributing-checkout lookup, stable restart ports, endpoint release and independent stop. All fixture launches stopped in `finally`.
+- `npm run test:crash`: passed. A transport shim held a real Core launch response after acceptance. The test verified durable intent with no terminal address, sent SIGKILL to the actual CLI, recovered its stale lock, and retried. Exactly the same launch ID and terminal address were reused, with exactly one live worker; cleanup stopped it.
+- `npm run build:mod` and `herdr-app check mods/rigs`: passed. Additional native checks eagerly rendered the first-run setup prompt, advanced profile-import, populated preview/service rows, persistent action-error display and draft-preview branches.
+- `npm run install:mod -- --update`: installed the current generated TypeScript panel, helper module and personal `rigs-workspace` layout. Shipped files remain intact. The last `herdr-app status` observation reported this layout and no errors.
+- A live screenshot confirmed stacked Spaces, Agents and Rigs sections with matching chrome background, small dim headers, compact actions and spacing. This proves the installed sidebar appearance, not the full service workflow.
+- `git init`: reinitialized the existing repository. No commits or staging were requested; project files remain untracked.
+
+## Requirement audit
+
+| PLAN.md requirement | Current implementation / evidence | Result |
+| --- | --- | --- |
+| One shared CLI/resolver for mod, shell and agents; versioned structured JSON | `src/cli.ts`, native panel `call`, unit and separate-process live tests | Verified for tested operations |
+| Durable immutable rig, service and launch identities, explicit repo/worktree links | Registry definitions, saved `checkout_bindings`, Core labels and crash test | Verified |
+| Commands, directory confinement, endpoints, environment bindings, independent readiness DAG | Resolver and tests, single/mono/split fixtures, CORS/API target checks | Verified |
+| Preview does not claim or launch; proposed vs allocated endpoints | Resolver test and registry state; plan/status assignment labels | Verified through CLI; panel click-through pending |
+| One active rig per canonical worktree, atomic port/checkout reservations, stable ports | Registry lock, cross-process fixture starts, overlap and port-conflict tests | Verified |
+| No ownership of manual/external processes; down preserves checkouts and data | Ownership label tests, external listener/data test, independent real fixture stop | Verified |
+| Parentless foreground terminals; startup readiness, rollback only current invocation, retained unknown claims | Real Core, crash test and failure tests; diagnostics no longer prevent cleanup | Verified for tested failure modes |
+| Secrets from local sources, no managed secret values in argv/state/previews/status | Resolver launch environment and redaction test; native output is application-controlled | Verified for declared sources; arbitrary user literals are not inferred as secrets |
+| Active rigs, stopped definitions, repo/branch labels, service endpoints, actual API target, output | Native implementation, status contract and real CLI fixtures | Implemented; full live panel interaction still unverified |
+| Checkout lookup through every contributing checkout, repeated branch names, detached/missing roots | Real mono/split lookup plus detached/stale/repair tests | Verified through CLI; branch-tree/panel action pending |
+| Core unavailability retains last-known endpoints and ownership | Unit test and status code | Verified through CLI; unavailable panel state not exercised interactively |
+| Refresh on open/actions; bounded polling only while shown | Init/action refresh and five-second timer; installed node ID checks hidden ancestors/inactive stack children | Implemented; live visibility behavior still needs interaction verification |
+| App quit/reopen preserves running services and terminal addresses; stop one while another remains | Core-owned terminals and registry reopening tested | Actual app quit/reopen remains unverified |
+| Assisted setup using scripts, framework config, environment examples and dev docs; user decides shared data | `src/init.ts` evidence discovery, draft review gate, setup tests; `+` now copies a prompt for the user's existing agent | Implemented and eagerly rendered; actual copy/paste/agent conversation not exercised |
+| First compatibility target hc 0.1.19 / herdr-app 0.1.14 and passing native checker | Installed versions inspected, Core live tests and native checks | Verified |
+| Local loopback only; remote/shared-rig/reboot recovery excluded | Profile endpoint resolution to 127.0.0.1; external URLs remain externally owned | Implemented |
+| User's stacked styling, TypeScript and Git requests | Installed layout/render observation, TS source/build, git init output | Verified |
+
+## Latest implementation corrections
+
+- Action errors now have their own state, so a successful background refresh cannot erase a failed preview/create/start message. The user can dismiss them explicitly.
+- Previews present checkout/branch, command arguments, endpoints, environment bindings, readiness order/checks and data scope as labeled fields. Incomplete setup reviews do not offer Start; CLI validation remains authoritative.
+- Focused-checkout suggestions reject remote machine contexts for this local-only release. Portless services explicitly report that no readiness check is configured.
+- Added `npm run prepare:desktop` and [DESKTOP_ACCEPTANCE.md](DESKTOP_ACCEPTANCE.md) for reproducible native acceptance without creating or starting rigs automatically.
+
+## Remaining acceptance work
+
+1. Exercise actual native `+ → Copy setup prompt`, advanced import, preview, start, endpoint-open, terminal-peek and stop flows with both fixture rigs, including service rows and large plans at sidebar widths.
+2. Verify hide/show polling and immediate return behavior in the actual app.
+3. Quit and reopen Herdr with both fixtures running, verify identical terminal addresses and outputs, then stop one and prove the other still runs.
+4. Complete the requirement-by-requirement audit using those direct UI observations. Source code, an eager checker and CLI registry reopening do not prove these desktop behaviors.
+
+Computer-use discovery found Herdr running, but selecting the app returned **“Computer Use was not approved to use Herdr.”** No native clicks or quit/reopen were attempted through another automation mechanism. The goal cannot be called complete until the remaining desktop gates have evidence.
+
+Herdr computer-use access was rechecked during the continuation and remained denied. The user replied that they will enable access; that response authorizes the work but does not prove the tool permission has changed. Await actual access before native interaction.
+
+## Workspace shared header — 2026-11-13
+
+On `fix/workspace-shared-headers`, the native TypeScript build and initial
+checker pass against released Herdr. The eager state checker covers the docked
+header and all existing popup/preview/service states without CLI calls or service
+launches. Its context/delete fixtures now supply the props that actual popups
+receive; the missing-props failure was reproduced using the unmodified baseline.
+The header changes do not alter the CLI, registry, ownership or lifecycle.
+Live verification below concerns header presentation only; the broader desktop
+acceptance items above remain separate.
+
+Verified in the isolated Workspace Native app on 2026-11-13: all seven restored panels show one title row. Context, Toolbox and Rigs retain their original header actions; the app status reports no rendering errors. Screenshot: workspace `.checks/native/shared-mod-headers.png`. This verifies header presentation only.
+
+## Observed app build reports — 2026-11-14
+
+Added an optional local JSON build report to process observations, retaining
+process state and external ownership. Freshness and PID/start-time identity
+checks prevent stale or unrelated green indicators. Native app and aggregate
+rig dots use red for build attention or unavailable status; unconfigured apps
+and stopped apps retain their existing behavior. No lifecycle operations or
+managed services were added. Verification results are recorded below after
+running the resolver/report tests, native build, and eager state fixtures.
+
+Follow-up: the Handlr user requested all status and action controls inside
+Rigs, so the independent badge was removed. Optional `development.check`
+refreshes the report under a bounded read-only subprocess; rebuild/relaunch
+argv run only on explicit app-tool invocation in a parentless Core terminal.
+34 resolver/observer/lifecycle tests pass, including duplicate tool exclusion,
+no launches while planning, report identity/freshness and checker caching.
+The native TypeScript build and all 21 eager state fixtures pass, including
+red outdated/unknown reports, green current reports and both development
+action buttons. The installed panel passes the native checker. Handlr's
+three action-sequencing tests confirm no quit after failed compilation and
+no second instance on quit timeout. Actual rebuild/relaunch verification
+is recorded separately after its helper finishes. No service ownership or
+Core shutdown operations were introduced.
+
+Actual Handlr Dev action verification (2026-11-14): invoked the configured
+rebuild action via `rig app-tool handlr-dev desktop --action rebuild` after
+the user explicitly requested rebuild/relaunch. Its parentless Core helper
+`t69` completed with exit 0, installed the signed Dev bundle, sent app.quit,
+waited for exit, and opened the replacement. The PID changed; both the project
+checker and Rigs status report `current` / “Handlr Dev in sync.” All 25 prior
+Core terminal addresses remain present (26 including the finished helper).
+The reopened app reports no errors and the separate badge node/mod is absent.
+The native eager fixtures verified the buttons and red/green states. The live
+frame API retained the initial “Loading rigs…” frame while backgrounded, so
+fresh screenshot confirmation of the row/buttons remains unverified; live
+report timestamps do demonstrate that Rigs is polling the new checker.
+No native click was simulated and no Core process was stopped.
+
+
+2026-11-14 control consistency follow-up: replaced the app-specific text action
+row with the same shared iconControl/controlTray implementation as existing
+service and rig controls. App controls appear on row hover, use the existing
+22px ▶ / ↻ glyph buttons, disabled treatment, tooltips and click-propagation
+rules, and sit before the rightmost status dot. App row clicks open action
+output when available; the rig name retains Preview. Native TypeScript and
+eager state fixtures were rerun for the presentation change; no native app
+rebuild or lifecycle action is needed for this mod update.

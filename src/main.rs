@@ -5,6 +5,7 @@ mod bench;
 mod commands;
 mod control;
 mod core_bin;
+mod core_session;
 mod files;
 mod hc;
 mod keys;
@@ -39,6 +40,7 @@ mod update_notes;
 mod vt;
 mod win32_keys;
 mod window;
+mod workspace;
 
 use gpui::*;
 
@@ -122,6 +124,9 @@ fn main() {
                 .unwrap_or_else(|_| "warn,herdr_app=info,gpui_shell=info".into()),
         )
         .init();
+
+    // Freeze the connection choice for this launch, including mod hc/run calls.
+    core_session::init(settings::load_person().ok().and_then(|p| p.core_session));
 
     update::leave_install_folder();
     if update::apply_on_startup() {

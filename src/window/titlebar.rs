@@ -34,6 +34,15 @@ const WIN_STRIP: f32 = 32.0;
 const WIN_BUTTON: f32 = 46.0;
 
 impl AppWindow {
+    // The compact window strip hosts the same mod as the fullscreen tab bar.
+    // Visibility and restore state remain owned by the mod's shared storage.
+    #[cfg(target_os = "macos")]
+    pub(super) fn titlebar_controls_mod(&self) -> Option<(String, Instance)> {
+        (self.workspace.is_some() && self.titlebar() == Titlebar::System).then(|| (
+            "@window/controls".into(), Instance::new("tabs".into(), json!({"windowControls":true}))
+        ))
+    }
+
     pub(super) fn titlebar(&self) -> Titlebar {
         self.chrome.titlebar.unwrap_or_default()
     }
@@ -140,9 +149,20 @@ impl AppWindow {
     pub(super) fn window_frame(&self, tree: AnyElement, window: &Window, cx: &mut Context<Self>) -> AnyElement {
         #[cfg(target_os = "macos")]
         {
-            let _ = window;
-            if self.titlebar() == Titlebar::System {
-                let strip = self.window_drag(div().flex_none().h(px(MAC_STRIP)).w_full(), cx);
+            // Fullscreen hides the native buttons, so content can use their strip.
+            if self.titlebar() == Titlebar::System && !window.is_fullscreen() {
+                // Native buttons end at 21px (7px inset + 14px diameter).
+                // Workspace canvas padding supplies the remaining breathing room.
+                let (height, background) = if self.workspace.is_some() {
+                    (22.0, "canvas")
+                } else {
+                    (MAC_STRIP, "background")
+                };
+                let strip = self.window_drag(div().flex_none().h(px(height)).w_full().flex().bg(c(background)), cx)
+                    .child(div().flex_1().h_full())
+                    .when(self.titlebar_controls_mod().is_some(), |d| d.child(
+                        div().flex_none().w(px(124.)).h_full().child(self.render_slot("@window/controls", cx))
+                    ));
                 return div().size_full().flex().flex_col().child(strip).child(div().flex_1().min_h_0().flex().child(tree)).into_any_element();
             }
             tree

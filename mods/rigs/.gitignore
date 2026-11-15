@@ -1,0 +1,11 @@
+node_modules/
+dist/
+*.error
+__pycache__/
+.rig-state/
+gpui-kit.d.ts
+herdr.d.ts
+jsconfig.json
+
+# Local setup proposals can contain machine-specific paths.
+rig.*.proposal.json

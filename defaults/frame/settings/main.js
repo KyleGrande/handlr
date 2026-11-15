@@ -2,7 +2,9 @@
 
 import { View, div, svg, image } from "gpui-kit";
 import { v_flex, h_flex, Scrollbar, InputState, Input, Popup } from "gpui-base";
-import { hc, run, theme, themes, fonts, updates, telemetry, settings, layouts, shared, appHome, readTextFile, writeTextFile, playSound, props, closeOverlay, notify, window } from "herdr";
+import { hc, exec, layout, run, theme, themes, fonts, updates, telemetry, settings, layouts, shared, setShared, appHome, readTextFile, writeTextFile, playSound, props, closeOverlay, notify, window } from "herdr";
+import { readMods, modCommand, modPanels } from "./mods.js";
+import { glassEnabled, glassSupported, setGlass, disableAllGlass, startGlass } from "./glass.js";
 
 const I = (name) => `frame/settings/${name}.svg`;
 
@@ -10,6 +12,7 @@ const SECTIONS = [
   { id: "look", title: "Look", icon: "palette" },
   ...(window()?.platform === "macos" ? [{ id: "keyboard", title: "Keyboard", icon: "keyboard" }] : []),
   { id: "machines", title: "Machines", icon: "server" },
+  { id: "mods", title: "Mods", icon: "mods" },
   { id: "alerts", title: "Alerts", icon: "bell" },
   { id: "updates", title: "Updates", icon: "refresh" },
   { id: "privacy", title: "Privacy", icon: "shield" },
@@ -26,8 +29,37 @@ const APPEARANCES = [
 const DEFAULT_FONT = "JetBrains Mono";
 const DEFAULT_UI_FONT = "Geist";
 
+// Keep the app canvas intact; only panel layers and outlines become transparent.
+// Theme/appearance changes still apply. Keep custom colors for restoration.
+function toggleSeamless(person) {
+  const keys = ["chrome", "surface", "border"];
+  person.colors ??= {};
+  if (!person.seamless) {
+    person.seamless_colors = Object.fromEntries(keys.filter(key => Object.hasOwn(person.colors, key)).map(key => [key, person.colors[key]]));
+    for (const key of keys) person.colors[key] = "#00000000";
+    person.seamless = true;
+  } else {
+    // The earlier preset also cleared canvas. Restore it when disabling that
+    // version so existing settings do not retain its transparent app background.
+    if (person.colors.canvas === "#00000000") {
+      if (Object.hasOwn(person.seamless_colors ?? {}, "canvas")) person.colors.canvas = person.seamless_colors.canvas;
+      else delete person.colors.canvas;
+    }
+    for (const key of keys) {
+      // Preserve colors edited independently while the preset was enabled.
+      if (person.colors[key] !== "#00000000") continue;
+      if (Object.hasOwn(person.seamless_colors ?? {}, key)) person.colors[key] = person.seamless_colors[key];
+      else delete person.colors[key];
+    }
+    delete person.seamless;
+    delete person.seamless_colors;
+    if (!Object.keys(person.colors).length) delete person.colors;
+  }
+}
+
 export default class Settings extends View {
   init(_props, cx) {
+    startGlass(cx);
     const asked = props()?.section;
     this.section = SECTIONS.some((s) => s.id === asked) ? asked : "look";
     this.picking = null; // "font" | "ui_font" while its list is open
@@ -54,11 +86,19 @@ export default class Settings extends View {
     this.machineResults = {};
     this.machineEdit = null;
     this.machineNotice = null;
+    this.modList = null;
+    this.modLoading = false;
+    this.modError = null;
+    this.modWorkspace = null;
+    this.modWorkspaceError = null;
+    this.modWorkspaceLoading = false;
+    this.modBusy = false;
     this.handle = cx.focus_handle();
     this.handle.focus();
     cx.spawn(async (cx) => {
       await this.load();
       if (this.section === "machines") await this.loadMachines();
+      if (this.section === "mods") await this.loadMods();
       cx.notify();
     });
     // After "Check now": follow the look (the answer comes from the app), then
@@ -70,6 +110,10 @@ export default class Settings extends View {
       cx.notify();
     });
     cx.timer.every(3000, (cx) => {
+      if (this.section === "mods") {
+        cx.spawn(async cx => { await this.loadModWorkspace(); cx.notify(); });
+        return;
+      }
       if (this.section !== "machines") return;
       cx.spawn(async (cx) => {
         await this.loadMachines();
@@ -149,6 +193,31 @@ export default class Settings extends View {
 
   close() {
     closeOverlay(props().overlay);
+  }
+
+  appearancePreset(glass, cx) {
+    if (this.appearanceBusy) return;
+    this.appearanceBusy = true;
+    cx.spawn(async cx => {
+      try {
+        if (glass) {
+          if (glassEnabled()) await setGlass(false);
+          else {
+            const failed = await this.save(person => { if (person.seamless) toggleSeamless(person); });
+            if (failed) throw new Error(failed.title);
+            await setGlass(true);
+          }
+        } else {
+          // Seamless is global, so restore material ownership on every layout
+          // before it captures personal colors as its baseline.
+          await disableAllGlass();
+          const failed = await this.save(toggleSeamless);
+          if (failed) throw new Error(failed.title);
+        }
+      } catch (error) {
+        notify({ title: "Appearance was not changed", body: String(error?.message ?? error), level: "error" });
+      } finally { this.appearanceBusy = false; cx.notify(); }
+    });
   }
 
   // Pieces ---------------------------------------------------------------
@@ -235,6 +304,105 @@ export default class Settings extends View {
       .when(on, (el) => el.justify_end())
       .on_click(onClick)
       .child(div().w(16).h(16).rounded(8).bg(on ? t.accent_foreground : t.muted));
+  }
+
+  // Mods -----------------------------------------------------------------
+
+  async loadMods() {
+    if (this.modLoading) return;
+    this.modLoading = true;
+    try {
+      this.modList = await readMods({ home: appHome(), platform: window()?.platform, exec, readTextFile });
+      this.modError = null;
+      await this.loadModWorkspace();
+    } catch (error) { this.modError = String(error?.message ?? error); }
+    finally { this.modLoading = false; }
+  }
+
+  async loadModWorkspace() {
+    const name = layout()?.workspace;
+    if (!name) { this.modWorkspace = null; this.modWorkspaceError = null; return; }
+    if (this.modWorkspaceLoading || this.modBusy) return;
+    this.modWorkspaceLoading = true;
+    try {
+      const snapshot = await modCommand(exec, "workspace.inspect");
+      if (!Number.isSafeInteger(snapshot.revision) || !snapshot.document?.panels || !Array.isArray(snapshot.document.groups)) throw new Error("The workspace could not be read.");
+      if (layout()?.workspace !== name) return;
+      this.modWorkspace = { name, ...snapshot };
+      this.modWorkspaceError = null;
+    } catch (error) { this.modWorkspace = null; this.modWorkspaceError = String(error?.message ?? error); }
+    finally { this.modWorkspaceLoading = false; }
+  }
+
+  setModEnabled(mod, enabled, cx) {
+    if (this.modBusy || this.modWorkspaceLoading || !mod.panel || !this.modWorkspace || this.modWorkspace.name !== layout()?.workspace) return;
+    const name = this.modWorkspace.name;
+    this.modBusy = true;
+    cx.spawn(async cx => {
+      try {
+        // Read a fresh revision: concurrent drags/edits must reject stale changes.
+        const snapshot = await modCommand(exec, "workspace.inspect");
+        if (layout()?.workspace !== name) throw new Error("The workspace changed. Refresh and try again.");
+        const ids = modPanels(snapshot.document, mod.id);
+        if (enabled) await modCommand(exec, "workspace.open", { name: mod.id });
+        else if (ids.length) await modCommand(exec, "workspace.apply", { transaction: {
+          expected_revision: snapshot.revision, commands: ids.map(panel_id => ({ op: "hide_panel", panel_id })),
+        } });
+        this.modWorkspaceError = null;
+      } catch (error) { this.modWorkspaceError = String(error?.message ?? error); }
+      finally {
+        this.modBusy = false;
+        // Do not claim a failed change succeeded; refresh the actual membership.
+        const actionError = this.modWorkspaceError;
+        await this.loadModWorkspace();
+        if (actionError) this.modWorkspaceError = actionError;
+        cx.notify();
+      }
+    });
+    cx.notify();
+  }
+
+  openMod(mod) {
+    if (!mod.openable) return;
+    closeOverlay(props()?.overlay);
+    run(mod.panel && layout()?.workspace ? "workspace.open" : "mod.open", { name: mod.id });
+  }
+
+  mods(t) {
+    const list = this.modList ?? [];
+    const body = v_flex().w_full()
+      .child(this.heading(t, "Mods"))
+      .child(div().pb(16).text_size(13).line_height("19px").text_color(t.dim).child("Manage installed panels and extensions. In workspace shows or hides a panel while keeping its data and running work."))
+      .child(h_flex().gap(8).pb(14)
+        .child(this.button(t, "st-mod-refresh", this.modLoading ? "Refreshing…" : "Refresh", (_e, cx) => {
+          cx.spawn(async cx => { await this.loadMods(); cx.notify(); });
+          cx.notify();
+        }))
+        .child(this.button(t, "st-mod-updates", "Review panel updates", () => run("mod.update"))));
+    if (this.modError) body.child(div().pb(12).text_size(12.5).text_color(t.blocked).child(`Could not refresh mods: ${this.modError}${this.modList ? " Showing the last loaded list." : ""}`));
+    if (this.modWorkspaceError) body.child(div().pb(12).text_size(12.5).text_color(t.blocked).child(this.modWorkspaceError));
+    if (!layout()?.workspace) body.child(div().pb(12).text_size(12.5).text_color(t.dim).child("Choose a panel workspace to enable or disable panels here. Open is available in regular layouts."));
+    if (this.modList === null) return body.child(div().py(14).text_size(13).text_color(t.dim).child(this.modLoading ? "Reading installed mods…" : "The mod list is unavailable. Try Refresh."));
+    if (!list.length) return body.child(div().py(14).text_size(13).text_color(t.dim).child("No mods are installed in this app home."));
+    body.child(div().pb(8).text_size(12).text_color(t.dim).child(`${list.length} installed`));
+    for (const [title, group] of [["Handlr mods", list.filter(mod => mod.handlr)], ["Other installed mods", list.filter(mod => !mod.handlr)]]) {
+      if (!group.length) continue;
+      body.child(this.heading(t, title));
+      for (const mod of group) {
+        const control = h_flex().gap(8).items_center()
+          .when(mod.panel && Boolean(this.modWorkspace) && this.modWorkspace.name === layout()?.workspace, el => {
+            const on = modPanels(this.modWorkspace.document, mod.id).length > 0;
+            return el.child(v_flex().gap(4).items_center().opacity(this.modBusy ? 0.5 : 1)
+              .child(div().text_size(11).text_color(t.dim).child("In workspace"))
+              .child(this.toggle(t, `st-mod-enabled-${mod.id}`, on, (_e, cx) => this.setModEnabled(mod, !on, cx))));
+          })
+          .when(mod.pending, el => el.child(this.button(t, `st-mod-review-${mod.id}`, "Review update", () => run("mod.update", { name: mod.id }))))
+          .when(mod.openable, el => el.child(this.button(t, `st-mod-open-${mod.id}`, "Open", () => this.openMod(mod))));
+        body.child(this.row(t, mod.title, `${mod.about} · ${mod.kind} · ${mod.id}`, control));
+        if (mod.error) body.child(div().py(6).text_size(12).text_color(t.blocked).child(mod.error));
+      }
+    }
+    return body;
   }
 
   // Look -----------------------------------------------------------------
@@ -517,6 +685,18 @@ export default class Settings extends View {
       .w_full()
       .child(this.heading(t, "Layout"))
       .child(this.layoutPicker(t, cx))
+      .child(this.row(t, "Hide panel buttons", "Hide dock and terminal-only buttons in the window bar and fullscreen tab bar.",
+        this.toggle(t, "st-hide-panel-buttons", Boolean(shared("tabs.hide-panel-buttons")), () => setShared("tabs.hide-panel-buttons", !shared("tabs.hide-panel-buttons")))))
+      .child(this.row(t, "Seamless", "Remove panel outlines and blend panels into the app background.",
+        this.toggle(t, "st-seamless", Boolean(p.seamless), (_e, cx) => this.appearancePreset(false, cx))))
+      .child(this.row(t, "Glass", glassSupported()
+        ? "Frost this layout in your theme. Bundled layouts open as personal copies; reduced transparency uses opaque surfaces."
+        : "Available on macOS in layouts using the bundled tabs panel.",
+        this.toggle(t, "st-glass", glassEnabled(), (_e, cx) => {
+          if (glassSupported() || glassEnabled()) this.appearancePreset(true, cx);
+        })))
+      .child(this.row(t, "No Headers", "Hide panel title rows. Turn off to restore panel controls and drag handles.",
+        this.toggle(t, "st-no-headers", Boolean(p.no_headers), (_e, cx) => this.change(q => { q.no_headers = !q.no_headers; }, cx))))
       .child(div().h(18))
       .child(this.heading(t, "Theme"))
       .child(this.row(t, "Appearance", "Light or dark, or as your system is now.", this.appearancePicker(t, cx)))
@@ -721,9 +901,26 @@ export default class Settings extends View {
     return row;
   }
 
+  coreSession(t) {
+    const sharedSession = this.person.core_session === "shared";
+    return v_flex().w_full()
+      .child(this.heading(t, "Core session"))
+      .child(this.row(t, "Use Herdr’s existing session",
+        sharedSession
+          ? "Herdr and Handlr share spaces, terminals, and agents. Handlr keeps its own panel layout."
+          : "Handlr uses its own session with separate spaces, terminals, and agents.",
+        this.toggle(t, "st-core-session", sharedSession, (_e, cx) =>
+          this.change((p) => { p.core_session = sharedSession ? "own" : "shared"; }, cx))))
+      .child(div().pt(10).text_size(12.5).line_height("18px").text_color(t.dim)
+        .child("Quit and reopen Handlr to apply a change. Running terminals and agents stay alive in both sessions."))
+      .child(div().pt(8).pb(18).text_size(12.5).line_height("18px").text_color(t.dim)
+        .child("Want access to both? You can always add Handlr’s separate session as a machine in Herdr, even on this computer."));
+  }
+
   machines(t) {
     const version = updates().core.version;
     return v_flex().w_full()
+      .child(this.coreSession(t))
       .child(this.heading(t, "Machines"))
       .child(div().pb(8).text_size(12.5).line_height("18px").text_color(t.dim).child("Your computers, reached over ssh. Their terminals keep running when you disconnect."))
       .child(this.row(t, "This computer", `Connected · ${version ? `hc ${version}` : "hc version unknown"}`, div().w(7).h(7).rounded(4).bg(t.ansi2)))
@@ -914,6 +1111,7 @@ export default class Settings extends View {
               this.machineEdit = null;
               this.handle.focus();
               if (s.id === "machines") cx.spawn(async (cx) => { await this.loadMachines(); cx.notify(); });
+              if (s.id === "mods") cx.spawn(async (cx) => { await this.loadMods(); cx.notify(); });
               cx.notify();
             })
             .child(svg(I(s.icon)).size(15).text_color(on ? t.accent : t.dim))
@@ -979,6 +1177,8 @@ export default class Settings extends View {
                         ? this.keyboard(t)
                       : this.section === "machines"
                         ? this.machines(t)
+                      : this.section === "mods"
+                        ? this.mods(t)
                       : this.section === "alerts"
                         ? this.alerts(t)
                         : this.section === "privacy"

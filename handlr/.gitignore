@@ -1,0 +1,10 @@
+.checks/
+dist/
+node_modules/
+.tools/
+.toolchain/
+
+# Local checkouts and machine-specific Rig configuration
+mod-worktrees/
+rig.handlr.json
+.DS_Store

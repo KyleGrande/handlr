@@ -8,6 +8,7 @@ async function harness(mod: string, values: Record<string, string>) {
   const data = new Map(Object.entries(values));
   const globals = {
     View: class {}, props: () => ({}), spaces: () => [], ScrollHandle: { new: () => ({}) },
+    shared: () => null, setShared() {},
     localStorage: { getItem: (key: string) => data.get(key) ?? null, setItem: (key: string, value: string) => data.set(key, value), removeItem: (key: string) => data.delete(key) },
   };
   const Mod = new Function(...Object.keys(globals), `${source}; return ${name};`)(...Object.values(globals));

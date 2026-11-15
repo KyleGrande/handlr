@@ -17,6 +17,106 @@ Actions use the current selection unless you give an explicit target.
 Some actions close terminals; read their descriptions before running them.
 Mods can add their own actions, which are not listed here.
 
+## `workspace.reveal`
+
+Go to an already open workspace panel without creating or reopening it.
+
+| Argument | Required |
+|---|---|
+| `panel` | yes |
+
+## `workspace.open`
+
+Add or reveal an installed mod panel in the active workspace, reusing its existing identity.
+
+| Argument | Required |
+|---|---|
+| `name` | yes |
+
+## `workspace.rename`
+
+Rename a workspace panel or view; omitted name prompts, empty panel name resets its title.
+
+| Argument | Required |
+|---|---|
+| `panel` | no |
+| `view` | no |
+| `name` | no |
+| `expected_revision` | no |
+
+## `workspace.activate`
+
+Create/select an opt-in local panel workspace; preserve other layouts.
+
+| Argument | Required |
+|---|---|
+| `name` | no |
+| `document` | no |
+
+## `workspace.inspect`
+
+Read the active local panel workspace, revision and history availability.
+
+No arguments.
+
+## `workspace.apply`
+
+Atomically apply workspace commands at an expected revision; preserves panel identities.
+
+| Argument | Required |
+|---|---|
+| `transaction` | yes |
+
+## `workspace.float`
+
+Detach a panel or group into a native floating window; defaults to the last clicked panel.
+
+| Argument | Required |
+|---|---|
+| `panel` | no |
+| `group` | no |
+
+## `workspace.dock`
+
+Return a floating panel to its saved dock, or to an explicit edge.
+
+| Argument | Required |
+|---|---|
+| `panel` | no |
+| `group` | no |
+| `edge` | no |
+
+## `workspace.undo`
+
+Undo one local workspace transaction; defaults to the current revision.
+
+| Argument | Required |
+|---|---|
+| `expected_revision` | no |
+
+## `workspace.redo`
+
+Redo one local workspace transaction; defaults to the current revision.
+
+| Argument | Required |
+|---|---|
+| `expected_revision` | no |
+
+## `workspace.export`
+
+Read the active local workspace document for export.
+
+No arguments.
+
+## `workspace.import`
+
+Validate/import a local workspace document as one undoable transaction.
+
+| Argument | Required |
+|---|---|
+| `expected_revision` | yes |
+| `document` | yes |
+
 ## `space.new`
 
 Make a space: its name (default: none, so it's called after where its first terminal is), the folder its terminals start in (default: the focused terminal's), its first tab's name (default: none, so it's called by its number), optionally an agent (argv) and its first message (task), and the machine it lives on (`hc machine ls`; default the focused space's machine for keys and clicks, this computer for scripts; empty string: this computer; its terminals start in that machine's home unless folder). It is shown at once; focus false keeps the shown space and tab (with no space shown, the new space is shown).
@@ -390,6 +490,17 @@ Duplicate a layout as <name>-copy (or as), then show it.
 |---|---|
 | `name` | yes |
 | `as` | no |
+
+## `mod.update`
+
+Review bundled panel updates; keep your version or use an app-provided update without changing panel identities.
+
+| Argument | Required |
+|---|---|
+| `name` | no |
+| `action` | no |
+| `version` | no |
+| `user_version` | no |
 
 ## `mod.clone`
 

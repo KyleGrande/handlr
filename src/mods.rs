@@ -21,6 +21,7 @@ include!(concat!(env!("OUT_DIR"), "/frame_mods.rs"));
 mod render_tests;
 #[cfg(test)]
 mod lifecycle_tests;
+pub(crate) mod updates;
 
 /// The frame's own mods (welcome, ...): the app's, not the person's. Written
 /// from the binary on every start, so no edit or broken mod can break them.
@@ -60,7 +61,7 @@ pub fn mods_dir() -> PathBuf {
 const AGENTS_MD: &str = include_str!("../defaults/AGENTS.md");
 
 /// Writes the agent guide and API types, and installs or updates the default
-/// mods. Shipped mods are replaced whole; edits are first moved to a clone.
+/// mods. Edited bundled mods stay active and become user-owned.
 pub fn write_workspace() -> std::io::Result<()> {
     let dir = app_dir();
     std::fs::create_dir_all(mods_dir())?;
@@ -97,42 +98,7 @@ fn edited_name(parent: &Path, name: &str, suffix: &str) -> String {
 }
 
 fn sync_defaults(mods: &Path, installed_path: &Path, shipped_mods: &[(&str, &[u8])]) -> std::io::Result<()> {
-    let text = std::fs::read_to_string(installed_path).unwrap_or_default();
-    let mut installed: Installed = serde_json::from_str(&text).unwrap_or_default();
-    let names: std::collections::BTreeSet<&str> = shipped_mods.iter().filter_map(|(p, _)| p.split('/').next()).collect();
-    let dropped: Vec<String> = installed.keys().filter(|n| !n.starts_with("layout:") && !names.contains(n.as_str())).cloned().collect();
-    for name in dropped {
-        let target = mods.join(&name);
-        if installed.get(&name).is_some_and(|was| target.exists() && as_shipped(&target, was)) {
-            std::fs::remove_dir_all(&target)?;
-        }
-        installed.remove(&name);
-    }
-    for name in names {
-        let target = mods.join(name);
-        let shipped: Files = shipped_mods.iter()
-            .filter_map(|(p, bytes)| Some((p.strip_prefix(&format!("{name}/"))?.to_owned(), fingerprint(bytes))))
-            .collect();
-        if installed.get(name) == Some(&shipped) && target.exists() && as_shipped(&target, &shipped) {
-            continue;
-        }
-        if target.exists() {
-            if !as_shipped(&target, installed.get(name).unwrap_or(&shipped)) {
-                let clone = edited_name(mods, name, "");
-                std::fs::rename(&target, mods.join(&clone))?;
-                edited_note(&clone);
-            } else {
-                std::fs::remove_dir_all(&target)?;
-            }
-        }
-        for (path, bytes) in shipped_mods.iter().filter(|(p, _)| p.starts_with(&format!("{name}/"))) {
-            let file = mods.join(path);
-            std::fs::create_dir_all(file.parent().unwrap())?;
-            std::fs::write(&file, bytes)?;
-        }
-        installed.insert(name.to_owned(), shipped);
-    }
-    write_if_changed(installed_path, serde_json::to_string_pretty(&installed).unwrap() + "\n")
+    updates::sync(mods, installed_path, shipped_mods)
 }
 
 pub fn sync_layouts(home: &Path, layouts: &[(&str, &str)]) -> std::io::Result<()> {
@@ -343,6 +309,29 @@ pub struct Hint {
     /// `pane.go` can give it the keyboard.
     #[serde(default)]
     pub focusable: bool,
+    /// The mod provides a 42px title row that shares workspace controls.
+    #[serde(default)]
+    pub workspace_header: bool,
+    #[serde(default)]
+    pub title: Option<String>,
+    #[serde(default)]
+    pub name: Option<String>,
+    #[serde(default)]
+    pub button: Value,
+    #[serde(default)]
+    pub overlay: Option<Value>,
+}
+
+impl Hint {
+    pub fn panel(&self) -> bool {
+        self.workspace_header || self.button["opens"] == "panel"
+            || self.place.as_deref().is_some_and(|p| matches!(p, "left" | "right" | "top" | "bottom" | "top_center" | "bottom_center"))
+    }
+    pub fn label(&self, id: &str) -> String {
+        self.title.as_deref().or_else(|| self.button["label"].as_str()).or(self.name.as_deref())
+            .filter(|s| !s.trim().is_empty()).map(str::to_owned)
+            .unwrap_or_else(|| { let mut chars=id.chars(); chars.next().map(|c|c.to_uppercase().to_string()+chars.as_str()).unwrap_or_default() })
+    }
 }
 
 #[derive(Clone)]
@@ -387,6 +376,7 @@ fn scan_dir(root: &Path, prefix: &str) -> Vec<Found> {
 
 /// What mods ask of the window.
 pub enum Request {
+    FromCopy { copy: u64, request: Box<Request> },
     Run { name: String, args: Value },
     OpenOverlay { id: String, spec: Value },
     CloseOverlay { id: String },
@@ -560,6 +550,7 @@ thread_local! {
 
 pub struct Snapshot {
     pub layout: Value,
+    pub panels: Value,
     pub spaces: Value,
     pub machines: Value,
     pub agents: Value,
@@ -576,7 +567,7 @@ pub struct Snapshot {
 impl Default for Snapshot {
     /// Lists start empty, never null, so mods can map over them right away.
     fn default() -> Self {
-        Snapshot { layout: Value::Null, spaces: json!([]), machines: json!([]), agents: json!([]), panes: json!([]), terminals: json!([]), focused: Value::Null, floats: json!({}), window: Value::Null }
+        Snapshot { layout: Value::Null, panels: json!({}), spaces: json!([]), machines: json!([]), agents: json!([]), panes: json!([]), terminals: json!([]), focused: Value::Null, floats: json!({}), window: Value::Null }
     }
 }
 
@@ -592,6 +583,9 @@ fn publish(key: &'static str, set: impl FnOnce(&mut Snapshot) -> (Value, Value))
     changed
 }
 
+pub fn publish_panels(v: Value) -> bool {
+    publish("panels", |s| (std::mem::replace(&mut s.panels,v.clone()),v))
+}
 pub fn publish_layout(layout: &Node) -> bool {
     let v = serde_json::to_value(layout).unwrap_or(Value::Null);
     publish("layout", |s| (std::mem::replace(&mut s.layout, v.clone()), v))
@@ -745,10 +739,13 @@ pub fn new_overlay_id() -> String {
 pub struct Instance {
     pub name: String,
     pub props: Value,
+    pub storage_namespace: Option<String>,
 }
 
 impl Instance {
+    pub fn new(name: String, props: Value) -> Self { Self { name, props, storage_namespace: None } }
     pub fn key(&self) -> String {
+        if let Some(namespace) = &self.storage_namespace { return format!("instance:{namespace}:{}", self.name); }
         if self.props.is_null() { self.name.clone() } else { format!("{}{}", self.name, self.props) }
     }
 }
@@ -1051,7 +1048,7 @@ fn module(inst: Instance, copy: u64) -> HostModule {
             crate::sound::play(a.string(0)?);
             Ok(HostValue::Null)
         })
-        .function("run", |a| {
+        .function("run", move |a| {
             let name = a.string(0)?.to_owned();
             let args = a.get(1).map(from_host).unwrap_or(Value::Null);
             if let Some(command) = crate::commands::find(&name) {
@@ -1063,7 +1060,7 @@ fn module(inst: Instance, copy: u64) -> HostModule {
                     tracing::warn!("final terminal.kill: {error:#}");
                 }
             } else {
-                request(Request::Run { name, args });
+                request(Request::FromCopy {copy,request:Box::new(Request::Run { name, args })});
             }
             Ok(HostValue::Null)
         })
@@ -1086,6 +1083,10 @@ fn module(inst: Instance, copy: u64) -> HostModule {
         .function("terminals", reader(reads.clone(), "terminals", |s| &s.terminals))
         .function("focused", reader(reads.clone(), "focused", |s| &s.focused))
         .function("layout", reader(reads.clone(), "layout", |s| &s.layout))
+        .function("panel", {
+            let reads=reads.clone();let id=copy.to_string();
+            move |_| Ok(read(&reads,"panels",|s|s.panels.get(&id).unwrap_or(&Value::Null)))
+        })
         .function("layouts", |_| Ok(to_host(&json!(crate::window::layout_names()))))
         .function("commands", |_| {
             let list: Vec<Value> = crate::commands::COMMANDS
@@ -1104,7 +1105,7 @@ fn module(inst: Instance, copy: u64) -> HostModule {
             let list: Vec<Value> = crate::keys::listing().into_iter().map(|(s, k, a)| json!({ "section": s, "keys": k, "action": a })).collect();
             Ok(to_host(&Value::Array(list)))
         })
-        .function("openOverlay", |a| {
+        .function("openOverlay", move |a| {
             let mut spec = from_host(a.value(0)?);
             if spec.get("mod").is_none()
                 && let Some(old) = spec.get("piece").cloned()
@@ -1115,11 +1116,11 @@ fn module(inst: Instance, copy: u64) -> HostModule {
                 return Err(HostError::new("openOverlay needs { mod: \"<folder>\" } or { layout: {...} }"));
             }
             let id = new_overlay_id();
-            request(Request::OpenOverlay { id: id.clone(), spec });
+            request(Request::FromCopy {copy,request:Box::new(Request::OpenOverlay { id: id.clone(), spec })});
             Ok(id.into())
         })
-        .function("closeOverlay", |a| {
-            request(Request::CloseOverlay { id: a.string(0)?.to_owned() });
+        .function("closeOverlay", move |a| {
+            request(Request::FromCopy {copy,request:Box::new(Request::CloseOverlay { id: a.string(0)?.to_owned() })});
             Ok(HostValue::Null)
         })
         .function("notify", |a| {
@@ -1204,7 +1205,7 @@ pub fn install_check_policy() {
 pub fn install_policy() -> async_channel::Receiver<Request> {
     gpui_shell::policy::update_default(|p| {
         p.with_capabilities(capabilities())
-            .with_host_module(module(Instance { name: String::new(), props: Value::Null }, 0))
+            .with_host_module(module(Instance::new(String::new(), Value::Null), 0))
             .expect("herdr module is valid")
     });
     let (tx, rx) = async_channel::unbounded();
@@ -1222,9 +1223,12 @@ pub fn prepare_load(inst: &Instance) -> u64 {
         s.set(s.get() + 1);
         s.get()
     });
-    let dir = app_dir().join("data").join(&inst.name);
+    let dir = match &inst.storage_namespace {
+        Some(namespace) => app_dir().join("data").join("instances").join(namespace),
+        None => app_dir().join("data").join(&inst.name),
+    };
     let _ = std::fs::create_dir_all(&dir);
-    let file = if inst.props.is_null() {
+    let file = if inst.storage_namespace.is_some() || inst.props.is_null() {
         "store.json".to_owned()
     } else {
         use std::hash::{Hash, Hasher};
@@ -1387,7 +1391,7 @@ mod tests {
     #[test]
     fn loading_copies_reclaims_closed_command_channels_without_dispatch() {
         std::thread::spawn(|| {
-            let inst = Instance { name: "test".into(), props: Value::Null };
+            let inst = Instance::new("test".into(), Value::Null);
             let live = module(inst.clone(), 1);
             for copy in 2..102 {
                 drop(module(inst.clone(), copy));
@@ -1639,7 +1643,7 @@ mod tests {
     }
 
     #[test]
-    fn default_mods_restore_shipped_and_move_edits_to_clones() {
+    fn default_mods_preserve_user_versions_and_offer_bundled_updates() {
         let root = std::env::temp_dir().join(format!("herdr-app-sync-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
         let (mods, record) = (root.join("mods"), root.join("installed.json"));
@@ -1658,8 +1662,9 @@ mod tests {
         sync_defaults(&mods, &record, v2).unwrap();
         assert_eq!(read("a/main.js"), "a2", "untouched mods update");
         assert!(!mods.join("a/old.js").exists(), "files the update dropped go");
-        assert_eq!(read("b/main.js"), "b2", "edited mods are restored");
-        assert_eq!(read("b-edited/main.js"), "mine", "edits become a clone");
+        assert_eq!(read("b/main.js"), "mine", "user version stays active");
+        assert!(!mods.join("b-edited").exists(), "no backup mods are created");
+        assert_eq!(updates::pending(&root).unwrap().len(), 1);
         assert_eq!(read("c/main.js"), "c2", "deleted mods are restored");
         std::fs::write(mods.join("b/main.js"), "changed again").unwrap();
 
@@ -1672,9 +1677,24 @@ mod tests {
         sync_defaults(&mods, &record, v4).unwrap();
         assert!(!mods.join("a").exists(), "untouched dropped defaults go");
         assert_eq!(read("b/main.js"), "changed again", "edited dropped defaults stay");
-        assert_eq!(read("b-edited/main.js"), "mine", "clones stay untouched");
         assert_eq!(read("d/notes.md"), "my notes", "a dropped default with an added file stays");
 
         std::fs::remove_dir_all(&root).unwrap();
+    }
+}
+
+#[cfg(test)]
+mod panel_hint_tests {
+    use super::*;
+    #[test]
+    fn openable_panels_are_declared_not_inferred_from_helper_titles() {
+        for meta in [json!({"workspace_header":true}),json!({"place":"left"}),json!({"button":{"opens":"panel","label":"My tools"}})] {
+            assert!(serde_json::from_value::<Hint>(meta).unwrap().panel());
+        }
+        for meta in [json!({"place":"none","title":"Pane header"}),json!({"overlay":{"kind":"dialog"}}),json!({})] {
+            assert!(!serde_json::from_value::<Hint>(meta).unwrap().panel());
+        }
+        let hint:Hint=serde_json::from_value(json!({"button":{"label":"My tools"}})).unwrap();
+        assert_eq!(hint.label("tools"),"My tools");
     }
 }

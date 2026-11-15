@@ -37,7 +37,7 @@ function spaceColor(t, p) {
 export default class Picker extends View {
   init(_props, cx) {
     this.filter = "";
-    this.input = InputState.new({ placeholder: "Go to a tab, space or agent…" });
+    this.input = InputState.new({ placeholder: "Go to a tab, space, agent or panel…" });
     this.input.on("change", (_e, cx) => {
       this.filter = this.input.value();
       this.at = this.filter ? Math.max(0, this.rows().filter(r => r.kind !== "head").findIndex(r => r.kind === "ctx")) : 0;
@@ -96,6 +96,9 @@ export default class Picker extends View {
       out.push({ kind: "earlier", count: quiet.length });
       if (this.showEarlier || f) quiet.forEach(add);
     }
+    for (const panel of props()?.workspacePanels ?? []) {
+      if (!f || panel.title.toLowerCase().includes(f)) out.push({ kind: "panel", panel });
+    }
     out.push({ kind: "new" });
     out.push({ kind: "space", machine: null });
     for (const m of this.machines) out.push({ kind: "space", machine: m });
@@ -112,7 +115,8 @@ export default class Picker extends View {
       return;
     }
     this.close();
-    if (r.kind === "ctx") run("tab.select", { id: r.ctx.id });
+    if (r.kind === "panel") run("workspace.reveal", { panel: r.panel.id });
+    else if (r.kind === "ctx") run("tab.select", { id: r.ctx.id });
     else if (r.kind === "new") run("tab.new");
     else if (r.kind === "space") run("space.new", { machine: r.machine ?? "" });
   }
@@ -202,6 +206,12 @@ export default class Picker extends View {
           .on_click(() => this.go(r))
           .child(div().w(12).child("+"))
           .child(label);
+      }
+      if (r.kind === "panel") {
+        return h_flex().id(`pk-panel-${r.panel.id}`).mx(4).px(10).h(32).rounded(7).gap(10).items_center().cursor_pointer()
+          .when(on, el => el.bg(t.hover)).hover(s => s.bg(t.hover)).on_click(() => this.go(r))
+          .child(div().flex_1().truncate().text_color(t.foreground).child(r.panel.title))
+          .child(div().text_size(11).text_color(t.dim).child("Panel"));
       }
       const who = r.mine.map((a) => a.program?.name ?? "agent").join(" · ");
       const here = r.w.active && r.ctx.active;

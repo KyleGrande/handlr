@@ -328,6 +328,9 @@ pub struct ClonedFrom {
 pub struct Node {
     #[serde(default)]
     pub id: String,
+    /// Opt-in local workspace document; only read on a layout root.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub workspace: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cloned_from: Option<ClonedFrom>,
     #[serde(flatten)]
@@ -409,6 +412,7 @@ impl Node {
     pub fn new(id: impl Into<String>, kind: Kind) -> Node {
         Node {
             id: id.into(),
+            workspace: None,
             cloned_from: None,
             kind,
             size: None,

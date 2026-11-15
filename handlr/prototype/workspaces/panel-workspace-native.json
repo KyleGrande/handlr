@@ -1,0 +1,265 @@
+{
+  "version": 1,
+  "panels": {
+    "prototype-changes-body": {
+      "id": "prototype-changes-body",
+      "content": {
+        "kind": "mod",
+        "name": "changes",
+        "props": null,
+        "duplicable": false
+      },
+      "binding": {
+        "kind": "follow_active"
+      },
+      "storage_namespace": null
+    },
+    "prototype-files-body": {
+      "id": "prototype-files-body",
+      "content": {
+        "kind": "mod",
+        "name": "files",
+        "props": null,
+        "duplicable": false
+      },
+      "binding": {
+        "kind": "follow_active"
+      },
+      "storage_namespace": null
+    },
+    "prototype-context-body": {
+      "id": "prototype-context-body",
+      "content": {
+        "kind": "mod",
+        "name": "context",
+        "props": null,
+        "duplicable": false
+      },
+      "binding": {
+        "kind": "follow_active"
+      },
+      "storage_namespace": null
+    },
+    "prototype-spaces-body": {
+      "id": "prototype-spaces-body",
+      "content": {
+        "kind": "mod",
+        "name": "spaces",
+        "props": null,
+        "duplicable": false
+      },
+      "binding": {
+        "kind": "follow_active"
+      },
+      "storage_namespace": null
+    },
+    "prototype-agents-body": {
+      "id": "prototype-agents-body",
+      "content": {
+        "kind": "mod",
+        "name": "agents",
+        "props": null,
+        "duplicable": false
+      },
+      "binding": {
+        "kind": "follow_active"
+      },
+      "storage_namespace": null
+    },
+    "prototype-toolbox-body": {
+      "id": "prototype-toolbox-body",
+      "content": {
+        "kind": "mod",
+        "name": "toolbox",
+        "props": null,
+        "duplicable": false
+      },
+      "binding": {
+        "kind": "follow_active"
+      },
+      "storage_namespace": null
+    },
+    "prototype-rigs-body": {
+      "id": "prototype-rigs-body",
+      "content": {
+        "kind": "mod",
+        "name": "rigs",
+        "props": null,
+        "duplicable": false
+      },
+      "binding": {
+        "kind": "follow_active"
+      },
+      "storage_namespace": null
+    }
+  },
+  "groups": [
+    {
+      "id": "prototype-code-group",
+      "active_view_id": "prototype-code",
+      "views": [
+        {
+          "id": "prototype-code",
+          "title": "Code",
+          "sections": [
+            {
+              "id": "prototype-changes-section",
+              "panel_id": "prototype-changes-body",
+              "collapsed": false,
+              "weight": 1,
+              "min_extent": 72
+            },
+            {
+              "id": "prototype-files-section",
+              "panel_id": "prototype-files-body",
+              "collapsed": false,
+              "weight": 2,
+              "min_extent": 72
+            }
+          ]
+        },
+        {
+          "id": "prototype-context",
+          "title": "Context",
+          "sections": [
+            {
+              "id": "prototype-context-section",
+              "panel_id": "prototype-context-body",
+              "collapsed": false,
+              "weight": 1,
+              "min_extent": 72
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "prototype-navigation-group",
+      "active_view_id": "prototype-spaces",
+      "views": [
+        {
+          "id": "prototype-spaces",
+          "title": "Spaces",
+          "sections": [
+            {
+              "id": "prototype-spaces-section",
+              "panel_id": "prototype-spaces-body",
+              "collapsed": false,
+              "weight": 1,
+              "min_extent": 72
+            }
+          ]
+        },
+        {
+          "id": "prototype-agents",
+          "title": "Agents",
+          "sections": [
+            {
+              "id": "prototype-agents-section",
+              "panel_id": "prototype-agents-body",
+              "collapsed": false,
+              "weight": 1,
+              "min_extent": 72
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "prototype-toolbox-group",
+      "active_view_id": "prototype-toolbox",
+      "views": [
+        {
+          "id": "prototype-toolbox",
+          "title": "Toolbox",
+          "sections": [
+            {
+              "id": "prototype-toolbox-section",
+              "panel_id": "prototype-toolbox-body",
+              "collapsed": false,
+              "weight": 1,
+              "min_extent": 72
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "prototype-rigs-group",
+      "active_view_id": "prototype-rigs",
+      "views": [
+        {
+          "id": "prototype-rigs",
+          "title": "Rigs",
+          "sections": [
+            {
+              "id": "prototype-rigs-section",
+              "panel_id": "prototype-rigs-body",
+              "collapsed": false,
+              "weight": 1,
+              "min_extent": 72
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "zones": [
+    {
+      "edge": "left",
+      "extent": 320,
+      "hidden": false,
+      "groups": [
+        {
+          "group_id": "prototype-code-group",
+          "weight": 3
+        },
+        {
+          "group_id": "prototype-navigation-group",
+          "weight": 2
+        }
+      ]
+    },
+    {
+      "edge": "right",
+      "extent": 320,
+      "hidden": false,
+      "groups": [
+        {
+          "group_id": "prototype-toolbox-group",
+          "weight": 1
+        },
+        {
+          "group_id": "prototype-rigs-group",
+          "weight": 1
+        }
+      ]
+    },
+    {
+      "edge": "top",
+      "extent": 200,
+      "hidden": true,
+      "groups": []
+    },
+    {
+      "edge": "bottom",
+      "extent": 200,
+      "hidden": true,
+      "groups": []
+    },
+    {
+      "edge": "top_center",
+      "extent": 200,
+      "hidden": true,
+      "groups": []
+    },
+    {
+      "edge": "bottom_center",
+      "extent": 200,
+      "hidden": true,
+      "groups": []
+    }
+  ],
+  "floating": [],
+  "focused_panel_id": null
+}
