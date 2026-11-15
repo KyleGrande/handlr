@@ -1,6 +1,7 @@
 import { View, div, svg, image } from "gpui-kit";
 import { h_flex, ScrollHandle } from "gpui-base";
 import { spaces, panes, run, openOverlay, theme, window, shared, setShared, layout, settings, props } from "herdr";
+import { startGlass } from "./glass.js";
 
 function find(node, id) {
   if (node?.id === id) return node;
@@ -118,7 +119,8 @@ function label(tab, lead) {
 }
 
 export default class Tabs extends View {
-  init() {
+  init(_props, cx) {
+    startGlass(cx);
     this.dockVisibility = new DockVisibility();
     this.pressed = null;
     this.scroll = ScrollHandle.new();

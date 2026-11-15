@@ -263,6 +263,13 @@ app background, preserving the app canvas and terminal background colors.
 Panel shells and title rows use the `surface` color so seamless mode clears
 their own fills as well as the surrounding frame.
 The Settings mod manages this color preset and restores previous colors when disabled.
+Settings → Look → Glass adds an opt-in frosted finish on macOS layouts using the
+bundled tabs panel, including Handlr. Bundled layouts open as personal copies.
+Glass follows the selected theme, keeps terminals opaque, and restores only its
+own overrides when disabled. It is mutually exclusive with Seamless in Settings.
+The Settings/tabs mods own per-layout preference and restoration in `glass.json`;
+do not edit that journal while enabled. Reduced transparency or a failed native
+accessibility query selects opaque fills (checked at most every fifteen seconds).
 In macOS fullscreen, content uses the height normally reserved for window buttons.
 
 In macOS panel workspaces, left/top/bottom/right controls sit on the window-button
