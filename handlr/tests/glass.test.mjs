@@ -91,7 +91,7 @@ test('bundled layouts are cloned rather than rewritten', async () => {
   assert.equal(f.files.get('/app/layouts/main.json'), shipped);
 });
 
-test('Seamless transition restores every layout before capturing personal color overrides', async () => {
+test('explicit Glass reset restores every layout without touching personal color overrides', async () => {
   const f = fixture();
   await f.api.setGlass(true);
   f.values.layout = 'second';
@@ -163,30 +163,34 @@ test('controller copies remain synchronized across the mod module sandbox', asyn
   }
 });
 
-test('Settings transitions restore Seamless before Glass captures its baseline', async () => {
+test('Settings toggles Glass and Seamless independently and immediately refreshes their combination', async () => {
   const text = (await readFile(new URL('../../defaults/frame/settings/main.js', import.meta.url), 'utf8'))
     .replace(/^import .*;\n/gm, '').replace('export default class Settings', 'class Settings');
   const events = [];
   let enabled = false;
-  const { Settings, toggleSeamless } = new Function('View', 'window', 'setGlass', 'disableAllGlass', 'glassEnabled', 'notify',
+  const { Settings, toggleSeamless } = new Function('View', 'window', 'setGlass', 'glassEnabled', 'notify',
     text + '; return {Settings,toggleSeamless};')(
     class {}, () => ({ platform: 'macos' }), async value => { events.push(['glass', value]); enabled = value; },
-    async () => { events.push(['restore-all']); enabled = false; }, () => enabled, value => { throw new Error(value.body); });
+    () => enabled, value => { throw new Error(value.body); });
   const view = new Settings();
   view.person = { colors: { chrome: '#123456', surface: '#654321', accent: '#abcdef' } };
   const original = structuredClone(view.person);
   toggleSeamless(view.person);
-  view.save = async edit => { edit(view.person); events.push(['saved', structuredClone(view.person)]); return null; };
+  view.save = async edit => { edit(view.person); return null; };
   let pending;
   const cx = { spawn: task => { pending = task(cx); }, notify() {} };
   view.appearancePreset(true, cx); await pending;
-  assert.deepEqual(view.person, original);
-  assert.deepEqual(events.at(-1), ['glass', true]);
+  assert.equal(enabled, true);
+  assert.equal(view.person.seamless, true, 'Glass must not disable Seamless');
   view.appearancePreset(false, cx); await pending;
+  assert.equal(enabled, true, 'Seamless must not disable Glass');
+  assert.deepEqual(view.person, original);
+  assert.deepEqual(events.at(-1), ['glass', true], 'refresh material after changing Seamless');
+  view.appearancePreset(false, cx); await pending;
+  view.appearancePreset(true, cx); await pending;
   assert.equal(enabled, false);
-  assert.equal(view.person.seamless, true);
-  assert.deepEqual(events.at(-2), ['restore-all']);
-  toggleSeamless(view.person);
+  assert.equal(view.person.seamless, true, 'disabling Glass keeps Seamless on');
+  view.appearancePreset(false, cx); await pending;
   assert.deepEqual(view.person, original);
 });
 
@@ -247,7 +251,7 @@ test('material adapts smoke and terminal tint to the theme without changing text
   const light = pure.glassMaterial({ ...palette, background: '#ffffff', surface: '#ffffff' }, true);
   assert.ok(parseInt(dark.background.slice(-2), 16) < 100, 'dark backdrop must remain glass rather than a dense smoke layer');
   assert.equal(light.background, '#ffffff2e');
-  assert.equal(dark.background.slice(0, 7), '#25272b', 'lift the dark terminal above black');
+  assert.equal(dark.background.slice(0, 7), '#2e3034', 'lift the dark terminal above black');
   assert.equal(light.terminal_opacity, dark.terminal_opacity, 'all resting terminals use the same light fill');
   assert.equal(dark.border, palette.border);
 });
@@ -284,7 +288,7 @@ test('Glass journals a denser focus fill while every resting terminal stays tran
   await f.api.setGlass(true);
   const pane = () => f.root().children[1].content.pane;
   assert.equal(pane().background, 'surface');
-  assert.equal(pane().focus_background, '#25272bb3');
+  assert.equal(pane().focus_background, '#2e3034b3');
   assert.equal(f.root().terminal_opacity, .10);
   f.current.dark = false;
   await f.api.setGlass(true);
@@ -303,4 +307,46 @@ test('independent focused-fill edits survive disabling Glass', async () => {
   f.edit(root => { root.children[1].content.pane.focus_background = '#11223388'; });
   await f.api.setGlass(false);
   assert.equal(f.root().children[1].content.pane.focus_background, '#11223388');
+});
+
+test('combined presets clear panel layers, outlines and shadows while preserving the focused terminal fill', () => {
+  const original = { id: 'terminals', content: { pane: { background: 'background', shadow: 'lg' } } };
+  const initial = pure.newGlassState(original);
+  const glass = pure.reconcileGlass(original, initial, palette, {}, true);
+  glass.state.pending = false;
+  const combined = pure.reconcileGlass(glass.root, glass.state, palette, { chrome: '#00000000', surface: '#00000000', border: '#00000000' }, true, true);
+  for (const key of ['chrome', 'surface', 'border']) assert.equal(combined.root.colors[key], '#00000000');
+  assert.equal(combined.root.content.pane.shadow, undefined);
+  assert.equal(combined.root.content.pane.background, 'surface');
+  assert.equal(combined.root.content.pane.focus_background, '#2e3034b3');
+  assert.equal(combined.root.window_blur, true);
+  combined.state.pending = false;
+  const back = pure.reconcileGlass(combined.root, combined.state, palette, {}, true, false);
+  assert.deepEqual(back.root, glass.root, 'turning Seamless off restores Glass without recapturing its own styling');
+  back.state.enabled = false; back.state.pending = false;
+  assert.deepEqual(pure.reconcileGlass(back.root, back.state, palette, {}, false).root, original);
+});
+
+test('Glass can start alongside Seamless and disable without changing Seamless settings', async () => {
+  const f = fixture();
+  const person = { seamless: true, seamless_colors: { surface: '#112233' }, colors: { chrome:'#00000000', surface:'#00000000', border:'#00000000' } };
+  f.files.set('/app/settings.json', JSON.stringify(person));
+  await f.api.setGlass(true);
+  assert.equal(f.root().colors.surface, '#00000000');
+  await f.api.setGlass(false);
+  assert.deepEqual(JSON.parse(f.files.get('/app/settings.json')), person);
+  assert.equal(f.root().colors, undefined);
+});
+
+test('combined mode preserves independent edits and selects opaque accessibility fallback', () => {
+  const original = { id: 'terminal', content: { pane: {} } };
+  const glass = pure.reconcileGlass(original, pure.newGlassState(original), palette, {}, true, true);
+  glass.root.colors.surface = '#123456';
+  glass.state.pending = false;
+  const reduced = pure.reconcileGlass(glass.root, glass.state, palette, {}, false, true);
+  assert.equal(reduced.root.colors.surface, '#123456');
+  assert.equal(reduced.root.colors.background, '#17191dff');
+  assert.equal(reduced.root.window_blur, false);
+  assert.equal(reduced.root.terminal_opacity, 1);
+  assert.equal(reduced.root.content.pane.focus_background, undefined);
 });

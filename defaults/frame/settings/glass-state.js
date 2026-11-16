@@ -11,9 +11,9 @@ export function glassMaterial(baseline, blur) {
   const dark = channels[0] * .2126 + channels[1] * .7152 + channels[2] * .0722 < 128;
   // Keep every pane translucent; lift the dark tint without building up
   // dense background layers inside each card.
-  const tint = dark && blur ? '#' + channels.map(c => Math.round(c + (255 - c) * .06).toString(16).padStart(2, '0')).join('') : baseline.background;
+  const tint = dark && blur ? '#' + channels.map(c => Math.round(c + (255 - c) * .10).toString(16).padStart(2, '0')).join('') : baseline.background;
   return {
-    background: alpha(tint, blur ? (dark ? .30 : .18) : 1),
+    background: alpha(tint, blur ? (dark ? .24 : .18) : 1),
     canvas: alpha(baseline.canvas, blur ? .02 : 1),
     chrome: alpha(baseline.chrome, blur ? .06 : 1),
     surface: alpha(baseline.surface, blur ? .14 : 1),
@@ -35,7 +35,7 @@ export function newGlassState(root) {
 
 // Compare only fields we own; layout structure and other colors are never saved
 // or replayed. A pending write accepts either side of its write-ahead journal.
-export function reconcileGlass(root, state, palette, personColors, blur) {
+export function reconcileGlass(root, state, palette, personColors, blur, seamless = false) {
   const next = copy(root), entry = copy(state);
   const current = { ...(root.colors ?? {}), window_blur: root.window_blur, terminal_opacity: root.terminal_opacity };
   for (const [key, applied] of Object.entries(entry.applied)) {
@@ -46,6 +46,9 @@ export function reconcileGlass(root, state, palette, personColors, blur) {
   blur = blur && !(entry.protected.window_blur && root.window_blur !== true);
   const baseline = { ...palette, ...personColors, ...entry.saved.colors };
   const material = glassMaterial(baseline, blur);
+  if (seamless) {
+    for (const key of ["chrome", "surface", "border"]) material[key] = "#00000000";
+  }
   next.colors ??= {};
   for (const key of [...KEYS, "window_blur", "terminal_opacity"]) {
     if (entry.protected[key]) continue;
@@ -58,7 +61,7 @@ export function reconcileGlass(root, state, palette, personColors, blur) {
   entry.before = Object.fromEntries([...KEYS, "window_blur", "terminal_opacity"].filter(key => current[key] !== undefined).map(key => [key, current[key]]));
   entry.applied = Object.fromEntries([...KEYS, "window_blur", "terminal_opacity"].filter(key => !entry.protected[key]).map(key => [key,
     KEYS.includes(key) ? next.colors?.[key] : next[key]]).filter(([, value]) => value !== undefined));
-  reconcileCards(next, entry, blur);
+  reconcileCards(next, entry, blur, seamless);
   entry.pending = true;
   return { root: next, state: entry };
 }
@@ -69,7 +72,7 @@ export function glassCanBlur(platform, result) {
 
 // PaneFrame already supports shadows and rounding. Keep their provenance beside
 // the color journal so disabling Glass never replays an old layout document.
-function reconcileCards(root, entry, blur) {
+function reconcileCards(root, entry, blur, seamless) {
   entry.cards ??= {};
   const visit = (node, path) => {
     const pane = node.content?.pane;
@@ -82,7 +85,7 @@ function reconcileCards(root, entry, blur) {
       }
       if (card) {
         const before = {};
-        for (const [key, value] of Object.entries({ shadow: blur ? 'sm' : undefined, radius: 12, background: 'surface', focus_background: alpha(root.colors?.background, .70) })) {
+        for (const [key, value] of Object.entries({ shadow: blur && !seamless ? 'sm' : undefined, radius: 12, background: 'surface', focus_background: alpha(root.colors?.background, .70) })) {
           if (!Object.hasOwn(card.saved, key)) card.saved[key] = { had: Object.hasOwn(pane, key), value: pane[key] ?? null };
           if (Object.hasOwn(pane, key)) before[key] = pane[key];
           if (Object.hasOwn(card.applied, key) && !same(pane[key] ?? null, card.applied[key])

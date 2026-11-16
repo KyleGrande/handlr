@@ -902,7 +902,10 @@ What's about the user, never a look:
   disabling Glass restores their prior fills and look.
   It is per layout; enabling on a bundled layout creates a personal copy named
   `<layout>-glass` (with a suffix if needed). It never rewrites bundled layouts.
-  Glass and Seamless are mutually exclusive in Settings. Disabling restores
+  Glass and Seamless can be enabled independently or together. Together,
+  Seamless clears panel fills, outlines and card shadows while Glass keeps
+  the frost and the focused terminal’s denser fill. Disabling either preserves
+  the other; disabling Glass restores
   prior overrides, preserving independent edits. The Settings and tabs mods own
   the `glass.json` restoration journal and `settings.glass` shared status; these
   are not native settings.json keys. Do not edit the journal while Glass is on.

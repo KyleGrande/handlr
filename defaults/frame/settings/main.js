@@ -4,7 +4,7 @@ import { View, div, svg, image } from "gpui-kit";
 import { v_flex, h_flex, Scrollbar, InputState, Input, Popup } from "gpui-base";
 import { hc, exec, layout, run, theme, themes, fonts, updates, telemetry, settings, layouts, shared, setShared, appHome, readTextFile, writeTextFile, playSound, props, closeOverlay, notify, window } from "herdr";
 import { readMods, modCommand, modPanels } from "./mods.js";
-import { glassEnabled, glassSupported, setGlass, disableAllGlass, startGlass } from "./glass.js";
+import { glassEnabled, glassSupported, setGlass, startGlass } from "./glass.js";
 
 const I = (name) => `frame/settings/${name}.svg`;
 
@@ -200,19 +200,13 @@ export default class Settings extends View {
     this.appearanceBusy = true;
     cx.spawn(async cx => {
       try {
-        if (glass) {
-          if (glassEnabled()) await setGlass(false);
-          else {
-            const failed = await this.save(person => { if (person.seamless) toggleSeamless(person); });
-            if (failed) throw new Error(failed.title);
-            await setGlass(true);
-          }
-        } else {
-          // Seamless is global, so restore material ownership on every layout
-          // before it captures personal colors as its baseline.
-          await disableAllGlass();
+        if (glass) await setGlass(!glassEnabled());
+        else {
           const failed = await this.save(toggleSeamless);
           if (failed) throw new Error(failed.title);
+          // Both presets can be active: Glass supplies the frost/focus fill,
+          // while Seamless clears panel layers and outlines.
+          if (glassEnabled()) await setGlass(true);
         }
       } catch (error) {
         notify({ title: "Appearance was not changed", body: String(error?.message ?? error), level: "error" });
@@ -689,10 +683,10 @@ export default class Settings extends View {
         this.toggle(t, "st-remember-per-space", Boolean(shared("layouts.remember-per-space")), () => run("workspace.remember", { enabled: !shared("layouts.remember-per-space") }))))
       .child(this.row(t, "Hide panel buttons", "Hide dock and terminal-only buttons in the window bar and fullscreen tab bar.",
         this.toggle(t, "st-hide-panel-buttons", Boolean(shared("tabs.hide-panel-buttons")), () => setShared("tabs.hide-panel-buttons", !shared("tabs.hide-panel-buttons")))))
-      .child(this.row(t, "Seamless", "Remove panel outlines and blend panels into the app background.",
+      .child(this.row(t, "Seamless", "Remove panel outlines and blend panels into the app background. Works with Glass.",
         this.toggle(t, "st-seamless", Boolean(p.seamless), (_e, cx) => this.appearancePreset(false, cx))))
       .child(this.row(t, "Glass", glassSupported()
-        ? "Frost this layout in your theme. Bundled layouts open as personal copies; reduced transparency uses opaque surfaces."
+        ? "Frost every pane, with a denser fill only on the focused terminal. Can be combined with Seamless; reduced transparency uses opaque surfaces."
         : "Available on macOS in layouts using the bundled tabs panel.",
         this.toggle(t, "st-glass", glassEnabled(), (_e, cx) => {
           if (glassSupported() || glassEnabled()) this.appearancePreset(true, cx);

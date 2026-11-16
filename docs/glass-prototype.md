@@ -18,7 +18,10 @@ and reverting to opaque defaults.
 Settings → Look → Glass starts off. It is available on macOS layouts using
 bundled tabs, including Handlr. Shipped layouts are copied before enabling;
 personal layouts retain their composition, theme and unrelated colors. Glass
-and Seamless are mutually exclusive in the UI. Disabling Glass restores fields
+and Seamless can be enabled independently or together. In the combined mode,
+Seamless clears panel fills, outlines and card shadows while Glass keeps the
+frost and focused-terminal fill. Disabling either keeps the other active.
+Disabling Glass restores fields
 it still owns, preserving independent color, opacity, blur and structural edits.
 The file writes use compare-and-swap guards and a write-ahead restoration journal.
 
@@ -63,8 +66,8 @@ No installed settings, mods, layouts or workspace documents are copied or edited
 The reference palettes are Atom One Dark and Paper. Supply existing theme JSON
 files with `--dark-theme` and `--light-theme` to study another palette. Text,
 selection, focus and custom border colors stay under theme control. Glass lifts
-the dark background tint 6% toward white to avoid black terminal wells. Its
-backdrop uses 30% tint in dark themes and 18% in light themes; canvas adds
+the dark background tint 10% toward white to avoid black terminal wells. Its
+backdrop uses 24% tint in dark themes and 18% in light themes; canvas adds
 2% and chrome 6%. Panel surfaces use 14%. Resting terminal backgrounds use 10%
 per paint pass (two passes), over a `surface` card background. Only the focused
 terminal gets a 70% tinted `focus_background` on its frame. The renderer follows
@@ -102,8 +105,9 @@ The opaque variant disables root blur and makes all material fills opaque.
   the terminal palette uses background RGB. Glass lifts dark background RGB slightly while keeping foreground and ANSI
   colors unchanged; terminal opacity applies only to background painting.
 - `defaults/frame/settings/main.js`: Seamless saves its own color overrides and
-  restores only values it still owns. A future material must restore Seamless
-  before capturing a baseline, and must remain active when Settings is closed.
+  restores only values it still owns. Glass layers its material over the
+  independently owned Seamless preference and remains active after Settings
+  closes. Toggling Seamless refreshes Glass without recapturing styled colors.
 - `defaults/herdr.d.ts`: `window()` exposes OS, focus and window state, but no
   reduced-transparency or blur-capability signal.
 - `vendor/gpui-pre-macos/src/window.rs`: older macOS uses NSVisualEffectView;
@@ -183,3 +187,12 @@ every terminal and the old pane focus field changes only the border, so mods
 could not supply the independent focused fill. Kyle approved adding the
 optional `content.pane.focus_background` field. Existing layouts without it
 retain their previous rendering. Mod panes do not receive this focus fill.
+
+### Lighter tint and combined mode (2026-11-16)
+
+Dark Glass now lifts the background tint 10% toward white and reduces its
+backdrop alpha from 30% to 24%. Glass and Seamless no longer disable one another.
+The Glass controller reads the existing `seamless` preference and clears
+chrome/surface/border colors plus its own card shadows in combined mode. The
+focused-terminal fill stays denser. Restoration remains independent, and
+reduced-transparency fallback still uses an opaque window and terminal fill.

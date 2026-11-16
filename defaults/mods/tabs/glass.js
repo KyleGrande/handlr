@@ -70,7 +70,7 @@ async function sync(state, raw, name, force = false) {
   const palette = selectedPalette();
   if (!palette) throw new Error("The current theme is unavailable");
   const person = parse(await readTextFile(`${appHome()}/settings.json`), {});
-  const next = reconcileGlass(root, entry, palette, person.colors ?? {}, entry.enabled && await canBlur(force));
+  const next = reconcileGlass(root, entry, palette, person.colors ?? {}, entry.enabled && await canBlur(force), Boolean(person.seamless));
   const changed = JSON.stringify(root) !== JSON.stringify(next.root);
   if (changed) {
     // Persist restoration provenance before touching the layout. A crash or
