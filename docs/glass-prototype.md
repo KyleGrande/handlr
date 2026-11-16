@@ -164,7 +164,10 @@ local tabs mod required its unchanged glass controller file to be updated
 explicitly; its unrelated customizations were preserved.
 
 The live restoration journal confirmed both appearance palettes and their
-adaptive fills were applied. Later native captures repeatedly returned the
-same light frame after switching the live app to dark, so the final dark
-material and exact Rex match are not visually signed off. Light appearance
-was restored after the check.
+adaptive fills were applied. Initial captures repeated a stale frame; raising
+the window through its native accessibility action refreshed the render.
+Subsequent captures verified the final light and dark materials: light terminal
+cards are brighter than the surrounding workspace, and dark terminal cards use
+a lifted tint over a deeper smoked backdrop. Light appearance was restored and
+visually verified afterward. This is a focused material/contrast smoke check;
+full accessibility, fullscreen and performance acceptance remains pending.
