@@ -557,6 +557,10 @@ The tab block says how each pane of the shown tab is wrapped:
 
 - The look applies to every pane; `focus` replaces the border while the
   pane has the keyboard; `gap` is the space between panes.
+- Optional `focus_background` replaces `background` for the focused terminal
+  only, e.g. `"focus_background": "#ffffffb3"`. Other terminals and mod panes
+  retain `background`. It accepts the same color, gradient, or image forms;
+  when absent, focus changes only the border as before.
 - `header`: a mod drawn on each pane, one copy per pane, with
   `props().pane` and `props().terminal`. It reads its live facts from
   `panes()` (title, folder, branch, agent status, focused, zoomed) and its
@@ -890,10 +894,18 @@ What's about the user, never a look:
   turning it off restores them. Theme and appearance changes continue to work.
 - **Settings → Look → Glass** is an opt-in macOS finish for layouts using the
   bundled tabs panel, including Handlr. It follows the chosen theme, frosts the
-  workspace, keeps terminal text/backgrounds opaque, and uses dense popup fills.
+  workspace and terminal backgrounds, keeps text opaque, and uses dense popup fills.
+  Every panel and resting terminal stays translucent. Only the focused terminal
+  gets a denser fill through the pane frame’s `focus_background`; it follows
+  focus immediately without writing layouts or changing text opacity. Dark
+  themes use a slightly lifted tint. Rounded terminal cards use soft shadows;
+  disabling Glass restores their prior fills and look.
   It is per layout; enabling on a bundled layout creates a personal copy named
   `<layout>-glass` (with a suffix if needed). It never rewrites bundled layouts.
-  Glass and Seamless are mutually exclusive in Settings. Disabling restores
+  Glass and Seamless can be enabled independently or together. Together,
+  Seamless clears panel fills, outlines and card shadows while Glass keeps
+  the frost and the focused terminal’s denser fill. Disabling either preserves
+  the other; disabling Glass restores
   prior overrides, preserving independent edits. The Settings and tabs mods own
   the `glass.json` restoration journal and `settings.glass` shared status; these
   are not native settings.json keys. Do not edit the journal while Glass is on.

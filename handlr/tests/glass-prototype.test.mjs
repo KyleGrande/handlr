@@ -4,7 +4,7 @@ import { readFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { materialTheme, paper, preparePrototype, prototypeLayout } from '../scripts/glass-prototype.mjs';
 
-test('material variants preserve palette RGB and text colors across appearances', () => {
+test('material variants preserve palette and text colors while adapting glass tint', () => {
   for (const background of ['#17191d', '#ffffff']) {
     const palette = { ...paper, background, colors: { foreground: '#112233', accent: '#456789', border: '#12345678' } };
     const original = structuredClone(palette);
@@ -12,8 +12,9 @@ test('material variants preserve palette RGB and text colors across appearances'
       const theme = materialTheme(palette, glass);
       for (const key of ['background', 'foreground', 'selection', 'cursor', 'ansi']) assert.deepEqual(theme[key], palette[key]);
       for (const key of ['foreground', 'accent', 'border']) assert.equal(theme.colors[key], palette.colors[key]);
-      assert.equal(theme.colors.background.slice(0, 7), background);
-      assert.equal(theme.colors.background.slice(-2), glass ? '66' : 'ff');
+      if (!glass || background === '#ffffff') assert.equal(theme.colors.background.slice(0, 7), background);
+      else assert.equal(theme.colors.background.slice(0, 7), '#2e3034');
+      assert.equal(theme.colors.background.slice(-2), glass ? (background === '#ffffff' ? '2e' : '3d') : 'ff');
       for (const key of ['popover', 'raised']) assert.match(theme.colors[key], /ff$/);
     }
     assert.deepEqual(palette, original);
@@ -29,12 +30,12 @@ test('invalid palettes and layout-owned looks fail instead of silently replacing
   }
 });
 
-test('personal variants leave the original layout intact and keep terminals opaque', () => {
+test('personal variants leave the original layout intact and give terminals translucent backgrounds', () => {
   const layout = { id: 'root', children: [{ content: { pane: { background: 'background' } } }] };
   const original = structuredClone(layout);
   const glass = prototypeLayout(layout, 'glass');
   assert.equal(glass.window_blur, true);
-  assert.equal(glass.terminal_opacity, 1);
+  assert.equal(glass.terminal_opacity, 0.10);
   assert.equal(glass.children[0].content.pane.background, 'surface');
   assert.equal(prototypeLayout(layout, 'opaque').window_blur, false);
   assert.deepEqual(layout, original);

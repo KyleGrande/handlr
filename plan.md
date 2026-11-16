@@ -40,8 +40,9 @@ updates, and platform behavior before choosing the final integration.
 Add **Settings → Look → Glass**, initially off.
 
 - Enabling Glass applies the tuned material while retaining the chosen theme.
-- Glass and Seamless are mutually exclusive in the UI. Transitions preserve
-  the original custom colors rather than saving the other preset as a baseline.
+- Glass and Seamless can be enabled independently or combined. Together they
+  retain frost and the focused-terminal fill while removing panel fills,
+  outlines and shadows. Each preset preserves its original restoration baseline.
 - Disabling Glass restores previous overrides while preserving independent
   edits made while it was enabled.
 - Theme and system appearance changes refresh the material appropriately.
@@ -101,7 +102,8 @@ compatibility; discuss any breaking change before proceeding.
 - Terminal text, icons, selections, focus indicators, and notifications remain
   legible over bright, dark, and busy backgrounds.
 - Disabling Glass restores prior overrides without losing independent edits.
-- Switching between Glass and Seamless does not corrupt saved appearance state.
+- Combining Glass and Seamless, or disabling either independently, does not
+  corrupt saved appearance state.
 - Theme changes, layout switching, and restart retain the intended preference
   without overriding layout-owned looks unexpectedly.
 - Missing blur support and reduced transparency retain readable opaque surfaces.

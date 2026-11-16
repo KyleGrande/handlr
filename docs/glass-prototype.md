@@ -3,8 +3,11 @@
 The Settings control is implemented in `defaults/frame/settings/main.js`.
 `glass.js` owns per-layout preference and restoration in the mod-owned
 `glass.json` file. A copy runs inside bundled tabs so theme/accessibility changes
-continue to update the material after Settings closes. No native settings,
-commands, layout-schema fields, mod APIs or Core state were added.
+continue to update the material after Settings closes. Preset styling and
+restoration remain mod-owned. Kyle approved the optional local pane-frame
+`focus_background` rendering field on 2026-11-16: it changes only the focused
+terminal’s fill, leaving other panes translucent. No native setting, command,
+shared mod API or Core state was added.
 The native workspace adapter now carries the file root's existing look and
 `window_blur` onto the displayed wrapper root, including maximized groups.
 Previously it kept those fields only on the nested center, so root material and
@@ -15,7 +18,10 @@ and reverting to opaque defaults.
 Settings → Look → Glass starts off. It is available on macOS layouts using
 bundled tabs, including Handlr. Shipped layouts are copied before enabling;
 personal layouts retain their composition, theme and unrelated colors. Glass
-and Seamless are mutually exclusive in the UI. Disabling Glass restores fields
+and Seamless can be enabled independently or together. In the combined mode,
+Seamless clears panel fills, outlines and card shadows while Glass keeps the
+frost and focused-terminal fill. Disabling either keeps the other active.
+Disabling Glass restores fields
 it still owns, preserving independent color, opacity, blur and structural edits.
 The file writes use compare-and-swap guards and a write-ahead restoration journal.
 
@@ -58,13 +64,21 @@ They share a workspace document so changing material retains the composition.
 No installed settings, mods, layouts or workspace documents are copied or edited.
 
 The reference palettes are Atom One Dark and Paper. Supply existing theme JSON
-files with `--dark-theme` and `--light-theme` to study another palette. Palette
-RGB, terminal colors, text, selections, focus colors and custom borders remain
-unchanged. Only material surface alphas change. Terminals stay fully opaque.
-The root background (40%) and canvas (30%) combine to approximately 58% opacity;
-panel headers use a denser 78% surface. Popover and raised surfaces are opaque.
-These are provisional study values, not visually approved values. Dialog/mod
-content using `background` instead of `popover` can still be translucent.
+files with `--dark-theme` and `--light-theme` to study another palette. Text,
+selection, focus and custom border colors stay under theme control. Glass lifts
+the dark background tint 10% toward white to avoid black terminal wells. Its
+backdrop uses 24% tint in dark themes and 18% in light themes; canvas adds
+2% and chrome 6%. Panel surfaces use 14%. Resting terminal backgrounds use 10%
+per paint pass (two passes), over a `surface` card background. Only the focused
+terminal gets a 70% tinted `focus_background` on its frame. The renderer follows
+focus immediately; mods do not poll focus or rewrite layout files on clicks.
+Glyphs and explicitly colored application cells stay opaque. Popovers and
+raised controls retain dense fills for readability.
+
+Terminal cards use soft shadows and 12px corners. Their background, focused
+background, shadow and radius are journaled; disabling Glass restores prior
+values and preserves independent edits without replaying layout structure.
+Opaque accessibility fallback restores the authored pane fills.
 
 Before switching to glass, check native reduced transparency, e.g. on macOS:
 
@@ -88,11 +102,12 @@ The opaque variant disables root blur and makes all material fills opaque.
   `window_blur`. Mods can edit a personal layout using existing commands; this
   requires ownership/restoration bookkeeping and cannot rewrite shipped layouts.
 - `src/terminal.rs` and `src/vt.rs`: terminal opacity affects background painting;
-  the terminal palette uses background RGB. Preserving RGB while adjusting alpha
-  avoids substituting a different terminal palette.
+  the terminal palette uses background RGB. Glass lifts dark background RGB slightly while keeping foreground and ANSI
+  colors unchanged; terminal opacity applies only to background painting.
 - `defaults/frame/settings/main.js`: Seamless saves its own color overrides and
-  restores only values it still owns. A future material must restore Seamless
-  before capturing a baseline, and must remain active when Settings is closed.
+  restores only values it still owns. Glass layers its material over the
+  independently owned Seamless preference and remains active after Settings
+  closes. Toggling Seamless refreshes Glass without recapturing styled colors.
 - `defaults/herdr.d.ts`: `window()` exposes OS, focus and window state, but no
   reduced-transparency or blur-capability signal.
 - `vendor/gpui-pre-macos/src/window.rs`: older macOS uses NSVisualEffectView;
@@ -101,9 +116,10 @@ The opaque variant disables root blur and makes all material fills opaque.
 
 ## Architecture boundary
 
-No model, layout schema, command, native setting or shared mod API was added.
-The existing mod execution capability provides the reduced-transparency read;
-the permanent control does not require the native additions initially considered.
+The preset adds no model/Core state, command, native setting or shared mod API.
+The only local layout addition is the Kyle-approved optional pane-frame
+`focus_background` fill. Existing mod execution provides the reduced-transparency
+read; the control does not require native accessibility APIs.
 If actual compositor capability or immediate native notifications are added,
 discuss the smallest proposal with Can first. The AGENTS.md questions are:
 
@@ -143,3 +159,40 @@ layout/adapter tests pass, including the root-material regression.
 
 Quit only the scratch window when done; its Core/terminal lifetime is independent.
 Never stop or restart another app/Core to test the material.
+
+### Material revision (2026-11-16)
+
+Compared the open Rex Beta window and Handlr Dev using native screenshots.
+The revised material uses a theme-dependent backdrop, translucent terminal
+backgrounds, original border alpha, and softly shadowed, rounded terminal cards.
+The mod test suite covers appearance refresh, card restoration, independent
+edits, interrupted writes, and opaque accessibility fallback. The customized
+local tabs mod required its unchanged glass controller file to be updated
+explicitly; its unrelated customizations were preserved.
+
+The live restoration journal confirmed both appearance palettes and their
+adaptive fills were applied. Initial captures repeated a stale frame; raising
+the window through its native accessibility action refreshed the render.
+Subsequent captures verified the final light and dark materials: light terminal
+cards are brighter than the surrounding workspace, and dark terminal cards use
+a lifted tint over a deeper smoked backdrop. Light appearance was restored and
+visually verified afterward. This is a focused material/contrast smoke check;
+full accessibility, fullscreen and performance acceptance remains pending.
+
+### Focus refinement (2026-11-16)
+
+All panel/terminal fills are translucent at rest, with only the focused terminal
+using a denser frame fill. The existing terminal opacity setting applies to
+every terminal and the old pane focus field changes only the border, so mods
+could not supply the independent focused fill. Kyle approved adding the
+optional `content.pane.focus_background` field. Existing layouts without it
+retain their previous rendering. Mod panes do not receive this focus fill.
+
+### Lighter tint and combined mode (2026-11-16)
+
+Dark Glass now lifts the background tint 10% toward white and reduces its
+backdrop alpha from 30% to 24%. Glass and Seamless no longer disable one another.
+The Glass controller reads the existing `seamless` preference and clears
+chrome/surface/border colors plus its own card shadows in combined mode. The
+focused-terminal fill stays denser. Restoration remains independent, and
+reduced-transparency fallback still uses an opaque window and terminal fill.

@@ -3,11 +3,11 @@ import { copyFile, mkdtemp, mkdir, readFile, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { glassMaterial } from '../../defaults/frame/settings/glass-state.js';
 
 const root = new URL('../../', import.meta.url);
 const json = async path => JSON.parse(await readFile(path, 'utf8'));
 const color = value => typeof value === 'string' && /^#[\da-f]{6}([\da-f]{2})?$/i.test(value);
-const alpha = (value, opacity) => `${value.slice(0, 7)}${Math.round(opacity * 255).toString(16).padStart(2, '0')}`;
 
 // A reference light palette, matching the built-in Paper palette. These are
 // prototype inputs, not new application defaults. Custom palettes can be passed in.
@@ -28,18 +28,9 @@ export function materialTheme(palette, glass) {
     throw new Error('Invalid palette colors');
   }
   const bg = palette.background;
-  // Leave RGB unchanged: VT consumes background RGB, ignoring alpha. Menus and
-  // dialogs often use background too, so keep it dense rather than clearing it.
-  // Root background + canvas are painted twice: .40 + .30 => .58 combined.
-  return { ...structuredClone(palette), colors: {
-    ...colors,
-    background: alpha(colors.background ?? bg, glass ? 0.40 : 1),
-    canvas: alpha(colors.canvas ?? bg, glass ? 0.30 : 1),
-    chrome: alpha(colors.chrome ?? bg, glass ? 0.30 : 1),
-    surface: alpha(colors.surface ?? bg, glass ? 0.78 : 1),
-    popover: alpha(colors.popover ?? bg, 1),
-    raised: alpha(colors.raised ?? bg, 1),
-  } };
+  const baseline = { background: bg, canvas: bg, chrome: bg, surface: bg, popover: bg, raised: bg, ...colors };
+  const { window_blur, terminal_opacity, ...material } = glassMaterial(baseline, glass);
+  return { ...structuredClone(palette), colors: { ...colors, ...material, 'glass-focus': material.background.slice(0, 7) + 'b3' } };
 }
 
 export function prototypeLayout(layout, material) {
@@ -51,11 +42,17 @@ export function prototypeLayout(layout, material) {
   if (owned(out)) throw new Error('Prototype requires a layout without theme, colors or terminal_opacity overrides');
   out.window_blur = material === 'glass';
   out.theme = { dark: `glass-study-${material}-dark`, light: `glass-study-${material}-light` };
-  out.terminal_opacity = 1;
-  // Panel shells must be denser than the workspace, independently of the root's
-  // background color. Existing terminal painting remains fully opaque.
+  // Match the translucent resting terminals in the Settings controller.
+  out.terminal_opacity = material === 'glass' ? 0.10 : 1;
+  // A light panel tint adds separation without hiding the desktop.
   const panels = node => {
-    if (node.content?.pane) node.content.pane.background = 'surface';
+    if (node.content?.pane) {
+      node.content.pane.background = 'surface';
+      if (material === 'glass') {
+        node.content.pane.shadow = 'sm'; node.content.pane.radius = 12;
+        node.content.pane.focus_background = 'glass-focus';
+      }
+    }
     for (const child of node.children ?? []) panels(child);
   };
   panels(out);
