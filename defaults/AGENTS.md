@@ -77,6 +77,7 @@ first frame or during GPU recovery it reports an error instead of a PNG.
 | File | What it decides | Applied |
 |---|---|---|
 | `layouts/<name>.json` | the window and its whole look: blocks, theme, fonts, backgrounds, pane frames; one file per layout (`main`, `terminals`, `win98`, any you add) | live |
+| `glass.json` | Settings mod's per-layout Glass preference and restoration journal; let Settings manage it | mod-owned |
 | `keys.json` | what every key does | live |
 | `settings.json` | the person: zoom, sounds, fonts for every layout, worktree directory | live |
 | `mods/<name>/` | panels: small JavaScript programs | live (hot reload) |
@@ -887,6 +888,19 @@ What's about the user, never a look:
   transparent too; keep popup, selection and input colors for their controls.
   The Settings mod owns this preset and saves previous overrides in `seamless_colors`;
   turning it off restores them. Theme and appearance changes continue to work.
+- **Settings → Look → Glass** is an opt-in macOS finish for layouts using the
+  bundled tabs panel, including Handlr. It follows the chosen theme, frosts the
+  workspace, keeps terminal text/backgrounds opaque, and uses dense popup fills.
+  It is per layout; enabling on a bundled layout creates a personal copy named
+  `<layout>-glass` (with a suffix if needed). It never rewrites bundled layouts.
+  Glass and Seamless are mutually exclusive in Settings. Disabling restores
+  prior overrides, preserving independent edits. The Settings and tabs mods own
+  the `glass.json` restoration journal and `settings.glass` shared status; these
+  are not native settings.json keys. Do not edit the journal while Glass is on.
+  The tabs mod refreshes theme/material changes every three seconds and checks
+  macOS reduced transparency at most every fifteen seconds. Reduced transparency
+  or a failed accessibility query selects opaque fills and disables root blur.
+  Other platforms keep the control unavailable until their native UI is tested.
 - `no_headers`: `true` enables Settings → Look → No Headers for panel workspaces.
   Panel title rows and their controls disappear, reclaiming their height; group
   navigation tabs remain. Applies live to docked and floating panels. Turn it off

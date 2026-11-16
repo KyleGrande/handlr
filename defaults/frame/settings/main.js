@@ -4,6 +4,7 @@ import { View, div, svg, image } from "gpui-kit";
 import { v_flex, h_flex, Scrollbar, InputState, Input, Popup } from "gpui-base";
 import { hc, exec, layout, run, theme, themes, fonts, updates, telemetry, settings, layouts, shared, setShared, appHome, readTextFile, writeTextFile, playSound, props, closeOverlay, notify, window } from "herdr";
 import { readMods, modCommand, modPanels } from "./mods.js";
+import { glassEnabled, glassSupported, setGlass, disableAllGlass, startGlass } from "./glass.js";
 
 const I = (name) => `frame/settings/${name}.svg`;
 
@@ -58,6 +59,7 @@ function toggleSeamless(person) {
 
 export default class Settings extends View {
   init(_props, cx) {
+    startGlass(cx);
     const asked = props()?.section;
     this.section = SECTIONS.some((s) => s.id === asked) ? asked : "look";
     this.picking = null; // "font" | "ui_font" while its list is open
@@ -191,6 +193,31 @@ export default class Settings extends View {
 
   close() {
     closeOverlay(props().overlay);
+  }
+
+  appearancePreset(glass, cx) {
+    if (this.appearanceBusy) return;
+    this.appearanceBusy = true;
+    cx.spawn(async cx => {
+      try {
+        if (glass) {
+          if (glassEnabled()) await setGlass(false);
+          else {
+            const failed = await this.save(person => { if (person.seamless) toggleSeamless(person); });
+            if (failed) throw new Error(failed.title);
+            await setGlass(true);
+          }
+        } else {
+          // Seamless is global, so restore material ownership on every layout
+          // before it captures personal colors as its baseline.
+          await disableAllGlass();
+          const failed = await this.save(toggleSeamless);
+          if (failed) throw new Error(failed.title);
+        }
+      } catch (error) {
+        notify({ title: "Appearance was not changed", body: String(error?.message ?? error), level: "error" });
+      } finally { this.appearanceBusy = false; cx.notify(); }
+    });
   }
 
   // Pieces ---------------------------------------------------------------
@@ -663,7 +690,13 @@ export default class Settings extends View {
       .child(this.row(t, "Hide panel buttons", "Hide dock and terminal-only buttons in the window bar and fullscreen tab bar.",
         this.toggle(t, "st-hide-panel-buttons", Boolean(shared("tabs.hide-panel-buttons")), () => setShared("tabs.hide-panel-buttons", !shared("tabs.hide-panel-buttons")))))
       .child(this.row(t, "Seamless", "Remove panel outlines and blend panels into the app background.",
-        this.toggle(t, "st-seamless", Boolean(p.seamless), (_e, cx) => this.change(toggleSeamless, cx))))
+        this.toggle(t, "st-seamless", Boolean(p.seamless), (_e, cx) => this.appearancePreset(false, cx))))
+      .child(this.row(t, "Glass", glassSupported()
+        ? "Frost this layout in your theme. Bundled layouts open as personal copies; reduced transparency uses opaque surfaces."
+        : "Available on macOS in layouts using the bundled tabs panel.",
+        this.toggle(t, "st-glass", glassEnabled(), (_e, cx) => {
+          if (glassSupported() || glassEnabled()) this.appearancePreset(true, cx);
+        })))
       .child(this.row(t, "No Headers", "Hide panel title rows. Turn off to restore panel controls and drag handles.",
         this.toggle(t, "st-no-headers", Boolean(p.no_headers), (_e, cx) => this.change(q => { q.no_headers = !q.no_headers; }, cx))))
       .child(div().h(18))
