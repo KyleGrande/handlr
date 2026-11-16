@@ -263,6 +263,9 @@ pub struct PaneFrame {
     pub header: Option<Header>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub background: Option<Background>,
+    /// Fill behind the focused terminal; other panes keep `background`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub focus_background: Option<Background>,
     /// `sm`, `md` or `lg`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub shadow: Option<String>,

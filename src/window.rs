@@ -4518,7 +4518,7 @@ impl AppWindow {
         if let Some(r) = f.radius {
             el = el.rounded(settings::z(r));
         }
-        if let Some(bg) = &f.background {
+        if let Some(bg) = pane_size::frame_background(f, n, on) {
             el = paint(el, bg);
         }
         if let Some(l) = line {

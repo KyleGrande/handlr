@@ -9,19 +9,19 @@ export function glassMaterial(baseline, blur) {
   const rgb = (baseline.background ?? '#17191d').slice(1, 7);
   const channels = [0, 2, 4].map(i => parseInt(rgb.slice(i, i + 2), 16));
   const dark = channels[0] * .2126 + channels[1] * .7152 + channels[2] * .0722 < 128;
-  // Smoke must be denser in a dark theme to avoid a gray, washed-out window.
-  // Lift its tint slightly so terminal cards do not become black wells.
+  // Keep every pane translucent; lift the dark tint without building up
+  // dense background layers inside each card.
   const tint = dark && blur ? '#' + channels.map(c => Math.round(c + (255 - c) * .06).toString(16).padStart(2, '0')).join('') : baseline.background;
   return {
-    background: alpha(tint, blur ? (dark ? .82 : .20) : 1),
-    canvas: alpha(baseline.canvas, blur ? .04 : 1),
-    chrome: alpha(baseline.chrome, blur ? .10 : 1),
-    surface: alpha(baseline.surface, blur ? (dark ? .36 : .55) : 1),
+    background: alpha(tint, blur ? (dark ? .30 : .18) : 1),
+    canvas: alpha(baseline.canvas, blur ? .02 : 1),
+    chrome: alpha(baseline.chrome, blur ? .06 : 1),
+    surface: alpha(baseline.surface, blur ? .14 : 1),
     popover: alpha(baseline.popover, 1), raised: alpha(baseline.raised, 1),
     // Preserve the theme's existing fine border instead of strengthening it.
     border: baseline.border,
     // The terminal paints its background twice; glyphs stay fully opaque.
-    window_blur: blur, terminal_opacity: blur ? (dark ? .40 : .60) : 1,
+    window_blur: blur, terminal_opacity: blur ? .10 : 1,
   };
 }
 
@@ -82,7 +82,7 @@ function reconcileCards(root, entry, blur) {
       }
       if (card) {
         const before = {};
-        for (const [key, value] of Object.entries({ shadow: blur ? 'md' : undefined, radius: 12 })) {
+        for (const [key, value] of Object.entries({ shadow: blur ? 'sm' : undefined, radius: 12, background: 'surface', focus_background: alpha(root.colors?.background, .70) })) {
           if (!Object.hasOwn(card.saved, key)) card.saved[key] = { had: Object.hasOwn(pane, key), value: pane[key] ?? null };
           if (Object.hasOwn(pane, key)) before[key] = pane[key];
           if (Object.hasOwn(card.applied, key) && !same(pane[key] ?? null, card.applied[key])

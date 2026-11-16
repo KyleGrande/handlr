@@ -40,8 +40,8 @@ test('Glass is opt-in, round trips through persisted state, and preserves custom
   await f.api.setGlass(true);
   assert.equal(f.api.glassEnabled(), true);
   assert.equal(f.root().window_blur, true);
-  assert.equal(f.root().terminal_opacity, 0.40);
-  assert.equal(f.root().colors.surface, '#1234565c');
+  assert.equal(f.root().terminal_opacity, 0.10);
+  assert.equal(f.root().colors.surface, '#12345624');
   assert.deepEqual(f.root().theme, original.theme);
   assert.deepEqual(f.root().children, original.children);
   // The state and root have crossed JSON file boundaries before restoration.
@@ -55,7 +55,7 @@ test('independent edits and deletions survive material refresh, appearance chang
   f.edit(root => { root.colors.surface = '#998877'; delete root.colors.chrome; root.colors.accent = '#334455'; root.children.push({ id: 'new-panel' }); root.terminal_opacity = 0.8; });
   f.current.dark = false;
   await f.api.setGlass(true);
-  assert.equal(f.root().colors.background, '#ffffff33');
+  assert.equal(f.root().colors.background, '#ffffff2e');
   assert.equal(f.root().colors.surface, '#998877');
   assert.equal(f.root().colors.chrome, undefined);
   await f.api.setGlass(false);
@@ -191,18 +191,19 @@ test('Settings transitions restore Seamless before Glass captures its baseline',
 });
 
 // Match the actual stacked paint path, rather than checking each alpha alone.
-test('stacked glass fills retain a translucent backdrop and subtle borders', () => {
+test('all resting panes retain visible glass through stacked backgrounds', () => {
   for (const background of ['#17191d', '#ffffff']) {
     const colors = { ...palette, background, border: '#00000017' };
-    const root = { colors: {} };
+    const root = { id: 'terminals', content: { pane: { background: 'background' } } };
     const { root: glass } = pure.reconcileGlass(root, pure.newGlassState(root), colors, {}, true);
     const opacity = color => parseInt(color.slice(-2), 16) / 255;
     const stacked = layers => 1 - layers.reduce((left, alpha) => left * (1 - alpha), 1);
     const base = [opacity(glass.colors.background), opacity(glass.colors.canvas), opacity(glass.colors.canvas)];
-    const panel = stacked([...base, opacity(glass.colors.surface), opacity(glass.colors.background)]);
-    const terminal = stacked([...base, opacity(glass.colors.background), glass.terminal_opacity, glass.terminal_opacity]);
-    assert.ok(panel < (background === '#ffffff' ? .85 : .985), 'card fills must remain below fully opaque');
-    assert.ok(terminal < (background === '#ffffff' ? .94 : .99), 'both terminal background passes must remain below fully opaque');
+    const panel = stacked([...base, opacity(glass.colors.surface), opacity(glass.colors.surface), opacity(glass.colors.background)]);
+    const terminal = stacked([...base, opacity(glass.colors.surface), glass.terminal_opacity, glass.terminal_opacity]);
+    assert.ok(panel < .70, 'nested panel backgrounds must remain translucent');
+    assert.ok(terminal < .60, 'resting terminal backgrounds must remain translucent');
+    assert.equal(glass.content.pane.background, 'surface');
     assert.equal(glass.colors.border, colors.border);
     assert.equal(glass.colors.foreground, undefined, 'text stays under theme control');
   }
@@ -215,7 +216,7 @@ test('floating terminal cards restore authored looks and retain independent edit
   ] };
   const f = fixture('Handlr', original);
   await f.api.setGlass(true);
-  assert.equal(f.root().children[1].content.pane.shadow, 'md');
+  assert.equal(f.root().children[1].content.pane.shadow, 'sm');
   assert.equal(f.root().children[1].content.pane.radius, 12);
   await f.api.setGlass(true);
   await f.api.setGlass(false);
@@ -236,7 +237,7 @@ test('opaque fallback removes glass shadows and disabling restores absent card f
   assert.equal(f.root().children[1].content.pane.shadow, undefined);
   f.signal({ code: 0, stdout: 'blur' });
   await f.api.setGlass(true);
-  assert.equal(f.root().children[1].content.pane.shadow, 'md');
+  assert.equal(f.root().children[1].content.pane.shadow, 'sm');
   await f.api.setGlass(false);
   assert.deepEqual(f.root(), original);
 });
@@ -244,10 +245,10 @@ test('opaque fallback removes glass shadows and disabling restores absent card f
 test('material adapts smoke and terminal tint to the theme without changing text colors', () => {
   const dark = pure.glassMaterial(palette, true);
   const light = pure.glassMaterial({ ...palette, background: '#ffffff', surface: '#ffffff' }, true);
-  assert.ok(parseInt(dark.background.slice(-2), 16) > 200, 'dark backdrop needs a deep smoke tint');
-  assert.equal(light.background, '#ffffff33');
+  assert.ok(parseInt(dark.background.slice(-2), 16) < 100, 'dark backdrop must remain glass rather than a dense smoke layer');
+  assert.equal(light.background, '#ffffff2e');
   assert.equal(dark.background.slice(0, 7), '#25272b', 'lift the dark terminal above black');
-  assert.ok(light.terminal_opacity > dark.terminal_opacity, 'light cards need more white fill for text contrast');
+  assert.equal(light.terminal_opacity, dark.terminal_opacity, 'all resting terminals use the same light fill');
   assert.equal(dark.border, palette.border);
 });
 
@@ -260,4 +261,46 @@ test('card journal recovers either side of an interrupted write without losing a
     const restored = pure.reconcileGlass(recovered.root, disabled, palette, {}, true);
     assert.deepEqual(restored.root, original);
   }
+});
+
+test('glass pane backgrounds restore authored fills and retain independent edits', async () => {
+  const original = { id: 'root', children: [{ id: 'tabs', content: { mod: 'tabs' } },
+    { id: 'terminal', content: { pane: { background: '#112233', radius: 8 } } }] };
+  const f = fixture('Handlr', original);
+  await f.api.setGlass(true);
+  assert.equal(f.root().children[1].content.pane.background, 'surface');
+  await f.api.setGlass(false);
+  assert.deepEqual(f.root(), original);
+  await f.api.setGlass(true);
+  f.edit(root => { root.children[1].content.pane.background = '#33445566'; });
+  await f.api.setGlass(false);
+  assert.equal(f.root().children[1].content.pane.background, '#33445566');
+});
+
+test('Glass journals a denser focus fill while every resting terminal stays translucent', async () => {
+  const original = { id: 'root', children: [{ id: 'tabs', content: { mod: 'tabs' } },
+    { id: 'terminal', content: { pane: { background: '#112233', focus_background: '#abcdef99' } } }] };
+  const f = fixture('Handlr', original);
+  await f.api.setGlass(true);
+  const pane = () => f.root().children[1].content.pane;
+  assert.equal(pane().background, 'surface');
+  assert.equal(pane().focus_background, '#25272bb3');
+  assert.equal(f.root().terminal_opacity, .10);
+  f.current.dark = false;
+  await f.api.setGlass(true);
+  assert.equal(pane().focus_background, '#ffffffb3');
+  f.signal({ code: 0, stdout: 'reduced' });
+  await f.api.setGlass(true);
+  assert.equal(pane().focus_background, original.children[1].content.pane.focus_background);
+  await f.api.setGlass(false);
+  assert.deepEqual(f.root(), original);
+});
+
+test('independent focused-fill edits survive disabling Glass', async () => {
+  const f = fixture('Handlr', { id: 'root', children: [{ id: 'tabs', content: { mod: 'tabs' } },
+    { id: 'terminal', content: { pane: {} } }] });
+  await f.api.setGlass(true);
+  f.edit(root => { root.children[1].content.pane.focus_background = '#11223388'; });
+  await f.api.setGlass(false);
+  assert.equal(f.root().children[1].content.pane.focus_background, '#11223388');
 });

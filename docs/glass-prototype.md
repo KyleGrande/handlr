@@ -3,8 +3,11 @@
 The Settings control is implemented in `defaults/frame/settings/main.js`.
 `glass.js` owns per-layout preference and restoration in the mod-owned
 `glass.json` file. A copy runs inside bundled tabs so theme/accessibility changes
-continue to update the material after Settings closes. No native settings,
-commands, layout-schema fields, mod APIs or Core state were added.
+continue to update the material after Settings closes. Preset styling and
+restoration remain mod-owned. Kyle approved the optional local pane-frame
+`focus_background` rendering field on 2026-11-16: it changes only the focused
+terminal’s fill, leaving other panes translucent. No native setting, command,
+shared mod API or Core state was added.
 The native workspace adapter now carries the file root's existing look and
 `window_blur` onto the displayed wrapper root, including maximized groups.
 Previously it kept those fields only on the nested center, so root material and
@@ -61,19 +64,18 @@ The reference palettes are Atom One Dark and Paper. Supply existing theme JSON
 files with `--dark-theme` and `--light-theme` to study another palette. Text,
 selection, focus and custom border colors stay under theme control. Glass lifts
 the dark background tint 6% toward white to avoid black terminal wells. Its
-backdrop uses 82% smoke in dark themes and 20% tint in light themes; canvas adds
-4% and chrome 10%. Panel surfaces use 36% in dark themes and 55% in light themes.
-The Settings controller uses 40% terminal fill per paint pass in dark themes and
-60% in light themes (the terminal has two background passes). The standalone
-study uses 60% in both appearances. Glyphs and explicitly colored application
-cells stay opaque. These values account for stacked fills rather than treating
-each surface as an isolated layer. Popover and raised surfaces stay opaque.
+backdrop uses 30% tint in dark themes and 18% in light themes; canvas adds
+2% and chrome 6%. Panel surfaces use 14%. Resting terminal backgrounds use 10%
+per paint pass (two passes), over a `surface` card background. Only the focused
+terminal gets a 70% tinted `focus_background` on its frame. The renderer follows
+focus immediately; mods do not poll focus or rewrite layout files on clicks.
+Glyphs and explicitly colored application cells stay opaque. Popovers and
+raised controls retain dense fills for readability.
 
-Terminal cards use existing PaneFrame shadows and rounding (medium shadow,
-12px corners), journaled and restored without replacing layout structure.
-Disabling Glass preserves independently edited card fields and colors.
-Dialog/mod content using `background` instead of `popover` can still be
-translucent. Full visual/performance acceptance remains pending.
+Terminal cards use soft shadows and 12px corners. Their background, focused
+background, shadow and radius are journaled; disabling Glass restores prior
+values and preserves independent edits without replaying layout structure.
+Opaque accessibility fallback restores the authored pane fills.
 
 Before switching to glass, check native reduced transparency, e.g. on macOS:
 
@@ -110,9 +112,10 @@ The opaque variant disables root blur and makes all material fills opaque.
 
 ## Architecture boundary
 
-No model, layout schema, command, native setting or shared mod API was added.
-The existing mod execution capability provides the reduced-transparency read;
-the permanent control does not require the native additions initially considered.
+The preset adds no model/Core state, command, native setting or shared mod API.
+The only local layout addition is the Kyle-approved optional pane-frame
+`focus_background` fill. Existing mod execution provides the reduced-transparency
+read; the control does not require native accessibility APIs.
 If actual compositor capability or immediate native notifications are added,
 discuss the smallest proposal with Can first. The AGENTS.md questions are:
 
@@ -171,3 +174,12 @@ cards are brighter than the surrounding workspace, and dark terminal cards use
 a lifted tint over a deeper smoked backdrop. Light appearance was restored and
 visually verified afterward. This is a focused material/contrast smoke check;
 full accessibility, fullscreen and performance acceptance remains pending.
+
+### Focus refinement (2026-11-16)
+
+All panel/terminal fills are translucent at rest, with only the focused terminal
+using a denser frame fill. The existing terminal opacity setting applies to
+every terminal and the old pane focus field changes only the border, so mods
+could not supply the independent focused fill. Kyle approved adding the
+optional `content.pane.focus_background` field. Existing layouts without it
+retain their previous rendering. Mod panes do not receive this focus fill.

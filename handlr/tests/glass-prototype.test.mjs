@@ -14,7 +14,7 @@ test('material variants preserve palette and text colors while adapting glass ti
       for (const key of ['foreground', 'accent', 'border']) assert.equal(theme.colors[key], palette.colors[key]);
       if (!glass || background === '#ffffff') assert.equal(theme.colors.background.slice(0, 7), background);
       else assert.equal(theme.colors.background.slice(0, 7), '#25272b');
-      assert.equal(theme.colors.background.slice(-2), glass ? (background === '#ffffff' ? '33' : 'd1') : 'ff');
+      assert.equal(theme.colors.background.slice(-2), glass ? (background === '#ffffff' ? '2e' : '4d') : 'ff');
       for (const key of ['popover', 'raised']) assert.match(theme.colors[key], /ff$/);
     }
     assert.deepEqual(palette, original);
@@ -35,7 +35,7 @@ test('personal variants leave the original layout intact and give terminals tran
   const original = structuredClone(layout);
   const glass = prototypeLayout(layout, 'glass');
   assert.equal(glass.window_blur, true);
-  assert.equal(glass.terminal_opacity, 0.60);
+  assert.equal(glass.terminal_opacity, 0.10);
   assert.equal(glass.children[0].content.pane.background, 'surface');
   assert.equal(prototypeLayout(layout, 'opaque').window_blur, false);
   assert.deepEqual(layout, original);
