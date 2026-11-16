@@ -58,13 +58,22 @@ They share a workspace document so changing material retains the composition.
 No installed settings, mods, layouts or workspace documents are copied or edited.
 
 The reference palettes are Atom One Dark and Paper. Supply existing theme JSON
-files with `--dark-theme` and `--light-theme` to study another palette. Palette
-RGB, terminal colors, text, selections, focus colors and custom borders remain
-unchanged. Only material surface alphas change. Terminals stay fully opaque.
-The root background (40%) and canvas (30%) combine to approximately 58% opacity;
-panel headers use a denser 78% surface. Popover and raised surfaces are opaque.
-These are provisional study values, not visually approved values. Dialog/mod
-content using `background` instead of `popover` can still be translucent.
+files with `--dark-theme` and `--light-theme` to study another palette. Text,
+selection, focus and custom border colors stay under theme control. Glass lifts
+the dark background tint 6% toward white to avoid black terminal wells. Its
+backdrop uses 82% smoke in dark themes and 20% tint in light themes; canvas adds
+4% and chrome 10%. Panel surfaces use 36% in dark themes and 55% in light themes.
+The Settings controller uses 40% terminal fill per paint pass in dark themes and
+60% in light themes (the terminal has two background passes). The standalone
+study uses 60% in both appearances. Glyphs and explicitly colored application
+cells stay opaque. These values account for stacked fills rather than treating
+each surface as an isolated layer. Popover and raised surfaces stay opaque.
+
+Terminal cards use existing PaneFrame shadows and rounding (medium shadow,
+12px corners), journaled and restored without replacing layout structure.
+Disabling Glass preserves independently edited card fields and colors.
+Dialog/mod content using `background` instead of `popover` can still be
+translucent. Full visual/performance acceptance remains pending.
 
 Before switching to glass, check native reduced transparency, e.g. on macOS:
 
@@ -88,8 +97,8 @@ The opaque variant disables root blur and makes all material fills opaque.
   `window_blur`. Mods can edit a personal layout using existing commands; this
   requires ownership/restoration bookkeeping and cannot rewrite shipped layouts.
 - `src/terminal.rs` and `src/vt.rs`: terminal opacity affects background painting;
-  the terminal palette uses background RGB. Preserving RGB while adjusting alpha
-  avoids substituting a different terminal palette.
+  the terminal palette uses background RGB. Glass lifts dark background RGB slightly while keeping foreground and ANSI
+  colors unchanged; terminal opacity applies only to background painting.
 - `defaults/frame/settings/main.js`: Seamless saves its own color overrides and
   restores only values it still owns. A future material must restore Seamless
   before capturing a baseline, and must remain active when Settings is closed.
@@ -143,3 +152,19 @@ layout/adapter tests pass, including the root-material regression.
 
 Quit only the scratch window when done; its Core/terminal lifetime is independent.
 Never stop or restart another app/Core to test the material.
+
+### Material revision (2026-11-16)
+
+Compared the open Rex Beta window and Handlr Dev using native screenshots.
+The revised material uses a theme-dependent backdrop, translucent terminal
+backgrounds, original border alpha, and softly shadowed, rounded terminal cards.
+The mod test suite covers appearance refresh, card restoration, independent
+edits, interrupted writes, and opaque accessibility fallback. The customized
+local tabs mod required its unchanged glass controller file to be updated
+explicitly; its unrelated customizations were preserved.
+
+The live restoration journal confirmed both appearance palettes and their
+adaptive fills were applied. Later native captures repeatedly returned the
+same light frame after switching the live app to dark, so the final dark
+material and exact Rex match are not visually signed off. Light appearance
+was restored after the check.

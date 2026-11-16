@@ -890,7 +890,10 @@ What's about the user, never a look:
   turning it off restores them. Theme and appearance changes continue to work.
 - **Settings → Look → Glass** is an opt-in macOS finish for layouts using the
   bundled tabs panel, including Handlr. It follows the chosen theme, frosts the
-  workspace, keeps terminal text/backgrounds opaque, and uses dense popup fills.
+  workspace and terminal backgrounds, keeps text opaque, and uses dense popup fills.
+  Dark themes use a deeper smoke tint and a slightly lifted terminal background;
+  light themes use brighter card fills. Rounded terminal cards use soft shadows;
+  disabling Glass restores their prior look.
   It is per layout; enabling on a bundled layout creates a personal copy named
   `<layout>-glass` (with a suffix if needed). It never rewrites bundled layouts.
   Glass and Seamless are mutually exclusive in Settings. Disabling restores
