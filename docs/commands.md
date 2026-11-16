@@ -17,6 +17,14 @@ Actions use the current selection unless you give an explicit target.
 Some actions close terminals; read their descriptions before running them.
 Mods can add their own actions, which are not listed here.
 
+## `workspace.remember`
+
+Read or set automatic panel arrangements per space; defaults off, retains associations when disabled.
+
+| Argument | Required |
+|---|---|
+| `enabled` | no |
+
 ## `workspace.reveal`
 
 Go to an already open workspace panel without creating or reopening it.
@@ -110,12 +118,14 @@ No arguments.
 
 ## `workspace.import`
 
-Validate/import a local workspace document as one undoable transaction.
+Validate/import a local workspace document as one undoable transaction; optional context guards reject a late import after navigation.
 
 | Argument | Required |
 |---|---|
 | `expected_revision` | yes |
 | `document` | yes |
+| `expected_space` | no |
+| `expected_workspace` | no |
 
 ## `space.new`
 

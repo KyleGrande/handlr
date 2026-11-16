@@ -28,6 +28,7 @@ const fn cmd(name: &'static str, args: &'static [Arg], about: &'static str) -> C
 }
 
 pub const COMMANDS: &[Command] = &[
+    cmd("workspace.remember", &[opt("enabled")], "Read or set automatic panel arrangements per space; defaults off, retains associations when disabled."),
     cmd("workspace.reveal", &[req("panel")], "Go to an already open workspace panel without creating or reopening it."),
     cmd("workspace.open", &[req("name")], "Add or reveal an installed mod panel in the active workspace, reusing its existing identity."),
     cmd("workspace.rename", &[opt("panel"), opt("view"), opt("name"), opt("expected_revision")], "Rename a workspace panel or view; omitted name prompts, empty panel name resets its title."),
@@ -39,7 +40,7 @@ pub const COMMANDS: &[Command] = &[
     cmd("workspace.undo", &[opt("expected_revision")], "Undo one local workspace transaction; defaults to the current revision."),
     cmd("workspace.redo", &[opt("expected_revision")], "Redo one local workspace transaction; defaults to the current revision."),
     cmd("workspace.export", &[], "Read the active local workspace document for export."),
-    cmd("workspace.import", &[req("expected_revision"), req("document")], "Validate/import a local workspace document as one undoable transaction."),
+    cmd("workspace.import", &[req("expected_revision"), req("document"), opt("expected_space"), opt("expected_workspace")], "Validate/import a local workspace document as one undoable transaction; optional context guards reject a late import after navigation."),
     // What exists.
     cmd("space.new", &[opt("name"), opt("folder"), opt("tab"), opt("argv"), opt("task"), opt("machine"), opt("focus")],
         "Make a space: its name (default: none, so it's called after where its first terminal is), the folder its terminals start in (default: the focused terminal's), its first tab's name (default: none, so it's called by its number), optionally an agent (argv) and its first message (task), and the machine it lives on (`hc machine ls`; default the focused space's machine for keys and clicks, this computer for scripts; empty string: this computer; its terminals start in that machine's home unless folder). It is shown at once; focus false keeps the shown space and tab (with no space shown, the new space is shown)."),

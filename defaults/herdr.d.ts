@@ -86,6 +86,8 @@ export function playSound(sound: string): null;
  * Mods: "<mod>.<command>" delivers <command> to that mod's nextCommand().
  */
 export function run(name: string, args?: Record<string, unknown>): null;
+/** Workspace command with a reply, routed to this mod copy's owning window. Rejects on error. */
+export function workspaceCommand(name: string, args?: Record<string, unknown>): Promise<any>;
 
 export type Status = "working" | "blocked" | "done" | "idle";
 

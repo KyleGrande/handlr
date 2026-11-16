@@ -658,6 +658,8 @@ export default class Settings extends View {
       .w_full()
       .child(this.heading(t, "Layout"))
       .child(this.layoutPicker(t, cx))
+      .child(this.row(t, "Remember layout per space", "Automatically save and restore each space’s panel arrangement. Applies to panel workspaces.",
+        this.toggle(t, "st-remember-per-space", Boolean(shared("layouts.remember-per-space")), () => run("workspace.remember", { enabled: !shared("layouts.remember-per-space") }))))
       .child(this.row(t, "Hide panel buttons", "Hide dock and terminal-only buttons in the window bar and fullscreen tab bar.",
         this.toggle(t, "st-hide-panel-buttons", Boolean(shared("tabs.hide-panel-buttons")), () => setShared("tabs.hide-panel-buttons", !shared("tabs.hide-panel-buttons")))))
       .child(this.row(t, "Seamless", "Remove panel outlines and blend panels into the app background.",

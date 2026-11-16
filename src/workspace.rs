@@ -8,6 +8,8 @@ use std::path::PathBuf;
 pub mod drag;
 #[path = "workspace/floating.rs"]
 pub mod floating;
+#[path = "workspace/spaces.rs"]
+pub mod spaces;
 
 pub const PREFIX: &str = "@workspace/";
 pub const HEADER: &str = "@workspace/header/";

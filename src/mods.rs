@@ -378,6 +378,7 @@ fn scan_dir(root: &Path, prefix: &str) -> Vec<Found> {
 pub enum Request {
     FromCopy { copy: u64, request: Box<Request> },
     Run { name: String, args: Value },
+    WorkspaceCommand { name: String, args: Value, reply: async_channel::Sender<Value> },
     OpenOverlay { id: String, spec: Value },
     CloseOverlay { id: String },
     /// The OS window's title; `None` restores the default.
@@ -941,6 +942,20 @@ fn module(inst: Instance, copy: u64) -> HostModule {
     });
     HostModule::new("herdr")
         .declarations(DECLARATIONS)
+        .async_function("workspaceCommand", move |a| {
+            let name = a.string(0)?.to_owned();
+            let args = a.get(1).map(from_host).unwrap_or(Value::Null);
+            if !name.starts_with("workspace.") { return Err(HostError::new("workspaceCommand accepts workspace commands only")); }
+            let command = crate::commands::find(&name).ok_or_else(|| HostError::new("unknown workspace command"))?;
+            crate::commands::validate_args(command, &args).map_err(HostError::new)?;
+            let (reply, receive) = async_channel::bounded(1);
+            request(Request::FromCopy { copy, request: Box::new(Request::WorkspaceCommand { name, args, reply }) });
+            Ok(async move {
+                let value = receive.recv().await.map_err(|e| HostError::new(e.to_string()))?;
+                if let Some(error) = value.get("error").and_then(Value::as_str) { return Err(HostError::new(error)); }
+                Ok(to_host(&value))
+            })
+        })
         .async_function("exec", |a| {
             let command = a.string(0)?.to_owned();
             Ok(exec_future(command, strings(a.get(1)), opt_str(a.get(2), "cwd"), opt_str(a.get(2), "on"), exec_limit(a.get(2))?))

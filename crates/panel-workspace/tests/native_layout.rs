@@ -6,6 +6,8 @@ mod commands;
 mod layout;
 #[path = "../../../src/workspace.rs"]
 mod workspace;
+#[path = "../../../src/persist.rs"]
+mod persist;
 
 use panel_workspace::*;
 use serde_json::json;

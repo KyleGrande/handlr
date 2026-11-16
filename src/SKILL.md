@@ -15,6 +15,13 @@ workspace section for schemas and current limitations. It is not the complete
 docking release. Do not test it by switching the person's production window;
 use an isolated app home and Core session.
 
+`workspace.remember {enabled: true}` enables automatic per-space panel arrangements
+(Settings → Look → Remember layout per space); false retains the current arrangement.
+`workspace.inspect` includes `space` and `workspace`; use `expected_space` and
+`expected_workspace` with `workspace.import` to guard delayed work after navigation.
+Open Layouts from the command palette to save, apply, update, rename, duplicate
+or delete personal panel arrangement presets. These do not contain terminal sessions.
+
 `workspace.float {panel?, group?}` moves a mod panel into a resizable native
 window while keeping its existing live copy. `workspace.dock {panel?, group?,
 edge?}` returns it to its dock. Closing that window also redocks it. On macOS,
