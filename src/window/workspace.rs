@@ -2,6 +2,57 @@ use super::*;
 use panel_workspace::{Command as WorkspaceCommand, Transaction, Workspace};
 
 impl AppWindow {
+    pub(super) fn sync_space_arrangement(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        mods::set_shared("layouts.remember-per-space".into(), json!(self.space_arrangements.state.enabled));
+        if let Some(warning) = self.space_arrangements.warning.take() {
+            self.command_error("workspace.remember", &warning, window, cx);
+        }
+        if !self.space_arrangements.state.enabled || self.workspace.is_none() { return; }
+        let key = self.model.active_space().and_then(|space| {
+            let machine_id = self.workspace_machine_ids.get(space.machine.as_deref().unwrap_or(""))?;
+            Some(crate::workspace::spaces::identity(self.file_chrome.workspace.as_deref()?, machine_id, crate::mirror::local(&space.id, space.machine.as_deref())))
+        });
+        let Some(key) = key else {
+            // No verified machine identity: keep navigation usable without
+            // attributing subsequent edits to the space we just left.
+            if let Some(owner) = self.space_arrangements.owner.take() {
+                let result = self.workspace_save_sizes().and_then(|_| {
+                    let mut state = self.space_arrangements.state.clone();
+                    state.arrangements.insert(owner, self.workspace.as_ref().unwrap().engine.document().clone());
+                    self.space_arrangements.persist(state)
+                });
+                if let Err(error) = result { self.command_error("workspace.remember", &error, window, cx); }
+            }
+            return;
+        };
+        let result = (|| -> Result<(), String> {
+            self.workspace_save_sizes()?;
+            let session = self.workspace.as_ref().unwrap();
+            if self.space_arrangements.owner.as_deref() == Some(&key) {
+                let mut state = self.space_arrangements.state.clone();
+                state.arrangements.insert(key.clone(), session.engine.document().clone());
+                return self.space_arrangements.persist(state);
+            }
+            let (state, incoming) = self.space_arrangements.prepare(&key, session.engine.document())?;
+            let chrome = self.workspace_preflight_for(&incoming, &self.file_chrome)?;
+            self.workspace_open_floats(&incoming, window, cx)?;
+            self.space_arrangements.persist(state)?;
+            let session = self.workspace.as_mut().unwrap();
+            session.import(incoming, session.engine.revision())?;
+            self.space_arrangements.owner = Some(key);
+            self.chrome = chrome;
+            Ok(())
+        })();
+        if let Err(error) = result {
+            let _ = self.workspace_sync_floats(window, cx);
+            let message = format!("Panel arrangement retained: {error}");
+            if self.space_arrangements.error.as_deref() != Some(&message) {
+                self.command_error("workspace.remember", &message, window, cx);
+            }
+            self.space_arrangements.error = Some(message);
+        } else { self.space_arrangements.error = None; }
+    }
+
     pub(super) fn panel_palette_entries(&self) -> Vec<Value> {
         let shipped: std::collections::BTreeSet<_> = mods::DEFAULT_MODS.iter()
             .filter_map(|(path, _)| path.split('/').next()).collect();
@@ -230,6 +281,23 @@ impl AppWindow {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Result<Value, String> {
+        if name == "workspace.remember" {
+            if let Some(value) = args.get("enabled") {
+                let enabled = value.as_bool().ok_or("enabled must be true or false")?;
+                if !enabled && self.space_arrangements.state.enabled { self.sync_space_arrangement(window, cx); }
+                let mut state = self.space_arrangements.state.clone();
+                state.enabled = enabled;
+                self.space_arrangements.persist(state)?;
+                if !enabled { self.space_arrangements.owner = None; }
+                self.sync(window, cx);
+            }
+            return Ok(json!({"enabled":self.space_arrangements.state.enabled}));
+        }
+        for (argument, current) in [("expected_space", json!(self.model.active)), ("expected_workspace", json!(self.file_chrome.workspace))] {
+            if args.get(argument).is_some_and(|expected| *expected != current) {
+                return Err("The active space or workspace changed; try again in the intended space".into());
+            }
+        }
         if matches!(name,"workspace.float"|"workspace.dock") {
             let doc = self.workspace.as_ref().ok_or("select a panel workspace first")?.engine.document();
             let panel = args.get("panel").and_then(Value::as_str)
@@ -347,7 +415,10 @@ impl AppWindow {
             .ok_or("select an opt-in workspace layout first")?;
         if matches!(name, "workspace.inspect" | "workspace.export") {
             return Ok(if name == "workspace.inspect" {
-                session.inspect()
+                let mut reply = session.inspect();
+                reply["space"] = json!(self.model.active);
+                reply["workspace"] = json!(self.file_chrome.workspace);
+                reply
             } else {
                 json!({"document":session.engine.document()})
             });

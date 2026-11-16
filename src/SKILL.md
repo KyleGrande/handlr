@@ -15,6 +15,13 @@ workspace section for schemas and current limitations. It is not the complete
 docking release. Do not test it by switching the person's production window;
 use an isolated app home and Core session.
 
+`workspace.remember {enabled: true}` enables automatic per-space panel arrangements
+(Settings → Look → Remember layout per space); false retains the current arrangement.
+`workspace.inspect` includes `space` and `workspace`; use `expected_space` and
+`expected_workspace` with `workspace.import` to guard delayed work after navigation.
+Open Layouts from the command palette to save, apply, update, rename, duplicate
+or delete personal panel arrangement presets. These do not contain terminal sessions.
+
 `workspace.float {panel?, group?}` moves a mod panel into a resizable native
 window while keeping its existing live copy. `workspace.dock {panel?, group?,
 edge?}` returns it to its dock. Closing that window also redocks it. On macOS,
@@ -263,6 +270,13 @@ app background, preserving the app canvas and terminal background colors.
 Panel shells and title rows use the `surface` color so seamless mode clears
 their own fills as well as the surrounding frame.
 The Settings mod manages this color preset and restores previous colors when disabled.
+Settings → Look → Glass adds an opt-in frosted finish on macOS layouts using the
+bundled tabs panel, including Handlr. Bundled layouts open as personal copies.
+Glass follows the selected theme, keeps terminals opaque, and restores only its
+own overrides when disabled. It is mutually exclusive with Seamless in Settings.
+The Settings/tabs mods own per-layout preference and restoration in `glass.json`;
+do not edit that journal while enabled. Reduced transparency or a failed native
+accessibility query selects opaque fills (checked at most every fifteen seconds).
 In macOS fullscreen, content uses the height normally reserved for window buttons.
 
 In macOS panel workspaces, left/top/bottom/right controls sit on the window-button

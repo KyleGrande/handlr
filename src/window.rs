@@ -255,17 +255,38 @@ fn clone_layout(name: &str, to: &str) -> std::io::Result<()> {
         return Err(std::io::Error::other("names use letters, digits, - or _"));
     }
     let mut node: Node = serde_json::from_str(&std::fs::read_to_string(layout_path(name))?)?;
+    let workspace_copy = node.workspace.as_ref().map(|source| {
+        if !mods::valid_name(source) { return Err(std::io::Error::other("invalid source workspace name")); }
+        let loaded = panel_workspace::Store::new(file(&format!("workspaces/{source}.json"))).load().map_err(std::io::Error::other)?;
+        Ok((file(&format!("workspaces/{to}.json")), loaded.document))
+    }).transpose()?;
+    if workspace_copy.is_some() { node.workspace = Some(to.into()); }
     node.cloned_from = Some(crate::layout::ClonedFrom { name: name.into(), version: env!("CARGO_PKG_VERSION").into() });
     let text = layout_sync::text_of(&node);
     use std::io::Write;
     let mut dest = std::fs::OpenOptions::new().write(true).create_new(true).open(layout_path(to))?;
+    let mut created_workspace = None;
     let result = (|| {
+        if let Some((path, document)) = &workspace_copy {
+            std::fs::create_dir_all(path.parent().unwrap())?;
+            if path.with_extension("last-good.json").exists() {
+                return Err(std::io::Error::other("a workspace recovery file already uses that name"));
+            }
+            // Reserve without overwriting an unrelated workspace document.
+            let mut workspace = std::fs::OpenOptions::new().write(true).create_new(true).open(path)?;
+            created_workspace = Some(path.clone());
+            workspace.write_all(&serde_json::to_vec_pretty(document)?)?;
+            workspace.sync_all()?;
+        }
         dest.write_all(text.as_bytes())?;
         mods::copy_layout_state(&mods::app_dir(), name, to)
     })();
     if result.is_err() {
         let _ = std::fs::remove_file(layout_path(to));
         let _ = std::fs::remove_file(state_path(to));
+        if let Some(path) = created_workspace {
+            let _ = std::fs::remove_file(path);
+        }
     }
     result
 }
@@ -378,6 +399,8 @@ pub struct AppWindow {
     mod_stamps: RefCell<HashMap<String, crate::files::ModStamp>>,
     chrome: Node,
     workspace: Option<crate::workspace::Session>,
+    space_arrangements: crate::workspace::spaces::Arrangements,
+    workspace_machine_ids: BTreeMap<String, String>,
     workspace_windows: HashMap<String, WindowHandle<workspace_float::WorkspaceFloat>>,
     workspace_float_layouts: HashMap<String, Node>,
     workspace_main_window: Option<AnyWindowHandle>,
@@ -509,6 +532,8 @@ impl AppWindow {
         }
         mods::note_fonts(cx);
         let seen = std::fs::read_to_string(file("seen.json")).ok().and_then(|s| serde_json::from_str(&s).ok()).unwrap_or_default();
+        let workspace_machine_ids = core.hello["core"]["id"].as_str()
+            .map(|id| [(String::new(), id.to_owned())].into()).unwrap_or_default();
         let mut w = AppWindow {
             core,
             runtime,
@@ -518,6 +543,8 @@ impl AppWindow {
             mod_stamps: RefCell::new(HashMap::new()),
             chrome: default_layout("main"),
             workspace: None,
+            space_arrangements: crate::workspace::spaces::Arrangements::load(file("data/layouts/space-arrangements.json")),
+            workspace_machine_ids,
             workspace_windows: HashMap::new(),
             workspace_float_layouts: HashMap::new(),
             workspace_main_window: None,
@@ -982,6 +1009,7 @@ impl AppWindow {
     /// Makes `name` the shown layout (its file, or its default if missing or
     /// broken), with the person's clicks on it.
     fn load_layout(&mut self, name: &str) {
+        self.space_arrangements.owner = None;
         self.workspace = None;
         self.layout_name = name.to_owned();
         self.written_layout.clear();
@@ -1559,6 +1587,7 @@ impl AppWindow {
     /// Creates what's visible, drops what isn't, publishes state, saves, focuses.
     fn sync(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.workspace_main_window.get_or_insert(window.window_handle());
+        self.sync_space_arrangement(window, cx);
         self.workspace_float_layouts = self.workspace.iter().flat_map(|s|&s.engine.document().floating)
             .filter_map(|f|self.workspace_float_node(&f.group_id).ok().map(|n|(f.group_id.clone(),n))).collect();
         self.model.order_spaces();
@@ -2196,6 +2225,9 @@ impl AppWindow {
             let states = kept().filter_map(|m| Some((m["name"].as_str()?, m["state"].as_str()?))).collect::<HashMap<_, _>>();
             for machine in kept() {
                 let Some(name) = machine["name"].as_str() else { continue };
+                if let Some(id) = machine["id"].as_str() {
+                    changed |= self.workspace_machine_ids.insert(name.to_owned(), id.to_owned()).as_deref() != Some(id);
+                }
                 let state = machine["state"].as_str().unwrap_or("unavailable");
                 let reason = (state != "connected").then(|| machine["why"].as_str().map(str::to_owned).unwrap_or_else(|| match state {
                     "needs_update" => format!("{name} needs a core update; run hc machine update {name}"),
@@ -4095,6 +4127,9 @@ impl AppWindow {
                 } else {self.handle(*request,window,cx);}
             }
             Request::Run { name, args } => self.run(&name, args, window, cx),
+            Request::WorkspaceCommand { name, args, reply } => {
+                let _ = reply.try_send(self.run_as(&name, args, false, window, cx));
+            }
             Request::OpenOverlay { id, spec } => self.open_overlay(id, spec, window, cx),
             Request::CloseOverlay { id } => self.close_overlay(&id, window, cx),
             Request::SetWindowTitle(title) => window.set_window_title(title.as_deref().unwrap_or("Herdr")),
@@ -6133,6 +6168,73 @@ mod tests {
     /// In the process `in_own_process` started for `name`: whether to go on.
     fn running_alone(name: &str) -> bool {
         std::env::var("HERDR_TEST_WINDOW").as_deref() == Ok(name)
+    }
+
+    #[test]
+    fn per_space_panel_arrangements() {
+        in_own_process("per_space_panel_arrangements_window");
+    }
+
+    #[gpui::test]
+    fn per_space_panel_arrangements_window(cx: &mut gpui::TestAppContext) {
+        if !running_alone("per_space_panel_arrangements_window") { return; }
+        let (view, cx) = open_window(cx, "unused", "", serde_json::json!({"id":"empty","type":"column","children":[]}));
+        cx.update(|window, cx| view.update(cx, |this, cx| {
+            use panel_workspace::Edge;
+            this.file_chrome = crate::workspace::default_center();
+            this.file_chrome.workspace = Some("test".into());
+            this.workspace = Some(crate::workspace::Session::load(super::file("workspaces/test.json")).unwrap());
+            this.workspace_machine_ids.insert(String::new(), "permanent-machine-id".into());
+            this.model.spaces = ["a", "b"].into_iter().map(|id| crate::model::Space {
+                id:id.into(),name:id.into(),folder:String::new(),machine:None,tabs:vec![],active:None,rest:serde_json::Map::new(),
+            }).collect();
+            this.model.active = Some("a".into());
+            let command = |this: &mut super::AppWindow, name, args, window: &mut gpui::Window, cx: &mut gpui::Context<super::AppWindow>| {
+                let reply = this.run_as(name, args, false, window, cx);
+                assert!(reply.get("error").is_none(), "{reply}"); reply
+            };
+            let resize = |this: &mut super::AppWindow, extent, window: &mut gpui::Window, cx: &mut gpui::Context<super::AppWindow>| {
+                let revision = this.workspace.as_ref().unwrap().engine.revision();
+                command(this, "workspace.apply", serde_json::json!({"transaction":{"expected_revision":revision,"commands":[{"op":"resize_zone","edge":"left","extent":extent}]}}), window, cx);
+            };
+            let width = |this: &super::AppWindow| this.workspace.as_ref().unwrap().engine.document().zones.iter().find(|z|z.edge==Edge::Left).unwrap().extent;
+            this.sync(window, cx);
+            resize(this, 450., window, cx);
+            this.model.active = Some("b".into()); this.sync(window, cx);
+            assert_eq!(width(this), 450., "off leaves layout unchanged");
+            command(this,"workspace.remember",serde_json::json!({"enabled":true}),window,cx);
+            resize(this, 650., window, cx);
+            this.model.active = Some("a".into()); this.sync(window, cx);
+            assert_eq!(width(this), 650., "unseen space seeds current composition");
+            resize(this, 800., window, cx);
+            for _ in 0..5 {
+                this.model.active = Some("b".into()); this.sync(window, cx); assert_eq!(width(this),650.);
+                this.model.active = Some("a".into()); this.sync(window, cx); assert_eq!(width(this),800.);
+            }
+            this.model.spaces[0].name = "renamed".into(); this.sync(window, cx); assert_eq!(width(this),800.);
+            command(this,"workspace.remember",serde_json::json!({"enabled":false}),window,cx);
+            resize(this, 900., window, cx);
+            command(this,"workspace.remember",serde_json::json!({"enabled":true}),window,cx);
+            assert_eq!(width(this),800., "re-enabling restores the stored association");
+            this.space_arrangements = crate::workspace::spaces::Arrangements::load(super::file("data/layouts/space-arrangements.json"));
+            this.model.active = Some("b".into()); this.sync(window, cx); assert_eq!(width(this),650.);
+            let snapshot = this.workspace.as_ref().unwrap().inspect();
+            let rejected = this.run_as("workspace.import",serde_json::json!({"document":snapshot["document"],"expected_revision":snapshot["revision"],"expected_space":"a","expected_workspace":"test"}),false,window,cx);
+            assert!(rejected.get("error").is_some()); assert_eq!(width(this),650.);
+            this.model.spaces.push(crate::model::Space { id:"offline/s".into(),name:"Offline".into(),folder:String::new(),machine:Some("offline".into()),tabs:vec![],active:None,rest:serde_json::Map::new() });
+            this.model.active = Some("offline/s".into()); this.sync(window,cx);
+            resize(this, 950., window, cx);
+            this.model.active = Some("b".into()); this.sync(window,cx);
+            assert_eq!(width(this),650.,"an unverified machine cannot overwrite the outgoing space's arrangement");
+            std::fs::write(super::layout_path("test"), serde_json::to_string(&this.file_chrome).unwrap()).unwrap();
+            super::clone_layout("test", "independent").unwrap();
+            let cloned: crate::layout::Node = serde_json::from_str(&std::fs::read_to_string(super::layout_path("independent")).unwrap()).unwrap();
+            assert_eq!(cloned.workspace.as_deref(),Some("independent"));
+            let cloned_store = panel_workspace::Store::new(super::file("workspaces/independent.json"));
+            let mut independent = cloned_store.load().unwrap().document;
+            independent.zones[0].extent = 1200.; cloned_store.save(&independent).unwrap();
+            assert_eq!(panel_workspace::Store::new(super::file("workspaces/test.json")).load().unwrap().document.zones[0].extent,650.);
+        }));
     }
 
     /// The window on a core that's never there (`hc::offline`), showing

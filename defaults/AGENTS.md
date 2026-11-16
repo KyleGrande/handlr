@@ -77,6 +77,7 @@ first frame or during GPU recovery it reports an error instead of a PNG.
 | File | What it decides | Applied |
 |---|---|---|
 | `layouts/<name>.json` | the window and its whole look: blocks, theme, fonts, backgrounds, pane frames; one file per layout (`main`, `terminals`, `win98`, any you add) | live |
+| `glass.json` | Settings mod's per-layout Glass preference and restoration journal; let Settings manage it | mod-owned |
 | `keys.json` | what every key does | live |
 | `settings.json` | the person: zoom, sounds, fonts for every layout, worktree directory | live |
 | `mods/<name>/` | panels: small JavaScript programs | live (hot reload) |
@@ -210,6 +211,27 @@ Composition is saved locally in `workspaces/<name>.json`, with a last-good copy;
 it does not change Core's ownership of terminal tabs.
 
 `workspace.inspect` reads `{revision, document, can_undo, can_redo, warning}`.
+It also returns `space` and `workspace`. Pass these as `expected_space` and
+`expected_workspace` on `workspace.import` to reject delayed imports after navigation.
+Settings → Look → **Remember layout per space** defaults off. With it on,
+native panel workspaces save and restore each space's working panel arrangement,
+even with the Layouts panel closed. `workspace.remember {enabled: true | false}`
+sets the preference; `workspace.remember` reads it. Turning it off keeps the
+displayed arrangement and retains associations for re-enabling. New spaces start
+from the current arrangement. This affects panel composition, not terminals,
+tabs, themes or fonts. Local associations live in
+`data/layouts/space-arrangements.json` with a last-good copy; identities use the
+workspace document, permanent machine ID and space ID, so renames keep them.
+The **Layouts** panel (command palette → Open Layouts) saves, applies, explicitly
+updates, renames, duplicates and deletes personal panel arrangements. Enter a
+name before Save, Rename or Duplicate. Presets live in `data/layouts/presets.json`
+with a `.last-good` recovery copy. Working arrangements are independent copies;
+deleting a preset does not change them. Whole-window layouts appear separately
+with Switch and Duplicate actions; bundled layouts remain read-only.
+Snapshots include grouping, selected views, placement, sizes and visibility.
+They omit terminal sessions, props, bindings, storage namespaces, theme and fonts.
+The first version reuses panel identities already registered in the target
+workspace; missing or reassigned panels produce an error without applying.
 `workspace.apply {transaction: {expected_revision, commands}}` validates a full
 draft and persists it before publishing. Commands use stable IDs and an `op`
 field: `new_group`, `new_view`, `register_panel`, `show_panel`, `move_section`,
@@ -350,8 +372,9 @@ The default clone name is `<name>-copy`; an existing name is refused.
 `layout.clone` switches to the clone. In the palette: Duplicate layout
 or Duplicate mod. Clones are yours and never updated. They record
 `cloned_from: {name, version}` and copy the layout and its clicks as-is,
-including its look. A cloned layout keeps its mod references:
-clone a mod too and point your layout's `content.mod` to it when you want an
+including its look. A cloned panel-workspace layout gets its own independent
+workspace document. A cloned layout keeps its mod references: clone a mod too
+and point your layout's `content.mod` to it when you want an
 additional independent variant. Editing the existing mod in place is also supported.
 Mod clones rewrite their own `mods/<name>/` asset paths and self-opening
 overlay names to the new name.
@@ -865,6 +888,19 @@ What's about the user, never a look:
   transparent too; keep popup, selection and input colors for their controls.
   The Settings mod owns this preset and saves previous overrides in `seamless_colors`;
   turning it off restores them. Theme and appearance changes continue to work.
+- **Settings → Look → Glass** is an opt-in macOS finish for layouts using the
+  bundled tabs panel, including Handlr. It follows the chosen theme, frosts the
+  workspace, keeps terminal text/backgrounds opaque, and uses dense popup fills.
+  It is per layout; enabling on a bundled layout creates a personal copy named
+  `<layout>-glass` (with a suffix if needed). It never rewrites bundled layouts.
+  Glass and Seamless are mutually exclusive in Settings. Disabling restores
+  prior overrides, preserving independent edits. The Settings and tabs mods own
+  the `glass.json` restoration journal and `settings.glass` shared status; these
+  are not native settings.json keys. Do not edit the journal while Glass is on.
+  The tabs mod refreshes theme/material changes every three seconds and checks
+  macOS reduced transparency at most every fifteen seconds. Reduced transparency
+  or a failed accessibility query selects opaque fills and disables root blur.
+  Other platforms keep the control unavailable until their native UI is tested.
 - `no_headers`: `true` enables Settings → Look → No Headers for panel workspaces.
   Panel title rows and their controls disappear, reclaiming their height; group
   navigation tabs remain. Applies live to docked and floating panels. Turn it off
@@ -1241,6 +1277,9 @@ All of it is in `herdr.d.ts`. In short:
   Terminal copy/paste and implicit right-click routing follow the focused block.
 - Floating: `placement()` (null unless this copy floats).
 - Act: `run(command, args)`.
+  `await workspaceCommand(name, args)` runs a `workspace.*` command in this mod
+  copy's owning window and returns its reply, rejecting on error. Use context
+  guards from `workspace.inspect` for asynchronous `workspace.import` actions.
 - Overlays: `openOverlay({ mod, props, kind: "dialog" | "popup" | "window", width, height, at, frame })`
   returns an id; the mod gets `props().overlay` and closes itself with
   `closeOverlay(id)`; Esc closes the top dialog or popup. `frame: "none"`

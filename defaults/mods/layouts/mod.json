@@ -1,0 +1,6 @@
+{
+  "title": "Layouts",
+  "place": "none",
+  "button": { "opens": "panel", "label": "Layouts" },
+  "overlay": { "kind": "window", "width": 440, "height": 540 }
+}

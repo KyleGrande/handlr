@@ -223,6 +223,7 @@ fn module(values: BTreeMap<String, Value>, calls: Rc<RefCell<Calls>>) -> HostMod
     }
     module = module.async_function("feedbackPickImages", |_| Ok(async { Ok(HostValue::Array(vec![])) }));
     module = module.async_function("knownAgents", |_| Ok(async { Ok(HostValue::Array(vec![])) }));
+    module = module.async_function("workspaceCommand", |_| Ok(async { Ok(HostValue::Null) }));
     module = module.async_function("pickFolder", |_| Ok(async { Ok(HostValue::Null) }));
     module = module.async_function("nextCommand", |_| Ok(std::future::pending::<gpui_shell::HostResult>()));
     module = module.cancellable_async_function("watchFolder", HostValue::Array(vec![]), |_| Ok(std::future::pending::<gpui_shell::HostResult>()));
@@ -232,6 +233,7 @@ fn module(values: BTreeMap<String, Value>, calls: Rc<RefCell<Calls>>) -> HostMod
             let first = a.get(0).map(from_host).unwrap_or(Value::Null);
             let reply = match name {
                 "readTextFile" if first == "/fixture/app/settings.json" || first == "/fixture/.ssh/config" => Some(Value::Null),
+                "readTextFile" if first == "/fixture/app/data/layouts/presets.json" || first == "/fixture/app/data/layouts/presets.json.last-good" => Some(Value::Null),
                 "readTextFile" => first
                     .as_str()
                     .and_then(|p| p.strip_prefix("/fixture/app/layouts/"))
@@ -488,6 +490,16 @@ fn shipped_initial_descriptions(cx: &mut TestAppContext) {
         entries.len(),
         start.elapsed()
     );
+}
+
+#[gpui::test]
+fn layouts_panel_exposes_presets_and_the_per_space_setting(cx: &mut TestAppContext) {
+    cx.update(gpui_shell::init);
+    let staged = Staged::new();
+    let tree = describe(cx, &staged, "mods/layouts", true, props(), updates("current", "current"), None).unwrap();
+    for label in ["Layouts", "layouts-remember", "layouts-save", "Personal panel arrangements", "Whole-window layouts"] {
+        assert!(tree.contains(label), "missing {label}: {tree}");
+    }
 }
 
 /// A mod's localStorage write lands on the executor; one that lands after the
@@ -964,6 +976,7 @@ fn settings_sections_and_updates(cx: &mut TestAppContext) {
         if section == "look" {
             assert!(tree.contains("st-no-headers"), "{tree}");
             assert!(tree.contains("No Headers"), "{tree}");
+            assert!(tree.contains("st-remember-per-space"), "{tree}");
         }
     }
     for app in ["source", "current", "ready"] {

@@ -6,6 +6,8 @@ mod commands;
 mod layout;
 #[path = "../../../src/workspace.rs"]
 mod workspace;
+#[path = "../../../src/persist.rs"]
+mod persist;
 
 use panel_workspace::*;
 use serde_json::json;
@@ -79,6 +81,26 @@ fn projection_preserves_center_and_uses_stable_panel_slots() {
     let json = serde_json::to_string(&projected).unwrap();
     let restored: layout::Node = serde_json::from_str(&json).unwrap();
     assert_eq!(restored, projected);
+}
+
+#[test]
+fn workspace_root_retains_layout_look_and_blur_in_normal_and_maximized_modes() {
+    let mut document = sample();
+    let center: layout::Node = serde_json::from_value(json!({
+        "id":"@workspace/center", "type":"column", "children":[], "window_blur":true,
+        "theme":{"light":"paper","dark":"ink"},
+        "colors":{"background":"#17191d66","canvas":"#1113164d","surface":"#17191dcc"},
+        "font":"JetBrains Mono", "font_size":15, "terminal_opacity":1
+    })).unwrap();
+    for maximized in [None, Some("left-group".to_owned())] {
+        document.maximized_group_id = maximized;
+        let projected = workspace::project(&document, &center).unwrap();
+        assert!(projected.window_blur, "the displayed root drives native blur");
+        assert_eq!(projected.look, center.look, "root theme resolution must see the layout's material");
+        let opaque = workspace::project(&document, &workspace::default_center()).unwrap();
+        assert!(!opaque.window_blur);
+        assert_eq!(opaque.look, workspace::default_center().look);
+    }
 }
 
 #[test]
