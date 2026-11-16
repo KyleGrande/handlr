@@ -58,9 +58,9 @@ mod tests {
     fn own_without_launcher_overrides_has_private_storage() {
         let env = profile(Some(CoreSession::Own), Path::new("/app"), |_| None);
         assert_eq!(env["HC_SESSION"], Some("handlr".into()));
-        assert_eq!(env["HC_SOCKET"], Some(Path::new("/app/core/core.sock").into()));
+        assert_eq!(env["HC_SOCKET"], Some(Path::new("/app").join("core").join("core.sock").into_os_string()));
         for (key, suffix) in [("XDG_STATE_HOME", "state"), ("XDG_CONFIG_HOME", "config"), ("XDG_RUNTIME_DIR", "run")] {
-            assert_eq!(env[key], Some(Path::new("/app/core").join(suffix).into_os_string()));
+            assert_eq!(env[key], Some(Path::new("/app").join("core").join(suffix).into_os_string()));
         }
     }
 
