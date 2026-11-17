@@ -9,10 +9,20 @@ export function glassBackgroundValue(value) {
   return typeof value === "number" && Number.isFinite(value) ? Math.max(0, Math.min(100, value)) : 100;
 }
 
+function isDark(color) {
+  const rgb = (color ?? '#17191d').slice(1, 7);
+  const [r, g, b] = [0, 2, 4].map(i => parseInt(rgb.slice(i, i + 2), 16));
+  return r * .2126 + g * .7152 + b * .0722 < 128;
+}
+
+export function glassCardFill(background, frost = 100) {
+  return alpha(background, isDark(background) ? .3034 : .3034 + (.82 - .3034) * glassBackgroundValue(frost) / 100);
+}
+
 export function glassMaterial(baseline, blur, background = 100, frost = 100) {
   const rgb = (baseline.background ?? '#17191d').slice(1, 7);
   const channels = [0, 2, 4].map(i => parseInt(rgb.slice(i, i + 2), 16));
-  const dark = channels[0] * .2126 + channels[1] * .7152 + channels[2] * .0722 < 128;
+  const dark = isDark(baseline.background);
   // Keep every pane translucent; lift the dark tint without building up
   // dense background layers inside each card.
   const tint = dark && blur ? '#' + channels.map(c => Math.round(c + (255 - c) * .10).toString(16).padStart(2, '0')).join('') : baseline.background;
@@ -24,7 +34,7 @@ export function glassMaterial(baseline, blur, background = 100, frost = 100) {
     background: alpha(tint, blur ? 1 - (1 - (dark ? .24 : .18 + .64 * glassBackgroundValue(frost) / 100)) * (1 - .3034 * glassBackgroundValue(background) / 100) : 1),
     canvas: alpha(baseline.canvas, blur ? .02 : 1),
     chrome: alpha(baseline.chrome, blur ? .06 : 1),
-    surface: alpha(baseline.surface, blur ? .14 : 1),
+    surface: alpha(baseline.surface, blur ? (dark ? .14 : .14 + .68 * glassBackgroundValue(frost) / 100) : 1),
     popover: alpha(baseline.popover, 1), raised: alpha(baseline.raised, 1),
     // Preserve the theme's existing fine border instead of strengthening it.
     border: baseline.border,
@@ -94,7 +104,7 @@ function reconcileCards(root, entry, blur, seamless) {
       }
       if (card) {
         const before = {};
-        for (const [key, value] of Object.entries({ shadow: blur ? 'sm' : undefined, radius: 12, background: alpha(root.colors?.background, .3034), focus_background: alpha(root.colors?.background, .37) })) {
+        for (const [key, value] of Object.entries({ shadow: blur ? 'sm' : undefined, radius: 12, background: glassCardFill(root.colors?.background, entry.frost), focus_background: glassCardFill(root.colors?.background, entry.frost) })) {
           if (!Object.hasOwn(card.saved, key)) card.saved[key] = { had: Object.hasOwn(pane, key), value: pane[key] ?? null };
           if (Object.hasOwn(pane, key)) before[key] = pane[key];
           if (Object.hasOwn(card.applied, key) && !same(pane[key] ?? null, card.applied[key])

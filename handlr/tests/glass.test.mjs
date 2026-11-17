@@ -205,10 +205,10 @@ test('all resting panes retain visible glass through stacked backgrounds', () =>
     const base = [opacity(glass.colors.background), opacity(glass.colors.canvas), opacity(glass.colors.canvas)];
     const panel = stacked([...base, opacity(glass.colors.surface), opacity(glass.colors.surface), opacity(glass.colors.background)]);
     const terminal = stacked([...base, opacity(glass.content.pane.background), glass.terminal_opacity, glass.terminal_opacity]);
-    assert.ok(panel < (background === '#ffffff' ? .995 : .82), 'nested panel backgrounds must remain translucent');
-    assert.ok(terminal < (background === '#ffffff' ? .93 : .75), 'resting terminal backgrounds must remain translucent');
+    assert.ok(panel < (background === '#ffffff' ? .9999 : .82), 'nested panel backgrounds must remain translucent');
+    assert.ok(terminal < (background === '#ffffff' ? .99 : .75), 'resting terminal backgrounds must remain translucent');
     if (background === '#ffffff') assert.ok(opacity(glass.colors.background) >= .8, 'white frost stays near white even over a black backdrop');
-    assert.equal(glass.content.pane.background, glass.colors.background.slice(0, 7) + '4d');
+    assert.equal(glass.content.pane.background, pure.glassCardFill(glass.colors.background));
     assert.equal(glass.colors.border, colors.border);
     assert.equal(glass.colors.foreground, undefined, 'text stays under theme control');
   }
@@ -282,18 +282,18 @@ test('glass pane backgrounds restore authored fills and retain independent edits
   assert.equal(f.root().children[1].content.pane.background, '#33445566');
 });
 
-test('Glass journals a denser focus fill while every resting terminal stays translucent', async () => {
+test('Glass journals stable card fills while the border carries focus', async () => {
   const original = { id: 'root', children: [{ id: 'tabs', content: { mod: 'tabs' } },
     { id: 'terminal', content: { pane: { background: '#112233', focus_background: '#abcdef99' } } }] };
   const f = fixture('Handlr', original);
   await f.api.setGlass(true);
   const pane = () => f.root().children[1].content.pane;
   assert.equal(pane().background, '#2e30344d');
-  assert.equal(pane().focus_background, '#2e30345e');
+  assert.equal(pane().focus_background, '#2e30344d');
   assert.equal(f.root().terminal_opacity, 0);
   f.current.dark = false;
   await f.api.setGlass(true);
-  assert.equal(pane().focus_background, '#ffffff5e');
+  assert.equal(pane().focus_background, '#ffffffd1');
   f.signal({ code: 0, stdout: 'reduced' });
   await f.api.setGlass(true);
   assert.equal(pane().focus_background, original.children[1].content.pane.focus_background);
@@ -319,7 +319,7 @@ test('combined presets clear panel layers and outlines while keeping floating te
   for (const key of ['chrome', 'surface', 'border']) assert.equal(combined.root.colors[key], '#00000000');
   assert.equal(combined.root.content.pane.shadow, 'sm');
   assert.equal(combined.root.content.pane.background, '#2e30344d');
-  assert.equal(combined.root.content.pane.focus_background, '#2e30345e');
+  assert.equal(combined.root.content.pane.focus_background, '#2e30344d');
   assert.equal(combined.root.window_blur, true);
   combined.state.pending = false;
   const back = pure.reconcileGlass(combined.root, combined.state, palette, {}, true, false);
@@ -396,7 +396,7 @@ test('resting and focused glass cards own their rounded fill without rectangular
     assert.equal(pane.radius, 12);
     assert.equal(pane.shadow, 'sm', 'resting cards float even in Seamless');
     assert.equal(pane.background, '#2e30344d');
-    assert.equal(pane.focus_background, '#2e30345e');
+    assert.equal(pane.focus_background, '#2e30344d');
   }
 });
 
@@ -428,4 +428,20 @@ test('both sliders persist together, refresh without recapture, and restore auth
   assert.equal(f.api.glassFrost(), 25, 'background changes retain the white-frost choice');
   await f.api.setGlass(false);
   assert.equal(f.root().colors, undefined);
+});
+
+
+test('white panel and card fills stay white with stable focus without changing the backdrop', () => {
+  const light = { ...palette, background: '#ffffff', surface: '#ffffff' };
+  for (const strength of [0, 50, 100]) {
+    const original = { id: 'terminal', content: { pane: {} } };
+    const state = { ...pure.newGlassState(original), background: strength, frost: 100 };
+    const { root } = pure.reconcileGlass(original, state, light, {}, true);
+    const backdrop = pure.glassMaterial(light, true, strength, 100).background;
+    assert.equal(root.colors.background, backdrop);
+    assert.equal(root.colors.surface, '#ffffffd1');
+    assert.equal(root.content.pane.background, '#ffffffd1');
+    assert.equal(root.content.pane.focus_background, root.content.pane.background);
+  }
+  assert.equal(pure.glassCardFill('#ffffff', 0), '#ffffff4d', 'clear finish retains the lighter card');
 });

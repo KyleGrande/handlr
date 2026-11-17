@@ -723,7 +723,7 @@ export default class Settings extends View {
       .child(this.row(t, "Seamless", "Remove panel outlines and blend panels into the app background. Works with Glass.",
         this.toggle(t, "st-seamless", Boolean(p.seamless), (_e, cx) => this.appearancePreset(false, cx))))
       .child(this.row(t, "Glass", glassSupported()
-        ? "Frost every pane with a readable backdrop and a subtle focused-terminal fill. Works with Seamless; reduced transparency uses opaque surfaces."
+        ? "Frost every pane with a readable backdrop and border focus cues. Works with Seamless; reduced transparency uses opaque surfaces."
         : "Available on macOS in layouts using the bundled tabs panel.",
         this.toggle(t, "st-glass", glassEnabled(), (_e, cx) => {
           if (glassSupported() || glassEnabled()) this.appearancePreset(true, cx);

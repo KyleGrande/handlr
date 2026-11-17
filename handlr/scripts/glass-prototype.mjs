@@ -3,7 +3,7 @@ import { copyFile, mkdtemp, mkdir, readFile, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { glassMaterial } from '../../defaults/frame/settings/glass-state.js';
+import { glassMaterial, glassCardFill } from '../../defaults/frame/settings/glass-state.js';
 
 const root = new URL('../../', import.meta.url);
 const json = async path => JSON.parse(await readFile(path, 'utf8'));
@@ -30,7 +30,7 @@ export function materialTheme(palette, glass) {
   const bg = palette.background;
   const baseline = { background: bg, canvas: bg, chrome: bg, surface: bg, popover: bg, raised: bg, ...colors };
   const { window_blur, terminal_opacity, ...material } = glassMaterial(baseline, glass);
-  return { ...structuredClone(palette), colors: { ...colors, ...material, 'glass-rest': material.background.slice(0, 7) + '4d', 'glass-focus': material.background.slice(0, 7) + '5e' } };
+  return { ...structuredClone(palette), colors: { ...colors, ...material, 'glass-rest': glassCardFill(material.background), 'glass-focus': glassCardFill(material.background) } };
 }
 
 export function prototypeLayout(layout, material) {

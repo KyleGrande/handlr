@@ -895,9 +895,9 @@ What's about the user, never a look:
 - **Settings → Look → Glass** is an opt-in macOS finish for layouts using the
   bundled tabs panel, including Handlr. It follows the chosen theme, frosts the
   workspace and terminal backgrounds, keeps text opaque, and uses dense popup fills.
-  Every panel and resting terminal stays translucent. Only the focused terminal
-  gets a subtle 37% fill through the pane frame’s `focus_background`; it follows
-  focus immediately without writing layouts or changing text opacity. Dark
+  Every panel and terminal stays translucent. Terminal card fills stay the same
+  when focused or hovered; focus and hover use the frame border. Frames with
+  an authored focus border reuse its color on hover without changing width. Dark
   themes use a slightly lifted tint. Light themes use denser white frost
   (82–87% backdrop opacity at the default) so dark desktop content does not turn them gray.
   In light mode, **White frost** blends from the earlier clear finish (0%) to
@@ -908,7 +908,8 @@ What's about the user, never a look:
   strength per layout: 0% uses the base window tint, 100% (the default)
   adds the former resting-terminal frost so Seamless panel text is easier to read.
   This percentage is material strength, not window opacity. Rounded terminal
-  frames own the resting fill (about 30%); rectangular terminal fills are transparent
+  frames own the fill (about 82% for white frost, 30% for clear/dark glass);
+  light panel surfaces also follow White frost. Rectangular terminal fills are transparent
   so every card keeps rounded corners. Terminal cards use soft shadows, including
   in Seamless mode;
   disabling Glass restores their prior fills and look.
@@ -916,7 +917,7 @@ What's about the user, never a look:
   `<layout>-glass` (with a suffix if needed). It never rewrites bundled layouts.
   Glass and Seamless can be enabled independently or together. Together,
   Seamless clears panel fills and outlines while Glass keeps terminal-card shadows,
-  the frost and the focused terminal’s denser fill. Disabling either preserves
+  the frost and stable terminal fills. Disabling either preserves
   the other; disabling Glass restores
   prior overrides, preserving independent edits. The Settings and tabs mods own
   the `glass.json` restoration journal and `settings.glass` shared status; these
