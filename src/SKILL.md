@@ -283,8 +283,10 @@ shadows and rounded resting/focused fills. The terminal background passes are
 transparent so they cannot cover the rounded frame corners. Glass background
 adjusts the backdrop per layout from the base tint (0%) to resting-
 terminal frost (100%, the default). Either control can be turned off independently.
-Light Glass uses 82–87% white backdrop opacity to retain a white frosted look
-over dark content; dark Glass keeps its existing smoke tint.
+Light Glass defaults to 82–87% white backdrop opacity to retain a white frosted
+look over dark content. Its White frost slider blends from the earlier clear
+finish (0%) to white frost (100%), independently of Glass background strength.
+Both values are saved per layout; dark Glass keeps its existing smoke tint.
 The Settings/tabs mods own per-layout preference and restoration in `glass.json`;
 do not edit that journal while enabled. Reduced transparency or a failed native
 accessibility query selects opaque fills (checked at most every fifteen seconds).

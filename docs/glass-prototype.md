@@ -224,3 +224,16 @@ focus fill is visible. Text and explicitly colored application cells stay opaque
 Existing frame fields and restoration journals handle the change; no native API
 or model extension is needed. The background-strength slider remains independent
 of the terminal cards' fill.
+
+
+### Independent white-frost control (2026-11-17)
+
+Light Glass now offers two sliders: Glass background retains the existing
+backdrop-strength adjustment, while White frost blends the base alpha from
+18% (the earlier clear finish) to 82% (the white finish). Both default to 100,
+so existing white-frost layouts keep their appearance. The Settings/tabs mods
+persist `background` and `frost` per layout in `glass.json`, and save both
+controls together after dragging or keyboard changes. A background-only update
+preserves the saved frost amount. Dark Glass retains its existing smoked tint;
+White frost is shown only in light mode. Opaque accessibility fallback, terminal
+card geometry and restoration ownership stay unchanged.

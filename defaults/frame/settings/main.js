@@ -4,7 +4,7 @@ import { View, div, svg, image } from "gpui-kit";
 import { v_flex, h_flex, Scrollbar, InputState, Input, Popup, SliderState, Slider, SliderTrack, SliderIndicator, SliderThumb } from "gpui-base";
 import { hc, exec, layout, run, theme, themes, fonts, updates, telemetry, settings, layouts, shared, setShared, appHome, readTextFile, writeTextFile, playSound, props, closeOverlay, notify, window } from "herdr";
 import { readMods, modCommand, modPanels } from "./mods.js";
-import { glassEnabled, glassSupported, glassBackground, setGlassBackground, setGlass, startGlass } from "./glass.js";
+import { glassEnabled, glassSupported, glassBackground, glassFrost, setGlassFinish, setGlass, startGlass } from "./glass.js";
 
 const I = (name) => `frame/settings/${name}.svg`;
 
@@ -60,21 +60,25 @@ function toggleSeamless(person) {
 export default class Settings extends View {
   init(_props, cx) {
     startGlass(cx);
-    this.glassSlider = SliderState.new({ min: 0, max: 100, step: 1, value: glassBackground() });
-    this.glassSlider.on("change", (value, cx) => {
-      const name = String(shared("layout") ?? "main");
-      const revision = this.glassRevision = (this.glassRevision ?? 0) + 1;
-      cx.notify();
-      // Coalesce dragging and keyboard changes into guarded material updates.
-      cx.timer.after(200, cx => {
-        if (revision !== this.glassRevision) return;
-        cx.spawn(async cx => {
-          try { await setGlassBackground(value, name); }
-          catch (error) { notify({ title: "Glass background was not changed", body: String(error?.message ?? error), level: "error" }); }
-          cx.notify();
+    this.glassSliders = {};
+    for (const [key, read] of [["background", glassBackground], ["frost", glassFrost]]) {
+      const state = this.glassSliders[key] = SliderState.new({ min: 0, max: 100, step: 1, value: read() });
+      state.on("change", (_value, cx) => {
+        const name = String(shared("layout") ?? "main");
+        const values = Object.fromEntries(Object.entries(this.glassSliders).map(([key, state]) => [key, state.value()]));
+        const revision = this.glassRevision = (this.glassRevision ?? 0) + 1;
+        cx.notify();
+        // Save both controls together so dragging either keeps the other's value.
+        cx.timer.after(200, cx => {
+          if (revision !== this.glassRevision) return;
+          cx.spawn(async cx => {
+            try { await setGlassFinish(values, name); }
+            catch (error) { notify({ title: "Glass was not changed", body: String(error?.message ?? error), level: "error" }); }
+            cx.notify();
+          });
         });
       });
-    });
+    }
     const asked = props()?.section;
     this.section = SECTIONS.some((s) => s.id === asked) ? asked : "look";
     this.picking = null; // "font" | "ui_font" while its list is open
@@ -229,14 +233,15 @@ export default class Settings extends View {
     });
   }
 
-  glassBackgroundControl(t) {
+  glassBackgroundControl(t, key = "background") {
     // Re-seed when switching layouts; each layout keeps its own strength.
     const name = shared("layout");
     if (this.glassSliderLayout !== name) {
       this.glassSliderLayout = name;
-      this.glassSlider.set_value(glassBackground());
+      this.glassSliders.background.set_value(glassBackground());
+      this.glassSliders.frost.set_value(glassFrost());
     }
-    const state = this.glassSlider;
+    const state = this.glassSliders[key];
     return h_flex().gap(10).items_center()
       .child(Slider.new(state).w(150).h(28)
         .child(SliderTrack.new(state).relative().w_full().h_full().flex().items_center()
@@ -723,6 +728,7 @@ export default class Settings extends View {
         this.toggle(t, "st-glass", glassEnabled(), (_e, cx) => {
           if (glassSupported() || glassEnabled()) this.appearancePreset(true, cx);
         })))
+      .when(glassEnabled() && !s.dark, el => el.child(this.row(t, "White frost", "Clear glass at 0%; translucent white frost at 100%. Saved for this layout.", this.glassBackgroundControl(t, "frost"))))
       .when(glassEnabled(), el => el.child(this.row(t, "Glass background", "Lighter at 0%; resting-terminal frost at 100%. Saved for this layout.", this.glassBackgroundControl(t))))
       .child(this.row(t, "No Headers", "Hide panel title rows. Turn off to restore panel controls and drag handles.",
         this.toggle(t, "st-no-headers", Boolean(p.no_headers), (_e, cx) => this.change(q => { q.no_headers = !q.no_headers; }, cx))))

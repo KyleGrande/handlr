@@ -22,6 +22,10 @@ export function glassBackground(name = shared("layout")) {
   return glassBackgroundValue(shared("settings.glass.background")?.[name]);
 }
 
+export function glassFrost(name = shared("layout")) {
+  return glassBackgroundValue(shared("settings.glass.frost")?.[name]);
+}
+
 export function glassSupported() {
   const tabs = node => node?.content?.mod === "tabs" || (node?.children ?? []).some(tabs);
   return window()?.platform === "macos" && tabs(layout());
@@ -30,6 +34,7 @@ export function glassSupported() {
 function publish(state) {
   setShared("settings.glass", Object.fromEntries(Object.entries(state.layouts).map(([name, entry]) => [name, Boolean(entry.enabled)])));
   setShared("settings.glass.background", Object.fromEntries(Object.entries(state.layouts).map(([name, entry]) => [name, glassBackgroundValue(entry.background)])));
+  setShared("settings.glass.frost", Object.fromEntries(Object.entries(state.layouts).map(([name, entry]) => [name, glassBackgroundValue(entry.frost)])));
   setShared("settings.glass.error", null);
 }
 
@@ -128,11 +133,17 @@ export async function setGlass(enabled) {
 }
 
 export async function setGlassBackground(value, name = String(shared("layout") ?? "main")) {
+  return setGlassFinish({ background: value }, name);
+}
+
+export async function setGlassFinish(values, name = String(shared("layout") ?? "main")) {
   const completed = await locked(async () => {
     const { state, raw } = await loadState();
     const entry = state.layouts[name];
     if (!entry?.enabled) return;
-    entry.background = glassBackgroundValue(value);
+    for (const key of ["background", "frost"]) {
+      if (Object.hasOwn(values, key)) entry[key] = glassBackgroundValue(values[key]);
+    }
     const updated = JSON.stringify(state, null, 2) + "\n";
     await writeTextFile(statePath(), updated, raw);
     await sync(state, updated, name);

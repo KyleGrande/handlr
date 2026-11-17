@@ -9,7 +9,7 @@ export function glassBackgroundValue(value) {
   return typeof value === "number" && Number.isFinite(value) ? Math.max(0, Math.min(100, value)) : 100;
 }
 
-export function glassMaterial(baseline, blur, background = 100) {
+export function glassMaterial(baseline, blur, background = 100, frost = 100) {
   const rgb = (baseline.background ?? '#17191d').slice(1, 7);
   const channels = [0, 2, 4].map(i => parseInt(rgb.slice(i, i + 2), 16));
   const dark = channels[0] * .2126 + channels[1] * .7152 + channels[2] * .0722 < 128;
@@ -21,7 +21,7 @@ export function glassMaterial(baseline, blur, background = 100) {
     // in the window backdrop, so Seamless panels get the same readable frost.
     // White frost needs a denser base: a faint white layer reads as gray over
     // dark content behind the window. Keep the dark material's existing smoke.
-    background: alpha(tint, blur ? 1 - (1 - (dark ? .24 : .82)) * (1 - .3034 * glassBackgroundValue(background) / 100) : 1),
+    background: alpha(tint, blur ? 1 - (1 - (dark ? .24 : .18 + .64 * glassBackgroundValue(frost) / 100)) * (1 - .3034 * glassBackgroundValue(background) / 100) : 1),
     canvas: alpha(baseline.canvas, blur ? .02 : 1),
     chrome: alpha(baseline.chrome, blur ? .06 : 1),
     surface: alpha(baseline.surface, blur ? .14 : 1),
@@ -54,7 +54,7 @@ export function reconcileGlass(root, state, palette, personColors, blur, seamles
   // An independent decision to disable blur must also select readable fills.
   blur = blur && !(entry.protected.window_blur && root.window_blur !== true);
   const baseline = { ...palette, ...personColors, ...entry.saved.colors };
-  const material = glassMaterial(baseline, blur, entry.background);
+  const material = glassMaterial(baseline, blur, entry.background, entry.frost);
   if (seamless) {
     for (const key of ["chrome", "surface", "border"]) material[key] = "#00000000";
   }
