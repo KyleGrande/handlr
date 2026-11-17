@@ -4523,6 +4523,12 @@ impl AppWindow {
         }
         if let Some(l) = line {
             el = el.border(settings::z(l.width)).border_color(c(&l.color));
+            if let Some(hover) = &f.focus {
+                // Reuse the authored focus color for a border-only hover cue.
+                // Keep the card fill stable and avoid changing its geometry.
+                let color = c(&hover.color);
+                el = el.hover(move |s| s.border_color(color));
+            }
         }
         el = shadow(el, f.shadow.as_deref());
         let body = div().flex_1().min_h_0().flex().child(inner);

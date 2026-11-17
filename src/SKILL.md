@@ -273,7 +273,8 @@ The Settings mod manages this color preset and restores previous colors when dis
 Settings → Look → Glass adds an opt-in frosted finish on macOS layouts using the
 bundled tabs panel, including Handlr. Bundled layouts open as personal copies.
 Glass follows the selected theme and keeps all panels and resting terminals
-translucent, with a denser fill only behind the focused terminal. Text stays
+translucent, with stable terminal fills across focus and hover. Border color
+carries focus and hover (frames reuse their authored focus border color). Text stays
 opaque. Optional pane-frame `focus_background` selects that terminal’s fill
 while it has focus; other panes keep `background`. With the field absent,
 existing layouts behave as before. Glass restores only its own overrides
@@ -286,7 +287,9 @@ terminal frost (100%, the default). Either control can be turned off independent
 Light Glass defaults to 82–87% white backdrop opacity to retain a white frosted
 look over dark content. Its White frost slider blends from the earlier clear
 finish (0%) to white frost (100%), independently of Glass background strength.
-Both values are saved per layout; dark Glass keeps its existing smoke tint.
+Both values are saved per layout. White frost also whitens panel surfaces and
+terminal card fills without changing the chosen backdrop; dark Glass keeps
+its existing smoke tint.
 The Settings/tabs mods own per-layout preference and restoration in `glass.json`;
 do not edit that journal while enabled. Reduced transparency or a failed native
 accessibility query selects opaque fills (checked at most every fifteen seconds).
