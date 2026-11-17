@@ -19,7 +19,9 @@ export function glassMaterial(baseline, blur, background = 100) {
   return {
     // At full strength, include the former resting card + two terminal fills
     // in the window backdrop, so Seamless panels get the same readable frost.
-    background: alpha(tint, blur ? 1 - (1 - (dark ? .24 : .18)) * (1 - .3034 * glassBackgroundValue(background) / 100) : 1),
+    // White frost needs a denser base: a faint white layer reads as gray over
+    // dark content behind the window. Keep the dark material's existing smoke.
+    background: alpha(tint, blur ? 1 - (1 - (dark ? .24 : .82)) * (1 - .3034 * glassBackgroundValue(background) / 100) : 1),
     canvas: alpha(baseline.canvas, blur ? .02 : 1),
     chrome: alpha(baseline.chrome, blur ? .06 : 1),
     surface: alpha(baseline.surface, blur ? .14 : 1),

@@ -898,8 +898,10 @@ What's about the user, never a look:
   Every panel and resting terminal stays translucent. Only the focused terminal
   gets a subtle 37% fill through the pane frame’s `focus_background`; it follows
   focus immediately without writing layouts or changing text opacity. Dark
-  themes use a slightly lifted tint. **Glass background** adjusts backdrop
-  strength per layout: 0% uses the earlier light window tint, 100% (the default)
+  themes use a slightly lifted tint. Light themes use denser white frost
+  (82–87% backdrop opacity) so dark desktop content does not turn them gray.
+  **Glass background** adjusts backdrop
+  strength per layout: 0% uses the base window tint, 100% (the default)
   adds the former resting-terminal frost so Seamless panel text is easier to read.
   This percentage is material strength, not window opacity. Rounded terminal
   frames own the resting fill (about 30%); rectangular terminal fills are transparent

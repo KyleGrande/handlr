@@ -67,7 +67,8 @@ The reference palettes are Atom One Dark and Paper. Supply existing theme JSON
 files with `--dark-theme` and `--light-theme` to study another palette. Text,
 selection, focus and custom border colors stay under theme control. Glass lifts
 the dark background tint 10% toward white to avoid black terminal wells. Its
-backdrop ranges from 24–47% tint in dark themes and 18–43% in light themes;
+backdrop ranges from 24–47% tint in dark themes and 82–87% in light themes.
+The denser light frost keeps white surfaces near white over dark desktop content;
 canvas adds 2% and chrome 6%. Panel surfaces use 14%. Resting terminal frames
 use about 30% tint and focused frames use 37%, with transparent terminal
 background paint passes so the rounded frame corners remain visible. The renderer follows
@@ -202,9 +203,9 @@ reduced-transparency fallback still uses an opaque window and terminal fill.
 
 Settings → Look → Glass background uses an existing mod Slider, saved as
 `layouts.<name>.background` (0–100) in the mod-owned `glass.json`. Missing values
-use 100. At 0, the backdrop retains the earlier 24% dark / 18% light tint; at
+use 100. At 0, the backdrop uses 24% dark / 82% light tint; at
 100, the default, it composites the former resting terminal's surface and two
-background paint passes into that tint (about 47% dark / 43% light). This gives
+background paint passes into that tint (about 47% dark / 87% light). This gives
 Seamless panel text a denser backdrop while panel outlines remain hidden.
 Intermediate values blend that added material linearly. The percentage describes
 strength within this range, not absolute window opacity. Reduced-transparency
