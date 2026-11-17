@@ -35,8 +35,8 @@ test('personal variants leave the original layout intact and give terminals tran
   const original = structuredClone(layout);
   const glass = prototypeLayout(layout, 'glass');
   assert.equal(glass.window_blur, true);
-  assert.equal(glass.terminal_opacity, 0.10);
-  assert.equal(glass.children[0].content.pane.background, 'surface');
+  assert.equal(glass.terminal_opacity, 0);
+  assert.equal(glass.children[0].content.pane.background, 'glass-rest');
   assert.equal(prototypeLayout(layout, 'opaque').window_blur, false);
   assert.deepEqual(layout, original);
 });

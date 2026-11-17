@@ -278,8 +278,11 @@ opaque. Optional pane-frame `focus_background` selects that terminal’s fill
 while it has focus; other panes keep `background`. With the field absent,
 existing layouts behave as before. Glass restores only its own overrides
 when disabled. Glass and Seamless can be used together: Seamless clears panel
-fills, outlines and card shadows while Glass retains the frost and focused
-terminal fill. Either control can be turned off independently.
+fills and outlines while Glass retains floating terminal cards with soft
+shadows and rounded resting/focused fills. The terminal background passes are
+transparent so they cannot cover the rounded frame corners. Glass background
+adjusts the backdrop per layout from the earlier light tint (0%) to resting-
+terminal frost (100%, the default). Either control can be turned off independently.
 The Settings/tabs mods own per-layout preference and restoration in `glass.json`;
 do not edit that journal while enabled. Reduced transparency or a failed native
 accessibility query selects opaque fills (checked at most every fifteen seconds).

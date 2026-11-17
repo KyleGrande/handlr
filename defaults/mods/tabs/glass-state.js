@@ -26,8 +26,9 @@ export function glassMaterial(baseline, blur, background = 100) {
     popover: alpha(baseline.popover, 1), raised: alpha(baseline.raised, 1),
     // Preserve the theme's existing fine border instead of strengthening it.
     border: baseline.border,
-    // The terminal paints its background twice; glyphs stay fully opaque.
-    window_blur: blur, terminal_opacity: blur ? .10 : 1,
+    // The rounded frame owns the glass fill. Rectangular terminal background
+    // passes would otherwise paint over its corners; glyphs remain opaque.
+    window_blur: blur, terminal_opacity: blur ? 0 : 1,
   };
 }
 
@@ -91,7 +92,7 @@ function reconcileCards(root, entry, blur, seamless) {
       }
       if (card) {
         const before = {};
-        for (const [key, value] of Object.entries({ shadow: blur && !seamless ? 'sm' : undefined, radius: 12, background: 'surface', focus_background: alpha(root.colors?.background, .22) })) {
+        for (const [key, value] of Object.entries({ shadow: blur ? 'sm' : undefined, radius: 12, background: alpha(root.colors?.background, .3034), focus_background: alpha(root.colors?.background, .37) })) {
           if (!Object.hasOwn(card.saved, key)) card.saved[key] = { had: Object.hasOwn(pane, key), value: pane[key] ?? null };
           if (Object.hasOwn(pane, key)) before[key] = pane[key];
           if (Object.hasOwn(card.applied, key) && !same(pane[key] ?? null, card.applied[key])

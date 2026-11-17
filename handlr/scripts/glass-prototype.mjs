@@ -30,7 +30,7 @@ export function materialTheme(palette, glass) {
   const bg = palette.background;
   const baseline = { background: bg, canvas: bg, chrome: bg, surface: bg, popover: bg, raised: bg, ...colors };
   const { window_blur, terminal_opacity, ...material } = glassMaterial(baseline, glass);
-  return { ...structuredClone(palette), colors: { ...colors, ...material, 'glass-focus': material.background.slice(0, 7) + '38' } };
+  return { ...structuredClone(palette), colors: { ...colors, ...material, 'glass-rest': material.background.slice(0, 7) + '4d', 'glass-focus': material.background.slice(0, 7) + '5e' } };
 }
 
 export function prototypeLayout(layout, material) {
@@ -43,11 +43,11 @@ export function prototypeLayout(layout, material) {
   out.window_blur = material === 'glass';
   out.theme = { dark: `glass-study-${material}-dark`, light: `glass-study-${material}-light` };
   // Match the translucent resting terminals in the Settings controller.
-  out.terminal_opacity = material === 'glass' ? 0.10 : 1;
+  out.terminal_opacity = material === 'glass' ? 0 : 1;
   // A light panel tint adds separation without hiding the desktop.
   const panels = node => {
     if (node.content?.pane) {
-      node.content.pane.background = 'surface';
+      node.content.pane.background = material === 'glass' ? 'glass-rest' : 'surface';
       if (material === 'glass') {
         node.content.pane.shadow = 'sm'; node.content.pane.radius = 12;
         node.content.pane.focus_background = 'glass-focus';

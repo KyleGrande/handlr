@@ -40,7 +40,7 @@ test('Glass is opt-in, round trips through persisted state, and preserves custom
   await f.api.setGlass(true);
   assert.equal(f.api.glassEnabled(), true);
   assert.equal(f.root().window_blur, true);
-  assert.equal(f.root().terminal_opacity, 0.10);
+  assert.equal(f.root().terminal_opacity, 0);
   assert.equal(f.root().colors.surface, '#12345624');
   assert.deepEqual(f.root().theme, original.theme);
   assert.deepEqual(f.root().children, original.children);
@@ -204,10 +204,10 @@ test('all resting panes retain visible glass through stacked backgrounds', () =>
     const stacked = layers => 1 - layers.reduce((left, alpha) => left * (1 - alpha), 1);
     const base = [opacity(glass.colors.background), opacity(glass.colors.canvas), opacity(glass.colors.canvas)];
     const panel = stacked([...base, opacity(glass.colors.surface), opacity(glass.colors.surface), opacity(glass.colors.background)]);
-    const terminal = stacked([...base, opacity(glass.colors.surface), glass.terminal_opacity, glass.terminal_opacity]);
-    assert.ok(panel < .80, 'nested panel backgrounds must remain translucent');
+    const terminal = stacked([...base, opacity(glass.content.pane.background), glass.terminal_opacity, glass.terminal_opacity]);
+    assert.ok(panel < .82, 'nested panel backgrounds must remain translucent');
     assert.ok(terminal < .75, 'resting terminal backgrounds must remain translucent');
-    assert.equal(glass.content.pane.background, 'surface');
+    assert.equal(glass.content.pane.background, glass.colors.background.slice(0, 7) + '4d');
     assert.equal(glass.colors.border, colors.border);
     assert.equal(glass.colors.foreground, undefined, 'text stays under theme control');
   }
@@ -272,7 +272,7 @@ test('glass pane backgrounds restore authored fills and retain independent edits
     { id: 'terminal', content: { pane: { background: '#112233', radius: 8 } } }] };
   const f = fixture('Handlr', original);
   await f.api.setGlass(true);
-  assert.equal(f.root().children[1].content.pane.background, 'surface');
+  assert.equal(f.root().children[1].content.pane.background, '#2e30344d');
   await f.api.setGlass(false);
   assert.deepEqual(f.root(), original);
   await f.api.setGlass(true);
@@ -287,12 +287,12 @@ test('Glass journals a denser focus fill while every resting terminal stays tran
   const f = fixture('Handlr', original);
   await f.api.setGlass(true);
   const pane = () => f.root().children[1].content.pane;
-  assert.equal(pane().background, 'surface');
-  assert.equal(pane().focus_background, '#2e303438');
-  assert.equal(f.root().terminal_opacity, .10);
+  assert.equal(pane().background, '#2e30344d');
+  assert.equal(pane().focus_background, '#2e30345e');
+  assert.equal(f.root().terminal_opacity, 0);
   f.current.dark = false;
   await f.api.setGlass(true);
-  assert.equal(pane().focus_background, '#ffffff38');
+  assert.equal(pane().focus_background, '#ffffff5e');
   f.signal({ code: 0, stdout: 'reduced' });
   await f.api.setGlass(true);
   assert.equal(pane().focus_background, original.children[1].content.pane.focus_background);
@@ -309,16 +309,16 @@ test('independent focused-fill edits survive disabling Glass', async () => {
   assert.equal(f.root().children[1].content.pane.focus_background, '#11223388');
 });
 
-test('combined presets clear panel layers, outlines and shadows while preserving the focused terminal fill', () => {
+test('combined presets clear panel layers and outlines while keeping floating terminal cards', () => {
   const original = { id: 'terminals', content: { pane: { background: 'background', shadow: 'lg' } } };
   const initial = pure.newGlassState(original);
   const glass = pure.reconcileGlass(original, initial, palette, {}, true);
   glass.state.pending = false;
   const combined = pure.reconcileGlass(glass.root, glass.state, palette, { chrome: '#00000000', surface: '#00000000', border: '#00000000' }, true, true);
   for (const key of ['chrome', 'surface', 'border']) assert.equal(combined.root.colors[key], '#00000000');
-  assert.equal(combined.root.content.pane.shadow, undefined);
-  assert.equal(combined.root.content.pane.background, 'surface');
-  assert.equal(combined.root.content.pane.focus_background, '#2e303438');
+  assert.equal(combined.root.content.pane.shadow, 'sm');
+  assert.equal(combined.root.content.pane.background, '#2e30344d');
+  assert.equal(combined.root.content.pane.focus_background, '#2e30345e');
   assert.equal(combined.root.window_blur, true);
   combined.state.pending = false;
   const back = pure.reconcileGlass(combined.root, combined.state, palette, {}, true, false);
@@ -383,4 +383,18 @@ test('background slider persists per layout through refresh, Seamless, and resto
   assert.equal(f.root().colors.surface, '#00000000');
   await f.api.setGlass(false);
   assert.equal(f.root().colors, undefined);
+});
+
+
+test('resting and focused glass cards own their rounded fill without rectangular terminal backgrounds', () => {
+  for (const seamless of [false, true]) {
+    const original = { id: 'terminal', content: { pane: {} } };
+    const { root } = pure.reconcileGlass(original, pure.newGlassState(original), palette, {}, true, seamless);
+    const pane = root.content.pane;
+    assert.equal(root.terminal_opacity, 0, 'both rectangular terminal background passes are transparent');
+    assert.equal(pane.radius, 12);
+    assert.equal(pane.shadow, 'sm', 'resting cards float even in Seamless');
+    assert.equal(pane.background, '#2e30344d');
+    assert.equal(pane.focus_background, '#2e30345e');
+  }
 });

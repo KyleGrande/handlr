@@ -19,8 +19,8 @@ Settings → Look → Glass starts off. It is available on macOS layouts using
 bundled tabs, including Handlr. Shipped layouts are copied before enabling;
 personal layouts retain their composition, theme and unrelated colors. Glass
 and Seamless can be enabled independently or together. In the combined mode,
-Seamless clears panel fills, outlines and card shadows while Glass keeps the
-frost and focused-terminal fill. Disabling either keeps the other active.
+Seamless clears panel fills and outlines while Glass keeps floating terminal
+cards, their shadows and the frost. Disabling either keeps the other active.
 Disabling Glass restores fields
 it still owns, preserving independent color, opacity, blur and structural edits.
 The file writes use compare-and-swap guards and a write-ahead restoration journal.
@@ -67,10 +67,10 @@ The reference palettes are Atom One Dark and Paper. Supply existing theme JSON
 files with `--dark-theme` and `--light-theme` to study another palette. Text,
 selection, focus and custom border colors stay under theme control. Glass lifts
 the dark background tint 10% toward white to avoid black terminal wells. Its
-backdrop uses 24% tint in dark themes and 18% in light themes; canvas adds
-2% and chrome 6%. Panel surfaces use 14%. Resting terminal backgrounds use 10%
-per paint pass (two passes), over a `surface` card background. Only the focused
-terminal gets a subtle 22% tinted `focus_background` on its frame. The renderer follows
+backdrop ranges from 24–47% tint in dark themes and 18–43% in light themes;
+canvas adds 2% and chrome 6%. Panel surfaces use 14%. Resting terminal frames
+use about 30% tint and focused frames use 37%, with transparent terminal
+background paint passes so the rounded frame corners remain visible. The renderer follows
 focus immediately; mods do not poll focus or rewrite layout files on clicks.
 Glyphs and explicitly colored application cells stay opaque. Popovers and
 raised controls retain dense fills for readability.
@@ -211,3 +211,15 @@ strength within this range, not absolute window opacity. Reduced-transparency
 fallback remains opaque at every strength. The focused terminal now uses a 22%
 frame fill instead of 70%, keeping its selection visible without a solid card.
 No native settings, layout fields or APIs were added.
+
+
+### Floating cards and inactive corners (2026-11-17)
+
+Terminal cards retain their shadows in combined Glass + Seamless mode. Both
+terminal background paint passes now use zero opacity; their former fill moves
+to the rounded pane frame (30.34% resting, 37% focused). This avoids rectangular
+terminal backgrounds covering the frame's rounded corners, especially when no
+focus fill is visible. Text and explicitly colored application cells stay opaque.
+Existing frame fields and restoration journals handle the change; no native API
+or model extension is needed. The background-strength slider remains independent
+of the terminal cards' fill.
