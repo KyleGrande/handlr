@@ -1,10 +1,10 @@
 // App-owned settings mod. Writes changes immediately; no Save step.
 
 import { View, div, svg, image } from "gpui-kit";
-import { v_flex, h_flex, Scrollbar, InputState, Input, Popup } from "gpui-base";
+import { v_flex, h_flex, Scrollbar, InputState, Input, Popup, SliderState, Slider, SliderTrack, SliderIndicator, SliderThumb } from "gpui-base";
 import { hc, exec, layout, run, theme, themes, fonts, updates, telemetry, settings, layouts, shared, setShared, appHome, readTextFile, writeTextFile, playSound, props, closeOverlay, notify, window } from "herdr";
 import { readMods, modCommand, modPanels } from "./mods.js";
-import { glassEnabled, glassSupported, setGlass, startGlass } from "./glass.js";
+import { glassEnabled, glassSupported, glassBackground, setGlassBackground, setGlass, startGlass } from "./glass.js";
 
 const I = (name) => `frame/settings/${name}.svg`;
 
@@ -60,6 +60,21 @@ function toggleSeamless(person) {
 export default class Settings extends View {
   init(_props, cx) {
     startGlass(cx);
+    this.glassSlider = SliderState.new({ min: 0, max: 100, step: 1, value: glassBackground() });
+    this.glassSlider.on("change", (value, cx) => {
+      const name = String(shared("layout") ?? "main");
+      const revision = this.glassRevision = (this.glassRevision ?? 0) + 1;
+      cx.notify();
+      // Coalesce dragging and keyboard changes into guarded material updates.
+      cx.timer.after(200, cx => {
+        if (revision !== this.glassRevision) return;
+        cx.spawn(async cx => {
+          try { await setGlassBackground(value, name); }
+          catch (error) { notify({ title: "Glass background was not changed", body: String(error?.message ?? error), level: "error" }); }
+          cx.notify();
+        });
+      });
+    });
     const asked = props()?.section;
     this.section = SECTIONS.some((s) => s.id === asked) ? asked : "look";
     this.picking = null; // "font" | "ui_font" while its list is open
@@ -212,6 +227,23 @@ export default class Settings extends View {
         notify({ title: "Appearance was not changed", body: String(error?.message ?? error), level: "error" });
       } finally { this.appearanceBusy = false; cx.notify(); }
     });
+  }
+
+  glassBackgroundControl(t) {
+    // Re-seed when switching layouts; each layout keeps its own strength.
+    const name = shared("layout");
+    if (this.glassSliderLayout !== name) {
+      this.glassSliderLayout = name;
+      this.glassSlider.set_value(glassBackground());
+    }
+    const state = this.glassSlider;
+    return h_flex().gap(10).items_center()
+      .child(Slider.new(state).w(150).h(28)
+        .child(SliderTrack.new(state).relative().w_full().h_full().flex().items_center()
+          .child(SliderIndicator.new(state).relative().w_full().h(4).rounded(2).bg(t.border)
+            .range_style(s => s.top(0).bottom(0).bg(t.accent).rounded(2))
+            .child(SliderThumb.new(state).top(-5).ml(-7).size(14).rounded(7).bg(t.accent)))))
+      .child(div().w(36).text_size(12).text_color(t.muted).child(`${Math.round(state.value())}%`));
   }
 
   // Pieces ---------------------------------------------------------------
@@ -686,11 +718,12 @@ export default class Settings extends View {
       .child(this.row(t, "Seamless", "Remove panel outlines and blend panels into the app background. Works with Glass.",
         this.toggle(t, "st-seamless", Boolean(p.seamless), (_e, cx) => this.appearancePreset(false, cx))))
       .child(this.row(t, "Glass", glassSupported()
-        ? "Frost every pane, with a denser fill only on the focused terminal. Can be combined with Seamless; reduced transparency uses opaque surfaces."
+        ? "Frost every pane with a readable backdrop and a subtle focused-terminal fill. Works with Seamless; reduced transparency uses opaque surfaces."
         : "Available on macOS in layouts using the bundled tabs panel.",
         this.toggle(t, "st-glass", glassEnabled(), (_e, cx) => {
           if (glassSupported() || glassEnabled()) this.appearancePreset(true, cx);
         })))
+      .when(glassEnabled(), el => el.child(this.row(t, "Glass background", "Lighter at 0%; resting-terminal frost at 100%. Saved for this layout.", this.glassBackgroundControl(t))))
       .child(this.row(t, "No Headers", "Hide panel title rows. Turn off to restore panel controls and drag handles.",
         this.toggle(t, "st-no-headers", Boolean(p.no_headers), (_e, cx) => this.change(q => { q.no_headers = !q.no_headers; }, cx))))
       .child(div().h(18))

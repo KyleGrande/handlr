@@ -14,7 +14,7 @@ test('material variants preserve palette and text colors while adapting glass ti
       for (const key of ['foreground', 'accent', 'border']) assert.equal(theme.colors[key], palette.colors[key]);
       if (!glass || background === '#ffffff') assert.equal(theme.colors.background.slice(0, 7), background);
       else assert.equal(theme.colors.background.slice(0, 7), '#2e3034');
-      assert.equal(theme.colors.background.slice(-2), glass ? (background === '#ffffff' ? '2e' : '3d') : 'ff');
+      assert.equal(theme.colors.background.slice(-2), glass ? (background === '#ffffff' ? '6d' : '78') : 'ff');
       for (const key of ['popover', 'raised']) assert.match(theme.colors[key], /ff$/);
     }
     assert.deepEqual(palette, original);

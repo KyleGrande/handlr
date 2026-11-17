@@ -70,7 +70,7 @@ the dark background tint 10% toward white to avoid black terminal wells. Its
 backdrop uses 24% tint in dark themes and 18% in light themes; canvas adds
 2% and chrome 6%. Panel surfaces use 14%. Resting terminal backgrounds use 10%
 per paint pass (two passes), over a `surface` card background. Only the focused
-terminal gets a 70% tinted `focus_background` on its frame. The renderer follows
+terminal gets a subtle 22% tinted `focus_background` on its frame. The renderer follows
 focus immediately; mods do not poll focus or rewrite layout files on clicks.
 Glyphs and explicitly colored application cells stay opaque. Popovers and
 raised controls retain dense fills for readability.
@@ -196,3 +196,18 @@ The Glass controller reads the existing `seamless` preference and clears
 chrome/surface/border colors plus its own card shadows in combined mode. The
 focused-terminal fill stays denser. Restoration remains independent, and
 reduced-transparency fallback still uses an opaque window and terminal fill.
+
+
+### Background strength (2026-11-17)
+
+Settings → Look → Glass background uses an existing mod Slider, saved as
+`layouts.<name>.background` (0–100) in the mod-owned `glass.json`. Missing values
+use 100. At 0, the backdrop retains the earlier 24% dark / 18% light tint; at
+100, the default, it composites the former resting terminal's surface and two
+background paint passes into that tint (about 47% dark / 43% light). This gives
+Seamless panel text a denser backdrop while panel outlines remain hidden.
+Intermediate values blend that added material linearly. The percentage describes
+strength within this range, not absolute window opacity. Reduced-transparency
+fallback remains opaque at every strength. The focused terminal now uses a 22%
+frame fill instead of 70%, keeping its selection visible without a solid card.
+No native settings, layout fields or APIs were added.

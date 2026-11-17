@@ -896,9 +896,12 @@ What's about the user, never a look:
   bundled tabs panel, including Handlr. It follows the chosen theme, frosts the
   workspace and terminal backgrounds, keeps text opaque, and uses dense popup fills.
   Every panel and resting terminal stays translucent. Only the focused terminal
-  gets a denser fill through the pane frame’s `focus_background`; it follows
+  gets a subtle 22% fill through the pane frame’s `focus_background`; it follows
   focus immediately without writing layouts or changing text opacity. Dark
-  themes use a slightly lifted tint. Rounded terminal cards use soft shadows;
+  themes use a slightly lifted tint. **Glass background** adjusts backdrop
+  strength per layout: 0% uses the earlier light window tint, 100% (the default)
+  adds the former resting-terminal frost so Seamless panel text is easier to read.
+  This percentage is material strength, not window opacity. Rounded terminal cards use soft shadows;
   disabling Glass restores their prior fills and look.
   It is per layout; enabling on a bundled layout creates a personal copy named
   `<layout>-glass` (with a suffix if needed). It never rewrites bundled layouts.

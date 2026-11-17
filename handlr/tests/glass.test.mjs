@@ -25,8 +25,8 @@ function fixture(name = 'Handlr', original = { id: 'root', children: [{ id: 'tab
     layout: () => original, notify: () => {}, run: (command, args) => { assert.equal(command, 'layout.switch'); values.layout = args.name; },
   };
   const api = new Function('host', 'pure', `const {${Object.keys(host).join(',')}} = host;
-    const {newGlassState,reconcileGlass,glassCanBlur} = pure;
-    ${source}; return {setGlass, disableAllGlass, glassEnabled, startGlass};`)(host, pure);
+    const {newGlassState,reconcileGlass,glassCanBlur,glassBackgroundValue} = pure;
+    ${source}; return {setGlass, setGlassBackground, glassBackground, disableAllGlass, glassEnabled, startGlass};`)(host, pure);
   return { api, files, values, current, signal: value => { signal = value; },
     root: () => JSON.parse(files.get(`/app/layouts/${values.layout}.json`)),
     edit: edit => { const root = JSON.parse(files.get(`/app/layouts/${values.layout}.json`)); edit(root); files.set(`/app/layouts/${values.layout}.json`, JSON.stringify(root)); },
@@ -55,7 +55,7 @@ test('independent edits and deletions survive material refresh, appearance chang
   f.edit(root => { root.colors.surface = '#998877'; delete root.colors.chrome; root.colors.accent = '#334455'; root.children.push({ id: 'new-panel' }); root.terminal_opacity = 0.8; });
   f.current.dark = false;
   await f.api.setGlass(true);
-  assert.equal(f.root().colors.background, '#ffffff2e');
+  assert.equal(f.root().colors.background, '#ffffff6d');
   assert.equal(f.root().colors.surface, '#998877');
   assert.equal(f.root().colors.chrome, undefined);
   await f.api.setGlass(false);
@@ -196,17 +196,17 @@ test('Settings toggles Glass and Seamless independently and immediately refreshe
 
 // Match the actual stacked paint path, rather than checking each alpha alone.
 test('all resting panes retain visible glass through stacked backgrounds', () => {
-  for (const background of ['#17191d', '#ffffff']) {
+  for (const [background, strength] of ['#17191d', '#ffffff'].flatMap(background => [0, 100].map(strength => [background, strength]))) {
     const colors = { ...palette, background, border: '#00000017' };
     const root = { id: 'terminals', content: { pane: { background: 'background' } } };
-    const { root: glass } = pure.reconcileGlass(root, pure.newGlassState(root), colors, {}, true);
+    const { root: glass } = pure.reconcileGlass(root, { ...pure.newGlassState(root), background: strength }, colors, {}, true);
     const opacity = color => parseInt(color.slice(-2), 16) / 255;
     const stacked = layers => 1 - layers.reduce((left, alpha) => left * (1 - alpha), 1);
     const base = [opacity(glass.colors.background), opacity(glass.colors.canvas), opacity(glass.colors.canvas)];
     const panel = stacked([...base, opacity(glass.colors.surface), opacity(glass.colors.surface), opacity(glass.colors.background)]);
     const terminal = stacked([...base, opacity(glass.colors.surface), glass.terminal_opacity, glass.terminal_opacity]);
-    assert.ok(panel < .70, 'nested panel backgrounds must remain translucent');
-    assert.ok(terminal < .60, 'resting terminal backgrounds must remain translucent');
+    assert.ok(panel < .80, 'nested panel backgrounds must remain translucent');
+    assert.ok(terminal < .75, 'resting terminal backgrounds must remain translucent');
     assert.equal(glass.content.pane.background, 'surface');
     assert.equal(glass.colors.border, colors.border);
     assert.equal(glass.colors.foreground, undefined, 'text stays under theme control');
@@ -249,8 +249,8 @@ test('opaque fallback removes glass shadows and disabling restores absent card f
 test('material adapts smoke and terminal tint to the theme without changing text colors', () => {
   const dark = pure.glassMaterial(palette, true);
   const light = pure.glassMaterial({ ...palette, background: '#ffffff', surface: '#ffffff' }, true);
-  assert.ok(parseInt(dark.background.slice(-2), 16) < 100, 'dark backdrop must remain glass rather than a dense smoke layer');
-  assert.equal(light.background, '#ffffff2e');
+  assert.ok(parseInt(dark.background.slice(-2), 16) < 130, 'dark backdrop must remain glass rather than a dense smoke layer');
+  assert.equal(light.background, '#ffffff6d');
   assert.equal(dark.background.slice(0, 7), '#2e3034', 'lift the dark terminal above black');
   assert.equal(light.terminal_opacity, dark.terminal_opacity, 'all resting terminals use the same light fill');
   assert.equal(dark.border, palette.border);
@@ -288,11 +288,11 @@ test('Glass journals a denser focus fill while every resting terminal stays tran
   await f.api.setGlass(true);
   const pane = () => f.root().children[1].content.pane;
   assert.equal(pane().background, 'surface');
-  assert.equal(pane().focus_background, '#2e3034b3');
+  assert.equal(pane().focus_background, '#2e303438');
   assert.equal(f.root().terminal_opacity, .10);
   f.current.dark = false;
   await f.api.setGlass(true);
-  assert.equal(pane().focus_background, '#ffffffb3');
+  assert.equal(pane().focus_background, '#ffffff38');
   f.signal({ code: 0, stdout: 'reduced' });
   await f.api.setGlass(true);
   assert.equal(pane().focus_background, original.children[1].content.pane.focus_background);
@@ -318,7 +318,7 @@ test('combined presets clear panel layers, outlines and shadows while preserving
   for (const key of ['chrome', 'surface', 'border']) assert.equal(combined.root.colors[key], '#00000000');
   assert.equal(combined.root.content.pane.shadow, undefined);
   assert.equal(combined.root.content.pane.background, 'surface');
-  assert.equal(combined.root.content.pane.focus_background, '#2e3034b3');
+  assert.equal(combined.root.content.pane.focus_background, '#2e303438');
   assert.equal(combined.root.window_blur, true);
   combined.state.pending = false;
   const back = pure.reconcileGlass(combined.root, combined.state, palette, {}, true, false);
@@ -349,4 +349,38 @@ test('combined mode preserves independent edits and selects opaque accessibility
   assert.equal(reduced.root.window_blur, false);
   assert.equal(reduced.root.terminal_opacity, 1);
   assert.equal(reduced.root.content.pane.focus_background, undefined);
+});
+
+
+test('background strength defaults to resting-terminal frost and spans the former backdrop', () => {
+  for (const background of ['#17191d', '#ffffff']) {
+    const colors = { ...palette, background };
+    const low = pure.glassMaterial(colors, true, 0);
+    const high = pure.glassMaterial(colors, true);
+    const opacity = color => parseInt(color.slice(-2), 16) / 255;
+    const resting = 1 - (1 - opacity(low.background)) * (1 - .14) * .9 * .9;
+    assert.ok(Math.abs(opacity(high.background) - resting) < .004);
+    assert.ok(opacity(pure.glassMaterial(colors, true, 50).background) > opacity(low.background));
+    assert.deepEqual(pure.glassMaterial(colors, false, 0), pure.glassMaterial(colors, false, 100));
+    assert.equal(pure.glassBackgroundValue(-10), 0);
+    assert.equal(pure.glassBackgroundValue(200), 100);
+    assert.equal(pure.glassBackgroundValue(null), 100);
+  }
+});
+
+test('background slider persists per layout through refresh, Seamless, and restores original colors', async () => {
+  const f = fixture();
+  await f.api.setGlass(true);
+  const denser = f.root().colors.background;
+  await f.api.setGlassBackground(0);
+  assert.equal(f.api.glassBackground(), 0);
+  assert.equal(f.root().colors.background, '#2e30343d');
+  await f.api.setGlass(true);
+  assert.equal(f.api.glassBackground(), 0);
+  f.files.set('/app/settings.json', JSON.stringify({ seamless: true }));
+  await f.api.setGlassBackground(100);
+  assert.equal(f.root().colors.background, denser);
+  assert.equal(f.root().colors.surface, '#00000000');
+  await f.api.setGlass(false);
+  assert.equal(f.root().colors, undefined);
 });

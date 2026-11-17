@@ -5,7 +5,11 @@ const copy = value => JSON.parse(JSON.stringify(value));
 const alpha = (color, value) => /^#[\da-f]{6}([\da-f]{2})?$/i.test(color ?? "")
   ? color.slice(0, 7) + Math.round(value * 255).toString(16).padStart(2, "0") : color;
 
-export function glassMaterial(baseline, blur) {
+export function glassBackgroundValue(value) {
+  return typeof value === "number" && Number.isFinite(value) ? Math.max(0, Math.min(100, value)) : 100;
+}
+
+export function glassMaterial(baseline, blur, background = 100) {
   const rgb = (baseline.background ?? '#17191d').slice(1, 7);
   const channels = [0, 2, 4].map(i => parseInt(rgb.slice(i, i + 2), 16));
   const dark = channels[0] * .2126 + channels[1] * .7152 + channels[2] * .0722 < 128;
@@ -13,7 +17,9 @@ export function glassMaterial(baseline, blur) {
   // dense background layers inside each card.
   const tint = dark && blur ? '#' + channels.map(c => Math.round(c + (255 - c) * .10).toString(16).padStart(2, '0')).join('') : baseline.background;
   return {
-    background: alpha(tint, blur ? (dark ? .24 : .18) : 1),
+    // At full strength, include the former resting card + two terminal fills
+    // in the window backdrop, so Seamless panels get the same readable frost.
+    background: alpha(tint, blur ? 1 - (1 - (dark ? .24 : .18)) * (1 - .3034 * glassBackgroundValue(background) / 100) : 1),
     canvas: alpha(baseline.canvas, blur ? .02 : 1),
     chrome: alpha(baseline.chrome, blur ? .06 : 1),
     surface: alpha(baseline.surface, blur ? .14 : 1),
@@ -45,7 +51,7 @@ export function reconcileGlass(root, state, palette, personColors, blur, seamles
   // An independent decision to disable blur must also select readable fills.
   blur = blur && !(entry.protected.window_blur && root.window_blur !== true);
   const baseline = { ...palette, ...personColors, ...entry.saved.colors };
-  const material = glassMaterial(baseline, blur);
+  const material = glassMaterial(baseline, blur, entry.background);
   if (seamless) {
     for (const key of ["chrome", "surface", "border"]) material[key] = "#00000000";
   }
@@ -85,7 +91,7 @@ function reconcileCards(root, entry, blur, seamless) {
       }
       if (card) {
         const before = {};
-        for (const [key, value] of Object.entries({ shadow: blur && !seamless ? 'sm' : undefined, radius: 12, background: 'surface', focus_background: alpha(root.colors?.background, .70) })) {
+        for (const [key, value] of Object.entries({ shadow: blur && !seamless ? 'sm' : undefined, radius: 12, background: 'surface', focus_background: alpha(root.colors?.background, .22) })) {
           if (!Object.hasOwn(card.saved, key)) card.saved[key] = { had: Object.hasOwn(pane, key), value: pane[key] ?? null };
           if (Object.hasOwn(pane, key)) before[key] = pane[key];
           if (Object.hasOwn(card.applied, key) && !same(pane[key] ?? null, card.applied[key])

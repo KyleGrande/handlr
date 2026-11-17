@@ -30,7 +30,7 @@ export function materialTheme(palette, glass) {
   const bg = palette.background;
   const baseline = { background: bg, canvas: bg, chrome: bg, surface: bg, popover: bg, raised: bg, ...colors };
   const { window_blur, terminal_opacity, ...material } = glassMaterial(baseline, glass);
-  return { ...structuredClone(palette), colors: { ...colors, ...material, 'glass-focus': material.background.slice(0, 7) + 'b3' } };
+  return { ...structuredClone(palette), colors: { ...colors, ...material, 'glass-focus': material.background.slice(0, 7) + '38' } };
 }
 
 export function prototypeLayout(layout, material) {
