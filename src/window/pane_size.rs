@@ -16,6 +16,14 @@ pub(super) fn frame_border(frame: &PaneFrame, focused: bool) -> Option<&Line> {
     if focused { frame.focus.as_ref().or(frame.border.as_ref()) } else { frame.border.as_ref() }
 }
 
+pub(super) fn frame_background<'a>(frame: &'a PaneFrame, pane: &Node, focused: bool) -> Option<&'a crate::layout::Background> {
+    if focused && pane.terminal().is_some() {
+        frame.focus_background.as_ref().or(frame.background.as_ref())
+    } else {
+        frame.background.as_ref()
+    }
+}
+
 pub(super) fn header_height(header: &Header) -> f32 {
     header.height.unwrap_or(HEADER_HEIGHT)
 }
@@ -222,5 +230,38 @@ impl AppWindow {
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod focus_background_tests {
+    use super::frame_background;
+    use crate::layout::{Node, PaneFrame};
+    use serde_json::json;
+
+    #[test]
+    fn focused_fill_follows_terminal_focus_and_never_highlights_mod_panes() {
+        let frame: PaneFrame = serde_json::from_value(json!({
+            "background":"surface", "focus_background":"#ffffffb3"
+        })).unwrap();
+        let terminal: Node = serde_json::from_value(json!({"id":"terminal","type":"block","content":{"terminal":"t1"}})).unwrap();
+        let other: Node = serde_json::from_value(json!({"id":"other","type":"block","content":{"terminal":"t2"}})).unwrap();
+        let panel: Node = serde_json::from_value(json!({"id":"panel","type":"block","content":{"mod":"files"}})).unwrap();
+        assert_eq!(frame_background(&frame, &terminal, true), frame.focus_background.as_ref());
+        assert_eq!(frame_background(&frame, &other, false), frame.background.as_ref());
+        assert_eq!(frame_background(&frame, &terminal, false), frame.background.as_ref());
+        assert_eq!(frame_background(&frame, &other, true), frame.focus_background.as_ref());
+        assert_eq!(frame_background(&frame, &panel, true), frame.background.as_ref());
+    }
+
+    #[test]
+    fn legacy_frames_keep_their_background_and_serialize_without_new_fields() {
+        let legacy = json!({"background":"surface","focus":{"width":1.0,"color":"accent"}});
+        let frame: PaneFrame = serde_json::from_value(legacy.clone()).unwrap();
+        let terminal: Node = serde_json::from_value(json!({"id":"terminal","type":"block","content":{"terminal":"t1"}})).unwrap();
+        for focused in [false, true] {
+            assert_eq!(frame_background(&frame, &terminal, focused), frame.background.as_ref());
+        }
+        assert_eq!(serde_json::to_value(frame).unwrap(), legacy);
     }
 }

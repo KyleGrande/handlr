@@ -272,8 +272,17 @@ their own fills as well as the surrounding frame.
 The Settings mod manages this color preset and restores previous colors when disabled.
 Settings → Look → Glass adds an opt-in frosted finish on macOS layouts using the
 bundled tabs panel, including Handlr. Bundled layouts open as personal copies.
-Glass follows the selected theme, keeps terminals opaque, and restores only its
-own overrides when disabled. It is mutually exclusive with Seamless in Settings.
+Glass follows the selected theme and keeps all panels and resting terminals
+translucent, with a denser fill only behind the focused terminal. Text stays
+opaque. Optional pane-frame `focus_background` selects that terminal’s fill
+while it has focus; other panes keep `background`. With the field absent,
+existing layouts behave as before. Glass restores only its own overrides
+when disabled. Glass and Seamless can be used together: Seamless clears panel
+fills and outlines while Glass retains floating terminal cards with soft
+shadows and rounded resting/focused fills. The terminal background passes are
+transparent so they cannot cover the rounded frame corners. Glass background
+adjusts the backdrop per layout from the earlier light tint (0%) to resting-
+terminal frost (100%, the default). Either control can be turned off independently.
 The Settings/tabs mods own per-layout preference and restoration in `glass.json`;
 do not edit that journal while enabled. Reduced transparency or a failed native
 accessibility query selects opaque fills (checked at most every fifteen seconds).

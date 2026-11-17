@@ -4518,7 +4518,7 @@ impl AppWindow {
         if let Some(r) = f.radius {
             el = el.rounded(settings::z(r));
         }
-        if let Some(bg) = &f.background {
+        if let Some(bg) = pane_size::frame_background(f, n, on) {
             el = paint(el, bg);
         }
         if let Some(l) = line {
@@ -4539,7 +4539,10 @@ impl AppWindow {
 
     /// `frame`: how panes are wrapped here (inside a framed tab), else None.
     fn render_node(&self, n: &Node, focused: &HashSet<String>, frame: Option<&PaneFrame>, cx: &mut Context<Self>) -> AnyElement {
-        let mut el = div().relative().overflow_hidden().size_full().flex();
+        // The pane frame clips its own contents. Let its shadow extend into
+        // the split gap instead of clipping it to this outer wrapper's box.
+        let floating = n.is_pane() && frame.is_some_and(|f| matches!(f.shadow.as_deref(), Some("sm" | "md" | "lg")));
+        let mut el = div().relative().size_full().flex().when(!floating, |el| el.overflow_hidden());
         let bounds_map = self.bounds.clone();
         let id = n.id.clone();
         el = el.child(canvas(move |b, _, _| { bounds_map.borrow_mut().insert(id, b); }, |_, _, _, _| {}).absolute().size_full());

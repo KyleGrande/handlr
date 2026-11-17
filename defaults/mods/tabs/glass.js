@@ -1,5 +1,5 @@
 import { appHome, exec, layout, layouts, notify, readTextFile, run, settings, shared, setShared, themes, window, writeTextFile } from "herdr";
-import { newGlassState, reconcileGlass, glassCanBlur } from "./glass-state.js";
+import { newGlassState, reconcileGlass, glassCanBlur, glassBackgroundValue } from "./glass-state.js";
 
 const SHIPPED = ["main", "terminals", "win98"];
 const ACCESSIBILITY = 'ObjC.import("AppKit"); $.NSWorkspace.sharedWorkspace.accessibilityDisplayShouldReduceTransparency ? "reduced" : "blur"';
@@ -18,6 +18,10 @@ export function glassEnabled(name = shared("layout")) {
   return Boolean(shared("settings.glass")?.[name]);
 }
 
+export function glassBackground(name = shared("layout")) {
+  return glassBackgroundValue(shared("settings.glass.background")?.[name]);
+}
+
 export function glassSupported() {
   const tabs = node => node?.content?.mod === "tabs" || (node?.children ?? []).some(tabs);
   return window()?.platform === "macos" && tabs(layout());
@@ -25,6 +29,7 @@ export function glassSupported() {
 
 function publish(state) {
   setShared("settings.glass", Object.fromEntries(Object.entries(state.layouts).map(([name, entry]) => [name, Boolean(entry.enabled)])));
+  setShared("settings.glass.background", Object.fromEntries(Object.entries(state.layouts).map(([name, entry]) => [name, glassBackgroundValue(entry.background)])));
   setShared("settings.glass.error", null);
 }
 
@@ -70,7 +75,7 @@ async function sync(state, raw, name, force = false) {
   const palette = selectedPalette();
   if (!palette) throw new Error("The current theme is unavailable");
   const person = parse(await readTextFile(`${appHome()}/settings.json`), {});
-  const next = reconcileGlass(root, entry, palette, person.colors ?? {}, entry.enabled && await canBlur(force));
+  const next = reconcileGlass(root, entry, palette, person.colors ?? {}, entry.enabled && await canBlur(force), Boolean(person.seamless));
   const changed = JSON.stringify(root) !== JSON.stringify(next.root);
   if (changed) {
     // Persist restoration provenance before touching the layout. A crash or
@@ -118,6 +123,19 @@ export async function setGlass(enabled) {
     await writeTextFile(statePath(), updated, raw);
     await sync(state, updated, name, true);
     if (cloned) run("layout.switch", { name });
+  });
+  if (!completed) throw new Error("Appearance is updating; try again in a moment");
+}
+
+export async function setGlassBackground(value, name = String(shared("layout") ?? "main")) {
+  const completed = await locked(async () => {
+    const { state, raw } = await loadState();
+    const entry = state.layouts[name];
+    if (!entry?.enabled) return;
+    entry.background = glassBackgroundValue(value);
+    const updated = JSON.stringify(state, null, 2) + "\n";
+    await writeTextFile(statePath(), updated, raw);
+    await sync(state, updated, name);
   });
   if (!completed) throw new Error("Appearance is updating; try again in a moment");
 }
