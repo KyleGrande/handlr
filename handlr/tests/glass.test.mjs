@@ -55,7 +55,7 @@ test('independent edits and deletions survive material refresh, appearance chang
   f.edit(root => { root.colors.surface = '#998877'; delete root.colors.chrome; root.colors.accent = '#334455'; root.children.push({ id: 'new-panel' }); root.terminal_opacity = 0.8; });
   f.current.dark = false;
   await f.api.setGlass(true);
-  assert.equal(f.root().colors.background, '#ffffff6d');
+  assert.equal(f.root().colors.background, '#ffffffdf');
   assert.equal(f.root().colors.surface, '#998877');
   assert.equal(f.root().colors.chrome, undefined);
   await f.api.setGlass(false);
@@ -205,8 +205,9 @@ test('all resting panes retain visible glass through stacked backgrounds', () =>
     const base = [opacity(glass.colors.background), opacity(glass.colors.canvas), opacity(glass.colors.canvas)];
     const panel = stacked([...base, opacity(glass.colors.surface), opacity(glass.colors.surface), opacity(glass.colors.background)]);
     const terminal = stacked([...base, opacity(glass.content.pane.background), glass.terminal_opacity, glass.terminal_opacity]);
-    assert.ok(panel < .82, 'nested panel backgrounds must remain translucent');
-    assert.ok(terminal < .75, 'resting terminal backgrounds must remain translucent');
+    assert.ok(panel < (background === '#ffffff' ? .995 : .82), 'nested panel backgrounds must remain translucent');
+    assert.ok(terminal < (background === '#ffffff' ? .93 : .75), 'resting terminal backgrounds must remain translucent');
+    if (background === '#ffffff') assert.ok(opacity(glass.colors.background) >= .8, 'white frost stays near white even over a black backdrop');
     assert.equal(glass.content.pane.background, glass.colors.background.slice(0, 7) + '4d');
     assert.equal(glass.colors.border, colors.border);
     assert.equal(glass.colors.foreground, undefined, 'text stays under theme control');
@@ -250,7 +251,7 @@ test('material adapts smoke and terminal tint to the theme without changing text
   const dark = pure.glassMaterial(palette, true);
   const light = pure.glassMaterial({ ...palette, background: '#ffffff', surface: '#ffffff' }, true);
   assert.ok(parseInt(dark.background.slice(-2), 16) < 130, 'dark backdrop must remain glass rather than a dense smoke layer');
-  assert.equal(light.background, '#ffffff6d');
+  assert.equal(light.background, '#ffffffdf');
   assert.equal(dark.background.slice(0, 7), '#2e3034', 'lift the dark terminal above black');
   assert.equal(light.terminal_opacity, dark.terminal_opacity, 'all resting terminals use the same light fill');
   assert.equal(dark.border, palette.border);
