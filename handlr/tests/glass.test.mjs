@@ -26,7 +26,7 @@ function fixture(name = 'Handlr', original = { id: 'root', children: [{ id: 'tab
   };
   const api = new Function('host', 'pure', `const {${Object.keys(host).join(',')}} = host;
     const {newGlassState,reconcileGlass,glassCanBlur,glassBackgroundValue} = pure;
-    ${source}; return {setGlass, setGlassBackground, glassBackground, disableAllGlass, glassEnabled, startGlass};`)(host, pure);
+    ${source}; return {setGlass, setGlassBackground, setGlassFinish, glassBackground, glassFrost, disableAllGlass, glassEnabled, startGlass};`)(host, pure);
   return { api, files, values, current, signal: value => { signal = value; },
     root: () => JSON.parse(files.get(`/app/layouts/${values.layout}.json`)),
     edit: edit => { const root = JSON.parse(files.get(`/app/layouts/${values.layout}.json`)); edit(root); files.set(`/app/layouts/${values.layout}.json`, JSON.stringify(root)); },
@@ -398,4 +398,34 @@ test('resting and focused glass cards own their rounded fill without rectangular
     assert.equal(pane.background, '#2e30344d');
     assert.equal(pane.focus_background, '#2e30345e');
   }
+});
+
+
+test('white frost spans the earlier clear finish and current white finish independently of background strength', () => {
+  const light = { ...palette, background: '#ffffff' };
+  for (const strength of [0, 50, 100]) {
+    const clear = pure.glassMaterial(light, true, strength, 0);
+    const white = pure.glassMaterial(light, true, strength, 100);
+    assert.ok(parseInt(clear.background.slice(-2), 16) < parseInt(white.background.slice(-2), 16));
+    assert.deepEqual(pure.glassMaterial(light, false, strength, 0), pure.glassMaterial(light, false, strength, 100));
+    assert.deepEqual(pure.glassMaterial(palette, true, strength, 0), pure.glassMaterial(palette, true, strength, 100), 'dark theme keeps its readable smoke');
+  }
+  assert.equal(pure.glassMaterial(light, true, 100, 0).background, '#ffffff6d');
+  assert.equal(pure.glassMaterial(light, true, 100, 100).background, '#ffffffdf');
+});
+
+test('both sliders persist together, refresh without recapture, and restore authored material', async () => {
+  const f = fixture();
+  f.current.dark = false;
+  await f.api.setGlass(true);
+  await f.api.setGlassFinish({ background: 40, frost: 25 });
+  assert.equal(f.api.glassBackground(), 40);
+  assert.equal(f.api.glassFrost(), 25);
+  const tint = f.root().colors.background;
+  await f.api.setGlass(true);
+  assert.equal(f.root().colors.background, tint);
+  await f.api.setGlassBackground(0);
+  assert.equal(f.api.glassFrost(), 25, 'background changes retain the white-frost choice');
+  await f.api.setGlass(false);
+  assert.equal(f.root().colors, undefined);
 });

@@ -899,7 +899,11 @@ What's about the user, never a look:
   gets a subtle 37% fill through the pane frame’s `focus_background`; it follows
   focus immediately without writing layouts or changing text opacity. Dark
   themes use a slightly lifted tint. Light themes use denser white frost
-  (82–87% backdrop opacity) so dark desktop content does not turn them gray.
+  (82–87% backdrop opacity at the default) so dark desktop content does not turn them gray.
+  In light mode, **White frost** blends from the earlier clear finish (0%) to
+  white frost (100%, the default), independently of **Glass background**.
+  Both sliders are saved per layout in the mod-owned `glass.json` journal
+  (`background` and `frost`); dark themes keep their smoked tint.
   **Glass background** adjusts backdrop
   strength per layout: 0% uses the base window tint, 100% (the default)
   adds the former resting-terminal frost so Seamless panel text is easier to read.
