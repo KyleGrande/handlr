@@ -34,6 +34,7 @@ impl AppWindow {
             .map(|(name, _)| name.clone())
             .collect();
         let mut layout = crate::workspace::project_with_headers(document, center, &headers)?;
+        layout.link_handlers = center.link_handlers.clone();
         if self.person.no_headers {
             crate::workspace::hide_panel_headers(document, &mut layout);
         }
