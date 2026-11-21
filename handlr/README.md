@@ -1,6 +1,7 @@
 # Handlr development tools
 
-Layout/mod packaging rules and our file inventory are in
+All mod sources, including bundled panels and internal UI, live under root
+[`mods/`](../mods/README.md). Layout/mod packaging rules and our file inventory are in
 [MODS-AND-LAYOUTS.md](MODS-AND-LAYOUTS.md). The native workspace reconstruction
 brief is [prototype/RECIPE.md](prototype/RECIPE.md). Toolbox, Context, Rigs and
 Ticket now live in the repository’s root [`mods/`](../mods/README.md) directory,
@@ -54,7 +55,8 @@ run these actions; installing the integration does not build or restart an app.
 `HERDR_APP_HOME` selects the Dev configuration directory. The setup requires
 `mods/rigs` built (`npm run mods:build -- rigs` from this directory).
 
-The Dev packager records a content snapshot of native sources, bundled mods,
+The Dev packager records a content snapshot of native sources, bundled mods
+selected by `mods/bundled.txt`, internal UI under `mods/frame/`,
 assets, local dependencies and build configuration, including uncommitted and
 new files, in `Contents/Resources/dev-build-info.json` before signing. Generated
 build outputs and runtime declarations are excluded. Source changes during

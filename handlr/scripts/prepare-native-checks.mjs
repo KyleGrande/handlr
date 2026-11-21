@@ -2,7 +2,7 @@ import { mkdir, copyFile, writeFile } from 'node:fs/promises';
 
 const destination = new URL('../.checks/tabs/', import.meta.url);
 await mkdir(destination, { recursive: true });
-const source = new URL('../prototype/mods/workspace-prototype/', import.meta.url);
+const source = new URL('../../mods/workspace-prototype/', import.meta.url);
 for (const [from, to] of [['main.js', 'controls.js'], ['actions.js', 'actions.js'], ['mod.json', 'mod.json']]) {
   await copyFile(new URL(from, source), new URL(to, destination));
 }

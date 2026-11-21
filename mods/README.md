@@ -1,7 +1,35 @@
 # Handlr mods
 
-These are source packages maintained together with Handlr. Each retains its
-own dependencies, lockfile, build scripts, tests and runtime storage contract.
+All mod source now lives here. Bundled JavaScript panels and internal app UI
+are edited directly; the four optional tool packages keep their own dependencies,
+lockfiles, build scripts, tests and runtime storage contracts.
+
+## Bundled mods and internal UI
+
+- `machines/`, `layouts/`, `spaces/`, `agents/`, `files/`, `changes/`, `tabs/`,
+  `pane/` and the other bundled mod directories hold the runtime JavaScript
+  and assets. `bundled.txt` is the explicit app-bundle inventory.
+- `frame/settings/` owns Settings, Glass and Seamless; `frame/palette/`,
+  `frame/mod-updates/`, `frame/welcome/`, `frame/feedback/` and `frame/whatsnew/`
+  are the other internal UI mods.
+- `workspace-prototype/` is the earlier fixed-layout demo, not the native
+  workspace engine and not an app-provided package.
+
+`build.rs` embeds only the listed bundled mods and `frame/`; it does not scan
+all of this directory into the app. Installed identities and paths remain
+`mods/<name>/` and `frame/<name>/`, so layouts, personal edits and update journals
+need no migration. `defaults/` retains layouts, keys, icons, and the guide/API.
+
+From `handlr/`, use `npm run mods:build -- machines layouts frame/settings`
+for JavaScript syntax checks, `npm run mods:test -- machines` for the shared
+Handlr mod suite, or `npm run mods:check -- machines layouts frame/settings`
+for native host checks. These source packages need no npm dependency install.
+Edits to installed mod copies can reload without recompiling the native app;
+shipping updated embedded defaults still requires rebuilding the app bundle.
+The Dev build checker fingerprints these listed sources and internal UI,
+while edits to optional tool packages do not invalidate the native app build.
+
+## Optional tool packages
 
 | Package | Responsibility | Source / CLI |
 | --- | --- | --- |
@@ -42,8 +70,8 @@ guides; regenerate them with `npm run build:mod` when its sources change.
 
 ## Installation and existing data
 
-These packages are optional; importing their sources does not bundle them in
-the portable Handlr release or install them in an app home. Each package README
+The four tool packages above are optional; importing their sources does not
+bundle them in the portable Handlr release or install them in an app home. Each package README
 documents its guarded installer and native checks. Choose the intended
 `HERDR_APP_HOME` before installation and preserve personal panel edits.
 
@@ -58,8 +86,8 @@ sources does not bypass those guards or rewrite paths in the running app.
 
 Storage locations, schemas, mod names and CLI names retain their Herdr
 identities. Notes, registries, tickets, credentials, machine paths and personal
-layouts stay outside these source packages. The four mods remain independent
-of one another at runtime.
+layouts stay outside these source packages. The four optional tool mods remain
+independent of one another at runtime.
 
 ## Import provenance
 

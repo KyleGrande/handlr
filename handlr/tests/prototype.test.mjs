@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { collapseActions, find } from '../prototype/mods/workspace-prototype/actions.js';
+import { collapseActions, find } from '../../mods/workspace-prototype/actions.js';
 
 const fresh = async () => JSON.parse(await readFile(new URL('../prototype/layouts/panel-workspace-prototype.json', import.meta.url)));
 function apply(root, commands) {

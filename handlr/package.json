@@ -14,7 +14,7 @@
     "package:macos": "node scripts/package-macos.mjs",
     "build": "node scripts/build.mjs",
     "test": "node --test tests/*.test.mjs",
-    "check:mod": "herdr-app check prototype/mods/workspace-prototype",
+    "check:mod": "herdr-app check ../mods/workspace-prototype",
     "prepare:checks": "node scripts/prepare-native-checks.mjs",
     "setup:toolchain": "node scripts/install-toolchain.mjs",
     "prepare:rust": "node scripts/fetch-rust-check-deps.mjs && node scripts/prepare-rust-check.mjs",

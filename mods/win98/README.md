@@ -20,9 +20,9 @@ Keys (`keys.json`, section `layout:win98`): `win98.start` (Ctrl+Esc),
 optional output root (default: `/var/tmp/herdr98`):
 
 ```sh
-bun defaults/mods/win98/art/generate.ts /var/tmp/herdr98
-bun defaults/mods/win98/art/sheet.ts /var/tmp/herdr98
-bun defaults/mods/win98/art/sounds.ts /var/tmp/herdr98
+bun mods/win98/art/generate.ts /var/tmp/herdr98
+bun mods/win98/art/sheet.ts /var/tmp/herdr98
+bun mods/win98/art/sounds.ts /var/tmp/herdr98
 ```
 
 Images and the contact sheet need ImageMagick (`magick`); sounds need

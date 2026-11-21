@@ -1,7 +1,7 @@
 import { test, expect } from "bun:test";
 import { readFile } from "node:fs/promises";
 
-const source = (await readFile(new URL("../defaults/mods/worktree/main.js", import.meta.url), "utf8"))
+const source = (await readFile(new URL("../mods/worktree/main.js", import.meta.url), "utf8"))
   .replace(/^import .*;\n/gm, "").replace("export default class Worktree", "class Worktree");
 
 // Execute conditional builders and retain text, without native GPUI layout.

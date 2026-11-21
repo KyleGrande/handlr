@@ -19,11 +19,12 @@ class Element {
     return proxy;
   }
 }
-const source = await readFile(new URL("../defaults/mods/tabs/main.js", import.meta.url), "utf8");
+const source = await readFile(new URL("../mods/tabs/main.js", import.meta.url), "utf8");
 const element = () => new Element();
 const commands: string[] = [];
 const store: Record<string, string> = {};
 const values: Record<string, unknown> = {
+  startGlass() {},
   View: class {}, div: element, svg: element, image: element, h_flex: element,
   ScrollHandle: { new: () => ({ scroll_to_item() {} }) },
   spaces: () => [{ id: "s1", active: true, tabs: [{ id: "t1", name: "a" }, { id: "t2", name: "b", active: true }, { id: "t3", name: "c" }] }],

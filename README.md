@@ -10,8 +10,9 @@ prerelease is available from [GitHub Releases](https://github.com/KyleGrande/han
 Download and extract the ZIP, then move `Handlr.app` into Applications.
 The build is ad-hoc signed and is not Apple-notarized.
 It uses `~/Library/Application Support/Handlr` for its own data and Core session.
-Context, Toolbox, Rigs and Ticket are maintained in this repository under
-[`mods/`](mods/README.md). They remain optional installations.
+All mod sources live under [`mods/`](mods/README.md), including bundled panels
+and internal UI. Context, Toolbox, Rigs and Ticket remain optional installations;
+`mods/bundled.txt` explicitly selects the app-provided panel packages.
 
 ## Development
 

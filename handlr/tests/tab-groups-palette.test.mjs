@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 
-const source = (await readFile(new URL('../../defaults/frame/palette/main.js', import.meta.url), 'utf8'))
+const source = (await readFile(new URL('../../mods/frame/palette/main.js', import.meta.url), 'utf8'))
   .replace(/^import .*;\n/gm, '').replace('export default class Palette', 'class Palette');
 
 test('Create Tab Group chooses two panels before submitting one transaction', () => {

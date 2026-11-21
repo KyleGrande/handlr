@@ -1,7 +1,7 @@
 import { test, expect } from "bun:test";
 import { readFile } from "node:fs/promises";
 
-const source = await readFile(new URL("../defaults/mods/changes/main.js", import.meta.url), "utf8");
+const source = await readFile(new URL("../mods/changes/main.js", import.meta.url), "utf8");
 const rowsSource = source.slice(source.indexOf("const untab ="), source.indexOf("\nexport default class"));
 const diffRows = new Function(`${rowsSource}; return diffRows;`)();
 

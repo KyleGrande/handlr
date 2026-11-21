@@ -19,7 +19,7 @@ class Element {
     return proxy;
   }
 }
-const source = await readFile(new URL("../defaults/mods/picker/main.js", import.meta.url), "utf8");
+const source = await readFile(new URL("../mods/picker/main.js", import.meta.url), "utf8");
 const element = () => new Element();
 const commands: unknown[][] = [];
 let testSpaces: any[] = [];

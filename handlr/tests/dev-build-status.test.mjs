@@ -121,3 +121,26 @@ test('build report publication includes time and process identities and replaces
     assert.ok(updated.changed.includes('src/main.rs'));
   } finally { f.close(); }
 });
+
+
+test('bundled mod and frame edits invalidate the app build while optional packages stay independent', () => {
+  const f = fixture();
+  try {
+    mkdirSync(join(f.root, 'mods/machines'), { recursive: true });
+    mkdirSync(join(f.root, 'mods/frame/settings'), { recursive: true });
+    mkdirSync(join(f.root, 'mods/context'), { recursive: true });
+    writeFileSync(join(f.root, 'mods/bundled.txt'), 'machines\n');
+    writeFileSync(join(f.root, 'mods/machines/main.js'), 'machine v1');
+    writeFileSync(join(f.root, 'mods/frame/settings/main.js'), 'settings v1');
+    writeFileSync(join(f.root, 'mods/context/main.js'), 'optional v1');
+    const before = sourceSnapshot(f.root);
+    writeFileSync(join(f.root, 'mods/context/main.js'), 'optional v2');
+    assert.equal(sourceSnapshot(f.root).fingerprint, before.fingerprint);
+    writeFileSync(join(f.root, 'mods/machines/main.js'), 'machine v2');
+    assert.notEqual(sourceSnapshot(f.root).files['mods/machines/main.js'], before.files['mods/machines/main.js']);
+    writeFileSync(join(f.root, 'mods/frame/settings/main.js'), 'settings v2');
+    assert.notEqual(sourceSnapshot(f.root).files['mods/frame/settings/main.js'], before.files['mods/frame/settings/main.js']);
+    writeFileSync(join(f.root, 'mods/bundled.txt'), 'machines\ncontext\n');
+    assert.ok(sourceSnapshot(f.root).files['mods/context/main.js']);
+  } finally { f.close(); }
+});

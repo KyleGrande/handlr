@@ -2,7 +2,7 @@ import { expect, test } from "bun:test";
 import { readFile } from "node:fs/promises";
 
 // What a click in the Settings window writes to settings.json, without a window or a core.
-const source = await readFile(new URL("../defaults/frame/settings/main.js", import.meta.url), "utf8");
+const source = await readFile(new URL("../mods/frame/settings/main.js", import.meta.url), "utf8");
 // settings.json as the mod sees it through readTextFile / writeTextFile.
 const disk: { raw: string | null; writes: number; fail?: string; readFail?: string; toasts: any[] } = { raw: null, writes: 0, toasts: [] };
 const values: Record<string, any> = {

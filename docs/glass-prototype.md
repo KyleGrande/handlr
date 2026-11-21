@@ -1,6 +1,6 @@
 # Glass material study
 
-The Settings control is implemented in `defaults/frame/settings/main.js`.
+The Settings control is implemented in `mods/frame/settings/main.js`.
 `glass.js` owns per-layout preference and restoration in the mod-owned
 `glass.json` file. A copy runs inside bundled tabs so theme/accessibility changes
 continue to update the material after Settings closes. Preset styling and
@@ -105,7 +105,7 @@ The opaque variant disables root blur and makes all material fills opaque.
 - `src/terminal.rs` and `src/vt.rs`: terminal opacity affects background painting;
   the terminal palette uses background RGB. Glass lifts dark background RGB slightly while keeping foreground and ANSI
   colors unchanged; terminal opacity applies only to background painting.
-- `defaults/frame/settings/main.js`: Seamless saves its own color overrides and
+- `mods/frame/settings/main.js`: Seamless saves its own color overrides and
   restores only values it still owns. Glass layers its material over the
   independently owned Seamless preference and remains active after Settings
   closes. Toggling Seamless refreshes Glass without recapturing styled colors.

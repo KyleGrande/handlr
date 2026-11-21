@@ -1,10 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { capture, compose } from '../../defaults/mods/layouts/library.js';
-import { LibraryStore } from '../../defaults/mods/layouts/store.js';
+import { capture, compose } from '../../mods/layouts/library.js';
+import { LibraryStore } from '../../mods/layouts/store.js';
 
-const source = (await readFile(new URL('../../defaults/mods/layouts/main.js', import.meta.url), 'utf8'))
+const source = (await readFile(new URL('../../mods/layouts/main.js', import.meta.url), 'utf8'))
   .replace(/^import .*;\n/gm, '').replace('export default class Layouts', 'return class Layouts');
 const document = JSON.parse(await readFile(new URL('../prototype/workspaces/panel-workspace-native.json', import.meta.url), 'utf8'));
 

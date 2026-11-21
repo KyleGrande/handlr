@@ -3,7 +3,7 @@ import { copyFile, mkdtemp, mkdir, readFile, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { glassMaterial, glassCardFill } from '../../defaults/frame/settings/glass-state.js';
+import { glassMaterial, glassCardFill } from '../../mods/frame/settings/glass-state.js';
 
 const root = new URL('../../', import.meta.url);
 const json = async path => JSON.parse(await readFile(path, 'utf8'));

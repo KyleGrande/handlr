@@ -2,13 +2,13 @@ import { test, expect } from "bun:test";
 import { readFile } from "node:fs/promises";
 
 async function harness(mod: string, values: Record<string, string>) {
-  const source = (await readFile(new URL(`../defaults/mods/${mod}/main.js`, import.meta.url), "utf8"))
+  const source = (await readFile(new URL(`../mods/${mod}/main.js`, import.meta.url), "utf8"))
     .replace(/^import .*;\n/gm, "").replace(/export default class (\w+)/, "class $1").replace(/^export /gm, "");
   const name = { agents: "Agents", spaces: "Spaces", tabs: "Tabs" }[mod]!;
   const data = new Map(Object.entries(values));
   const globals = {
     View: class {}, props: () => ({}), spaces: () => [], ScrollHandle: { new: () => ({}) },
-    shared: () => null, setShared() {},
+    shared: () => null, setShared() {}, startGlass() {},
     localStorage: { getItem: (key: string) => data.get(key) ?? null, setItem: (key: string, value: string) => data.set(key, value), removeItem: (key: string) => data.delete(key) },
   };
   const Mod = new Function(...Object.keys(globals), `${source}; return ${name};`)(...Object.values(globals));

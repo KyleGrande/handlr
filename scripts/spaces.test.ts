@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import { mkdtempSync, mkdirSync, realpathSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-const source = (await readFile(new URL("../defaults/mods/spaces/main.js", import.meta.url), "utf8"))
+const source = (await readFile(new URL("../mods/spaces/main.js", import.meta.url), "utf8"))
   .replace(/^import .*;\n/gm, "").replace("export default class Spaces", "class Spaces").replace(/^export /gm, "");
 
 type Space = { id: string; folder: string; machine?: string | null; active?: boolean };
