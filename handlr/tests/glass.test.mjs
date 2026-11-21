@@ -408,7 +408,10 @@ test('white frost spans the earlier clear finish and current white finish indepe
     const white = pure.glassMaterial(light, true, strength, 100);
     assert.ok(parseInt(clear.background.slice(-2), 16) < parseInt(white.background.slice(-2), 16));
     assert.deepEqual(pure.glassMaterial(light, false, strength, 0), pure.glassMaterial(light, false, strength, 100));
-    assert.deepEqual(pure.glassMaterial(palette, true, strength, 0), pure.glassMaterial(palette, true, strength, 100), 'dark theme keeps its readable smoke');
+    const darkClear = pure.glassMaterial(palette, true, strength, 0);
+    const darkFrost = pure.glassMaterial(palette, true, strength, 100);
+    assert.ok(parseInt(darkClear.background.slice(-2), 16) < parseInt(darkFrost.background.slice(-2), 16), 'dark frost changes its smoked tint');
+    assert.deepEqual(pure.glassMaterial(palette, false, strength, 0), pure.glassMaterial(palette, false, strength, 100), 'accessibility fallback stays opaque');
   }
   assert.equal(pure.glassMaterial(light, true, 100, 0).background, '#ffffff6d');
   assert.equal(pure.glassMaterial(light, true, 100, 100).background, '#ffffffdf');
@@ -444,4 +447,18 @@ test('white panel and card fills stay white with stable focus without changing t
     assert.equal(root.content.pane.focus_background, root.content.pane.background);
   }
   assert.equal(pure.glassCardFill('#ffffff', 0), '#ffffff4d', 'clear finish retains the lighter card');
+});
+
+
+test('dark frost adjusts cards independently and preserves the existing full-frost appearance', () => {
+  const original = { id: 'terminal', content: { pane: {} } };
+  const render = frost => pure.reconcileGlass(original, { ...pure.newGlassState(original), frost }, palette, {}, true).root;
+  const clear = render(0), frosted = render(100);
+  assert.equal(frosted.colors.background, '#2e303478');
+  assert.equal(frosted.colors.surface, '#17191d24');
+  assert.equal(frosted.content.pane.background, '#2e30344d');
+  assert.equal(clear.content.pane.background, '#2e30341a');
+  assert.equal(clear.content.pane.focus_background, clear.content.pane.background);
+  assert.equal(frosted.content.pane.focus_background, frosted.content.pane.background);
+  assert.equal(clear.terminal_opacity, frosted.terminal_opacity);
 });

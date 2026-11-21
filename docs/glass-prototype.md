@@ -247,3 +247,14 @@ frames blend from 30.34% to 82%, with the same fill whether focused or resting.
 Dark cards retain their 30.34% fill. Terminal frame hover reuses the existing
 authored focus-border color without changing border width or card fill; no
 new layout field or mod API is added. Rounded corners and floating shadows remain.
+
+
+### Both sliders in either appearance (2026-11-20)
+
+Remove the light-only visibility guard from the frost control. Both sliders
+now appear whenever Glass is enabled. In light appearance it is White frost;
+in dark appearance it is Glass frost and adjusts smoked material. Dark base
+alpha ranges from 8–24%, panel surfaces from 4–14%, and terminal cards from
+10–30.34%. At 100%, dark appearance stays exactly as before. Missing preferences
+still default to 100; light material and current saved values stay unchanged.
+Opaque accessibility fallback ignores both sliders as before.

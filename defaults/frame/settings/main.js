@@ -728,7 +728,9 @@ export default class Settings extends View {
         this.toggle(t, "st-glass", glassEnabled(), (_e, cx) => {
           if (glassSupported() || glassEnabled()) this.appearancePreset(true, cx);
         })))
-      .when(glassEnabled() && !s.dark, el => el.child(this.row(t, "White frost", "Clear glass at 0%; translucent white frost at 100%. Saved for this layout.", this.glassBackgroundControl(t, "frost"))))
+      .when(glassEnabled(), el => el.child(this.row(t, s.dark ? "Glass frost" : "White frost", s.dark
+        ? "Clear glass at 0%; smoked frost at 100%. Saved for this layout."
+        : "Clear glass at 0%; translucent white frost at 100%. Saved for this layout.", this.glassBackgroundControl(t, "frost"))))
       .when(glassEnabled(), el => el.child(this.row(t, "Glass background", "Lighter at 0%; resting-terminal frost at 100%. Saved for this layout.", this.glassBackgroundControl(t))))
       .child(this.row(t, "No Headers", "Hide panel title rows. Turn off to restore panel controls and drag handles.",
         this.toggle(t, "st-no-headers", Boolean(p.no_headers), (_e, cx) => this.change(q => { q.no_headers = !q.no_headers; }, cx))))

@@ -16,7 +16,7 @@ function isDark(color) {
 }
 
 export function glassCardFill(background, frost = 100) {
-  return alpha(background, isDark(background) ? .3034 : .3034 + (.82 - .3034) * glassBackgroundValue(frost) / 100);
+  return alpha(background, isDark(background) ? .10 + .2034 * glassBackgroundValue(frost) / 100 : .3034 + (.82 - .3034) * glassBackgroundValue(frost) / 100);
 }
 
 export function glassMaterial(baseline, blur, background = 100, frost = 100) {
@@ -30,11 +30,11 @@ export function glassMaterial(baseline, blur, background = 100, frost = 100) {
     // At full strength, include the former resting card + two terminal fills
     // in the window backdrop, so Seamless panels get the same readable frost.
     // White frost needs a denser base: a faint white layer reads as gray over
-    // dark content behind the window. Keep the dark material's existing smoke.
-    background: alpha(tint, blur ? 1 - (1 - (dark ? .24 : .18 + .64 * glassBackgroundValue(frost) / 100)) * (1 - .3034 * glassBackgroundValue(background) / 100) : 1),
+    // dark content behind the window. At 100%, keep the dark material's existing smoke.
+    background: alpha(tint, blur ? 1 - (1 - (dark ? .08 + .16 * glassBackgroundValue(frost) / 100 : .18 + .64 * glassBackgroundValue(frost) / 100)) * (1 - .3034 * glassBackgroundValue(background) / 100) : 1),
     canvas: alpha(baseline.canvas, blur ? .02 : 1),
     chrome: alpha(baseline.chrome, blur ? .06 : 1),
-    surface: alpha(baseline.surface, blur ? (dark ? .14 : .14 + .68 * glassBackgroundValue(frost) / 100) : 1),
+    surface: alpha(baseline.surface, blur ? (dark ? .04 + .10 * glassBackgroundValue(frost) / 100 : .14 + .68 * glassBackgroundValue(frost) / 100) : 1),
     popover: alpha(baseline.popover, 1), raised: alpha(baseline.raised, 1),
     // Preserve the theme's existing fine border instead of strengthening it.
     border: baseline.border,
