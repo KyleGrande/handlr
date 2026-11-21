@@ -284,7 +284,12 @@ shadows and rounded resting/focused fills. The terminal background passes are
 transparent so they cannot cover the rounded frame corners. Glass background
 adjusts the backdrop per layout from the base tint (0%) to resting-
 terminal frost (100%, the default). Either control can be turned off independently.
-Light terminal cards retain a 90–98% white fill even at low Glass slider values;
+Terminal background independently sets terminal card opacity over the window
+glass, from clear (0%) to solid (100%), while glyphs stay opaque. Its per-layout
+`terminal` preference lives in the mod-owned `glass.json`; leaving it unset
+preserves existing material. Pane headers round their outward corners to the
+frame’s inner radius, keeping their fill inside the highlighted border.
+Light terminal cards default to a 90–98% white fill even at low Glass slider values;
 the surrounding backdrop remains independently adjustable.
 Light Glass defaults to 82–87% white backdrop opacity to retain a white frosted
 look over dark content. Its White frost slider blends from the earlier clear

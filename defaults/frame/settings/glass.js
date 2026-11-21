@@ -1,5 +1,5 @@
 import { appHome, exec, layout, layouts, notify, readTextFile, run, settings, shared, setShared, themes, window, writeTextFile } from "herdr";
-import { newGlassState, reconcileGlass, glassCanBlur, glassBackgroundValue } from "./glass-state.js";
+import { newGlassState, reconcileGlass, glassCanBlur, glassBackgroundValue, glassCardFill } from "./glass-state.js";
 
 const SHIPPED = ["main", "terminals", "win98"];
 const ACCESSIBILITY = 'ObjC.import("AppKit"); $.NSWorkspace.sharedWorkspace.accessibilityDisplayShouldReduceTransparency ? "reduced" : "blur"';
@@ -26,6 +26,14 @@ export function glassFrost(name = shared("layout")) {
   return glassBackgroundValue(shared("settings.glass.frost")?.[name]);
 }
 
+export function glassTerminal(name = shared("layout")) {
+  const value = shared("settings.glass.terminal")?.[name];
+  if (typeof value === "number" && Number.isFinite(value)) return glassBackgroundValue(value);
+  // Older layouts retain their current material until this slider is changed.
+  const background = selectedPalette()?.background ?? (settings().dark ? "#17191d" : "#ffffff");
+  return Math.round(parseInt(glassCardFill(background, glassFrost(name)).slice(-2), 16) * 100 / 255);
+}
+
 export function glassSupported() {
   const tabs = node => node?.content?.mod === "tabs" || (node?.children ?? []).some(tabs);
   return window()?.platform === "macos" && tabs(layout());
@@ -35,6 +43,7 @@ function publish(state) {
   setShared("settings.glass", Object.fromEntries(Object.entries(state.layouts).map(([name, entry]) => [name, Boolean(entry.enabled)])));
   setShared("settings.glass.background", Object.fromEntries(Object.entries(state.layouts).map(([name, entry]) => [name, glassBackgroundValue(entry.background)])));
   setShared("settings.glass.frost", Object.fromEntries(Object.entries(state.layouts).map(([name, entry]) => [name, glassBackgroundValue(entry.frost)])));
+  setShared("settings.glass.terminal", Object.fromEntries(Object.entries(state.layouts).map(([name, entry]) => [name, typeof entry.terminal === "number" && Number.isFinite(entry.terminal) ? glassBackgroundValue(entry.terminal) : null])));
   setShared("settings.glass.error", null);
 }
 
@@ -141,12 +150,15 @@ export async function setGlassFinish(values, name = String(shared("layout") ?? "
     const { state, raw } = await loadState();
     const entry = state.layouts[name];
     if (!entry?.enabled) return;
-    for (const key of ["background", "frost"]) {
+    for (const key of ["background", "frost", "terminal"]) {
       if (Object.hasOwn(values, key)) entry[key] = glassBackgroundValue(values[key]);
     }
     const updated = JSON.stringify(state, null, 2) + "\n";
     await writeTextFile(statePath(), updated, raw);
-    await sync(state, updated, name);
+    // Save a delayed edit to its owner, but wait for that layout to be selected
+    // before applying material with the active layout's resolved palette.
+    if (String(shared("layout") ?? "main") === name) await sync(state, updated, name);
+    else publish(state);
   });
   if (!completed) throw new Error("Appearance is updating; try again in a moment");
 }

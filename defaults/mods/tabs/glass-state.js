@@ -15,7 +15,8 @@ function isDark(color) {
   return r * .2126 + g * .7152 + b * .0722 < 128;
 }
 
-export function glassCardFill(background, frost = 100) {
+export function glassCardFill(background, frost = 100, terminal) {
+  if (typeof terminal === "number" && Number.isFinite(terminal)) return alpha(background, glassBackgroundValue(terminal) / 100);
   // Light terminals keep a white paper base even when the window frost is low.
   // The sliders can clear the surrounding glass without turning the text area gray.
   return alpha(background, isDark(background) ? .10 + .2034 * glassBackgroundValue(frost) / 100 : .90 + .08 * glassBackgroundValue(frost) / 100);
@@ -106,7 +107,7 @@ function reconcileCards(root, entry, blur, seamless) {
       }
       if (card) {
         const before = {};
-        for (const [key, value] of Object.entries({ shadow: blur ? 'sm' : undefined, radius: 12, background: glassCardFill(root.colors?.background, entry.frost), focus_background: glassCardFill(root.colors?.background, entry.frost) })) {
+        for (const [key, value] of Object.entries({ shadow: blur ? 'sm' : undefined, radius: 12, background: glassCardFill(root.colors?.background, entry.frost, entry.terminal), focus_background: glassCardFill(root.colors?.background, entry.frost, entry.terminal) })) {
           if (!Object.hasOwn(card.saved, key)) card.saved[key] = { had: Object.hasOwn(pane, key), value: pane[key] ?? null };
           if (Object.hasOwn(pane, key)) before[key] = pane[key];
           if (Object.hasOwn(card.applied, key) && !same(pane[key] ?? null, card.applied[key])

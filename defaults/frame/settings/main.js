@@ -4,7 +4,7 @@ import { View, div, svg, image } from "gpui-kit";
 import { v_flex, h_flex, Scrollbar, InputState, Input, Popup, SliderState, Slider, SliderTrack, SliderIndicator, SliderThumb } from "gpui-base";
 import { hc, exec, layout, run, theme, themes, fonts, updates, telemetry, settings, layouts, shared, setShared, appHome, readTextFile, writeTextFile, playSound, props, closeOverlay, notify, window } from "herdr";
 import { readMods, modCommand, modPanels } from "./mods.js";
-import { glassEnabled, glassSupported, glassBackground, glassFrost, setGlassFinish, setGlass, startGlass } from "./glass.js";
+import { glassEnabled, glassSupported, glassBackground, glassFrost, glassTerminal, setGlassFinish, setGlass, startGlass } from "./glass.js";
 
 const I = (name) => `frame/settings/${name}.svg`;
 
@@ -61,19 +61,22 @@ export default class Settings extends View {
   init(_props, cx) {
     startGlass(cx);
     this.glassSliders = {};
-    for (const [key, read] of [["background", glassBackground], ["frost", glassFrost]]) {
+    this.glassWrites = new Map();
+    for (const [key, read] of [["background", glassBackground], ["frost", glassFrost], ["terminal", glassTerminal]]) {
       const state = this.glassSliders[key] = SliderState.new({ min: 0, max: 100, step: 1, value: read() });
       state.on("change", (_value, cx) => {
+        if (this.glassSeeding) return;
         const name = String(shared("layout") ?? "main");
-        const values = Object.fromEntries(Object.entries(this.glassSliders).map(([key, state]) => [key, state.value()]));
-        const revision = this.glassRevision = (this.glassRevision ?? 0) + 1;
+        const job = { values: { ...this.glassWrites.get(name)?.values, [key]: state.value() } };
+        this.glassWrites.set(name, job);
         cx.notify();
-        // Save both controls together so dragging either keeps the other's value.
+        // Coalesce changed controls per layout without pinning untouched defaults.
         cx.timer.after(200, cx => {
-          if (revision !== this.glassRevision) return;
+          if (this.glassWrites.get(name) !== job) return;
           cx.spawn(async cx => {
-            try { await setGlassFinish(values, name); }
+            try { await setGlassFinish(job.values, name); }
             catch (error) { notify({ title: "Glass was not changed", body: String(error?.message ?? error), level: "error" }); }
+            finally { if (this.glassWrites.get(name) === job) this.glassWrites.delete(name); cx.notify(); }
             cx.notify();
           });
         });
@@ -236,10 +239,14 @@ export default class Settings extends View {
   glassBackgroundControl(t, key = "background") {
     // Re-seed when switching layouts; each layout keeps its own strength.
     const name = shared("layout");
-    if (this.glassSliderLayout !== name) {
-      this.glassSliderLayout = name;
+    const stateKey = JSON.stringify([name, settings().dark, glassBackground(), glassFrost(), glassTerminal()]);
+    if (this.glassSliderLayout !== stateKey && !this.glassWrites.has(String(name))) {
+      this.glassSliderLayout = stateKey;
+      this.glassSeeding = true;
       this.glassSliders.background.set_value(glassBackground());
       this.glassSliders.frost.set_value(glassFrost());
+      this.glassSliders.terminal.set_value(glassTerminal());
+      this.glassSeeding = false;
     }
     const state = this.glassSliders[key];
     return h_flex().gap(10).items_center()
@@ -732,6 +739,7 @@ export default class Settings extends View {
         ? "Clear glass at 0%; smoked frost at 100%. Saved for this layout."
         : "Clear glass at 0%; translucent white frost at 100%. Saved for this layout.", this.glassBackgroundControl(t, "frost"))))
       .when(glassEnabled(), el => el.child(this.row(t, "Glass background", "Lighter at 0%; resting-terminal frost at 100%. Saved for this layout.", this.glassBackgroundControl(t))))
+      .when(glassEnabled(), el => el.child(this.row(t, "Terminal background", "Clear at 0%; solid at 100%. Text stays opaque. Saved for this layout.", this.glassBackgroundControl(t, "terminal"))))
       .child(this.row(t, "No Headers", "Hide panel title rows. Turn off to restore panel controls and drag handles.",
         this.toggle(t, "st-no-headers", Boolean(p.no_headers), (_e, cx) => this.change(q => { q.no_headers = !q.no_headers; }, cx))))
       .child(div().h(18))

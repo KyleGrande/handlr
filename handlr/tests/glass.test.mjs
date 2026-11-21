@@ -25,8 +25,8 @@ function fixture(name = 'Handlr', original = { id: 'root', children: [{ id: 'tab
     layout: () => original, notify: () => {}, run: (command, args) => { assert.equal(command, 'layout.switch'); values.layout = args.name; },
   };
   const api = new Function('host', 'pure', `const {${Object.keys(host).join(',')}} = host;
-    const {newGlassState,reconcileGlass,glassCanBlur,glassBackgroundValue} = pure;
-    ${source}; return {setGlass, setGlassBackground, setGlassFinish, glassBackground, glassFrost, disableAllGlass, glassEnabled, startGlass};`)(host, pure);
+    const {newGlassState,reconcileGlass,glassCanBlur,glassBackgroundValue,glassCardFill} = pure;
+    ${source}; return {setGlass, setGlassBackground, setGlassFinish, glassBackground, glassFrost, glassTerminal, disableAllGlass, glassEnabled, startGlass};`)(host, pure);
   return { api, files, values, current, signal: value => { signal = value; },
     root: () => JSON.parse(files.get(`/app/layouts/${values.layout}.json`)),
     edit: edit => { const root = JSON.parse(files.get(`/app/layouts/${values.layout}.json`)); edit(root); files.set(`/app/layouts/${values.layout}.json`, JSON.stringify(root)); },
@@ -470,4 +470,57 @@ test('dark frost adjusts cards independently and preserves the existing full-fro
   assert.equal(clear.content.pane.focus_background, clear.content.pane.background);
   assert.equal(frosted.content.pane.focus_background, frosted.content.pane.background);
   assert.equal(clear.terminal_opacity, frosted.terminal_opacity);
+});
+
+test('terminal slider is independent, persists zero, and restores authored fills', async () => {
+  const original = { id: 'terminal', content: { pane: { background: '#112233', focus_background: '#445566' } }, children: [{ id: 'tabs', content: { mod: 'tabs' } }] };
+  const f = fixture('Handlr', original);
+  f.current.dark = false;
+  await f.api.setGlass(true);
+  const backdrop = f.root().colors.background;
+  await f.api.setGlassFinish({ terminal: 0 });
+  assert.equal(f.api.glassTerminal(), 0);
+  assert.equal(f.root().content.pane.background, '#ffffff00');
+  assert.equal(f.root().content.pane.focus_background, '#ffffff00');
+  assert.equal(f.root().colors.background, backdrop);
+  await f.api.setGlassFinish({ terminal: 35 });
+  await f.api.setGlassFinish({ frost: 0, background: 0 });
+  assert.equal(f.root().content.pane.background, '#ffffff59');
+  await f.api.setGlass(true);
+  assert.equal(f.api.glassTerminal(), 35);
+  await f.api.setGlassFinish({ terminal: 100 });
+  assert.equal(f.root().content.pane.background, '#ffffffff');
+  f.signal({ code: 0, stdout: 'reduced' });
+  await f.api.setGlass(true);
+  assert.equal(f.root().content.pane.background, original.content.pane.background, 'accessibility fallback restores opaque authored material');
+  await f.api.setGlass(false);
+  assert.deepEqual(f.root(), original);
+});
+
+test('unconfigured terminal strength follows the old material until explicitly changed', async () => {
+  const f = fixture('Handlr', { id: 'terminal', content: { pane: {} }, children: [{ id: 'tabs', content: { mod: 'tabs' } }] });
+  f.current.dark = false;
+  await f.api.setGlass(true);
+  assert.equal(f.api.glassTerminal(), 98);
+  await f.api.setGlassFinish({ frost: 0 });
+  assert.equal(f.api.glassTerminal(), 90);
+  assert.equal(JSON.parse(f.files.get('/app/glass.json')).layouts.Handlr.terminal, undefined);
+  f.current.dark = true;
+  await f.api.setGlass(true);
+  assert.equal(f.api.glassTerminal(), 10);
+});
+
+test('delayed slider edits save to their layout and defer painting with another layout’s palette', async () => {
+  const f = fixture('Handlr', { id: 'terminal', content: { pane: {} }, children: [{ id: 'tabs', content: { mod: 'tabs' } }] });
+  f.current.dark = false;
+  await f.api.setGlass(true);
+  const before = f.files.get('/app/layouts/Handlr.json');
+  f.values.layout = 'another-layout';
+  f.current.dark = true;
+  await f.api.setGlassFinish({ terminal: 35 }, 'Handlr');
+  assert.equal(f.files.get('/app/layouts/Handlr.json'), before);
+  assert.equal(JSON.parse(f.files.get('/app/glass.json')).layouts.Handlr.terminal, 35);
+  f.values.layout = 'Handlr'; f.current.dark = false;
+  await f.api.setGlass(true);
+  assert.equal(f.root().content.pane.background, '#ffffff59');
 });
