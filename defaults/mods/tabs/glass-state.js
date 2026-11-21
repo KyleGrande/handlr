@@ -16,7 +16,9 @@ function isDark(color) {
 }
 
 export function glassCardFill(background, frost = 100) {
-  return alpha(background, isDark(background) ? .10 + .2034 * glassBackgroundValue(frost) / 100 : .3034 + (.82 - .3034) * glassBackgroundValue(frost) / 100);
+  // Light terminals keep a white paper base even when the window frost is low.
+  // The sliders can clear the surrounding glass without turning the text area gray.
+  return alpha(background, isDark(background) ? .10 + .2034 * glassBackgroundValue(frost) / 100 : .90 + .08 * glassBackgroundValue(frost) / 100);
 }
 
 export function glassMaterial(baseline, blur, background = 100, frost = 100) {

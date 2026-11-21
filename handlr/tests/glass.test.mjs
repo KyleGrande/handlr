@@ -206,7 +206,7 @@ test('all resting panes retain visible glass through stacked backgrounds', () =>
     const panel = stacked([...base, opacity(glass.colors.surface), opacity(glass.colors.surface), opacity(glass.colors.background)]);
     const terminal = stacked([...base, opacity(glass.content.pane.background), glass.terminal_opacity, glass.terminal_opacity]);
     assert.ok(panel < (background === '#ffffff' ? .9999 : .82), 'nested panel backgrounds must remain translucent');
-    assert.ok(terminal < (background === '#ffffff' ? .99 : .75), 'resting terminal backgrounds must remain translucent');
+    assert.ok(terminal < (background === '#ffffff' ? .999 : .75), 'resting terminal backgrounds must remain translucent');
     if (background === '#ffffff') assert.ok(opacity(glass.colors.background) >= .8, 'white frost stays near white even over a black backdrop');
     assert.equal(glass.content.pane.background, pure.glassCardFill(glass.colors.background));
     assert.equal(glass.colors.border, colors.border);
@@ -293,7 +293,7 @@ test('Glass journals stable card fills while the border carries focus', async ()
   assert.equal(f.root().terminal_opacity, 0);
   f.current.dark = false;
   await f.api.setGlass(true);
-  assert.equal(pane().focus_background, '#ffffffd1');
+  assert.equal(pane().focus_background, '#fffffffa');
   f.signal({ code: 0, stdout: 'reduced' });
   await f.api.setGlass(true);
   assert.equal(pane().focus_background, original.children[1].content.pane.focus_background);
@@ -443,10 +443,19 @@ test('white panel and card fills stay white with stable focus without changing t
     const backdrop = pure.glassMaterial(light, true, strength, 100).background;
     assert.equal(root.colors.background, backdrop);
     assert.equal(root.colors.surface, '#ffffffd1');
-    assert.equal(root.content.pane.background, '#ffffffd1');
+    assert.equal(root.content.pane.background, '#fffffffa');
     assert.equal(root.content.pane.focus_background, root.content.pane.background);
   }
-  assert.equal(pure.glassCardFill('#ffffff', 0), '#ffffff4d', 'clear finish retains the lighter card');
+  assert.equal(pure.glassCardFill('#ffffff', 0), '#ffffffe6', 'low frost retains a near-white terminal base');
+  for (const background of [0, 3, 100]) for (const frost of [0, 20, 100]) {
+    const original = { id: 'terminal', content: { pane: {} } };
+    const state = { ...pure.newGlassState(original), background, frost };
+    const { root } = pure.reconcileGlass(original, state, light, {}, true);
+    const opacity = color => parseInt(color.slice(-2), 16) / 255;
+    assert.ok(opacity(root.content.pane.background) >= .90, 'terminal stays whitish at low slider values, even over black');
+    assert.equal(root.content.pane.focus_background, root.content.pane.background);
+    assert.equal(root.colors.background, pure.glassMaterial(light, true, background, frost).background, 'terminal whitening does not change the surrounding glass');
+  }
 });
 
 

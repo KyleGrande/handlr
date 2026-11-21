@@ -910,7 +910,8 @@ What's about the user, never a look:
   strength per layout: 0% uses the base window tint, 100% (the default)
   adds the former resting-terminal frost so Seamless panel text is easier to read.
   This percentage is material strength, not window opacity. Rounded terminal
-  frames own the fill (about 82% for white frost, 30% for clear/dark glass);
+  frames own the fill (90–98% in light mode, staying whitish even with both
+  sliders low; dark glass retains its existing 10–30% range);
   light panel surfaces also follow White frost. Rectangular terminal fills are transparent
   so every card keeps rounded corners. Terminal cards use soft shadows, including
   in Seamless mode;
