@@ -27,7 +27,8 @@ export function glassFrost(name = shared("layout")) {
 }
 
 export function glassTerminal(name = shared("layout")) {
-  const value = shared("settings.glass.terminal")?.[name];
+  const scoped = shared(settings().dark ? "settings.glass.terminal_dark" : "settings.glass.terminal_light")?.[name];
+  const value = typeof scoped === "number" && Number.isFinite(scoped) ? scoped : shared("settings.glass.terminal")?.[name];
   if (typeof value === "number" && Number.isFinite(value)) return glassBackgroundValue(value);
   // Older layouts retain their current material until this slider is changed.
   const background = selectedPalette()?.background ?? (settings().dark ? "#17191d" : "#ffffff");
@@ -43,7 +44,9 @@ function publish(state) {
   setShared("settings.glass", Object.fromEntries(Object.entries(state.layouts).map(([name, entry]) => [name, Boolean(entry.enabled)])));
   setShared("settings.glass.background", Object.fromEntries(Object.entries(state.layouts).map(([name, entry]) => [name, glassBackgroundValue(entry.background)])));
   setShared("settings.glass.frost", Object.fromEntries(Object.entries(state.layouts).map(([name, entry]) => [name, glassBackgroundValue(entry.frost)])));
-  setShared("settings.glass.terminal", Object.fromEntries(Object.entries(state.layouts).map(([name, entry]) => [name, typeof entry.terminal === "number" && Number.isFinite(entry.terminal) ? glassBackgroundValue(entry.terminal) : null])));
+  for (const key of ["terminal", "terminal_light", "terminal_dark"]) {
+    setShared(`settings.glass.${key}`, Object.fromEntries(Object.entries(state.layouts).map(([name, entry]) => [name, typeof entry[key] === "number" && Number.isFinite(entry[key]) ? glassBackgroundValue(entry[key]) : null])));
+  }
   setShared("settings.glass.error", null);
 }
 
@@ -150,7 +153,7 @@ export async function setGlassFinish(values, name = String(shared("layout") ?? "
     const { state, raw } = await loadState();
     const entry = state.layouts[name];
     if (!entry?.enabled) return;
-    for (const key of ["background", "frost", "terminal"]) {
+    for (const key of ["background", "frost", "terminal", "terminal_light", "terminal_dark"]) {
       if (Object.hasOwn(values, key)) entry[key] = glassBackgroundValue(values[key]);
     }
     const updated = JSON.stringify(state, null, 2) + "\n";

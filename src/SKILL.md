@@ -279,8 +279,8 @@ opaque. Optional pane-frame `focus_background` selects that terminal’s fill
 while it has focus; other panes keep `background`. With the field absent,
 existing layouts behave as before. Glass restores only its own overrides
 when disabled. Glass and Seamless can be used together: Seamless clears panel
-fills and outlines while Glass retains floating terminal cards with soft
-shadows and rounded resting/focused fills. The terminal background passes are
+fills and outlines while Glass retains rounded terminal cards with soft
+shadows in dark mode and rounded resting/focused fills. The terminal background passes are
 transparent so they cannot cover the rounded frame corners. Glass background
 adjusts the backdrop per layout from the base tint (0%) to resting-
 terminal frost (100%, the default). Either control can be turned off independently.
@@ -289,6 +289,12 @@ glass, from clear (0%) to solid (100%), while glyphs stay opaque. Its per-layout
 `terminal` preference lives in the mod-owned `glass.json`; leaving it unset
 preserves existing material. Pane headers round their outward corners to the
 frame’s inner radius, keeping their fill inside the highlighted border.
+The slider saves `terminal_light` or `terminal_dark` for the active appearance;
+the legacy `terminal` preference remains a fallback. A 0% light terminal uses
+the window glass directly, avoiding an extra white card layer while retaining
+the dark appearance’s own transparency preference.
+Light glass omits the card drop shadow to avoid its black interior showing
+through as gray. Dark glass retains the existing shadow and terminal fill.
 Light terminal cards default to a 90–98% white fill even at low Glass slider values;
 the surrounding backdrop remains independently adjustable.
 Light Glass defaults to 82–87% white backdrop opacity to retain a white frosted

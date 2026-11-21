@@ -107,7 +107,12 @@ function reconcileCards(root, entry, blur, seamless) {
       }
       if (card) {
         const before = {};
-        for (const [key, value] of Object.entries({ shadow: blur ? 'sm' : undefined, radius: 12, background: glassCardFill(root.colors?.background, entry.frost, entry.terminal), focus_background: glassCardFill(root.colors?.background, entry.frost, entry.terminal) })) {
+        const scoped = entry[isDark(root.colors?.background) ? "terminal_dark" : "terminal_light"];
+        const terminal = typeof scoped === "number" && Number.isFinite(scoped) ? scoped : entry.terminal;
+        // A drop shadow also paints below the card's interior. Through clear
+        // light glass that darkens the whole terminal; keep shadows for smoke.
+        const shadow = blur && isDark(root.colors?.background) ? 'sm' : undefined;
+        for (const [key, value] of Object.entries({ shadow, radius: 12, background: glassCardFill(root.colors?.background, entry.frost, terminal), focus_background: glassCardFill(root.colors?.background, entry.frost, terminal) })) {
           if (!Object.hasOwn(card.saved, key)) card.saved[key] = { had: Object.hasOwn(pane, key), value: pane[key] ?? null };
           if (Object.hasOwn(pane, key)) before[key] = pane[key];
           if (Object.hasOwn(card.applied, key) && !same(pane[key] ?? null, card.applied[key])

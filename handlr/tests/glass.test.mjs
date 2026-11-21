@@ -524,3 +524,31 @@ test('delayed slider edits save to their layout and defer painting with another 
   await f.api.setGlass(true);
   assert.equal(f.root().content.pane.background, '#ffffff59');
 });
+
+test('light terminal can match the window glass without changing a legacy dark preference', async () => {
+  const f = fixture('Handlr', { id: 'terminal', content: { pane: {} }, children: [{ id: 'tabs', content: { mod: 'tabs' } }] });
+  f.current.dark = false;
+  await f.api.setGlass(true);
+  await f.api.setGlassFinish({ terminal: 52 });
+  const backdrop = f.root().colors.background;
+  await f.api.setGlassFinish({ terminal_light: 0 });
+  assert.equal(f.api.glassTerminal(), 0);
+  assert.equal(f.root().content.pane.background, '#ffffff00');
+  assert.equal(f.root().content.pane.focus_background, '#ffffff00');
+  assert.equal(f.root().content.pane.shadow, undefined, 'no black shadow under the clear light card');
+  assert.equal(f.root().colors.background, backdrop);
+  f.current.dark = true;
+  await f.api.setGlass(true);
+  assert.equal(f.api.glassTerminal(), 52);
+  assert.equal(f.root().content.pane.background, '#2e303485');
+  assert.equal(f.root().content.pane.shadow, 'sm', 'dark mode retains its floating-card shadow');
+  await f.api.setGlassFinish({ terminal_dark: 35 });
+  f.current.dark = false;
+  await f.api.setGlass(true);
+  assert.equal(f.api.glassTerminal(), 0);
+  assert.equal(f.root().content.pane.background, '#ffffff00');
+  const saved = JSON.parse(f.files.get('/app/glass.json')).layouts.Handlr;
+  assert.equal(saved.terminal, 52, 'legacy preference remains available as fallback');
+  assert.equal(saved.terminal_dark, 35);
+  assert.equal(saved.terminal_light, 0);
+});

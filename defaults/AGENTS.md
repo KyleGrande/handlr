@@ -906,6 +906,13 @@ What's about the user, never a look:
   the window glass: 0% is clear, 100% is solid; glyphs stay opaque. It does not
   change the backdrop or panel frost. Layouts without a terminal preference
   retain their existing card material until this control is changed.
+  Terminal background is saved separately for light and dark appearance
+  (`terminal_light`, `terminal_dark`), so adjusting light terminals preserves
+  a preferred dark finish. At 0% the terminal matches the window glass, with no
+  extra card fill. Existing `terminal` values remain the fallback for either
+  appearance until its own value is set.
+  Light glass omits the terminal drop shadow because it paints beneath the
+  transparent card and casts gray through it; dark glass keeps its shadow.
   All three sliders are saved per layout in the mod-owned `glass.json` journal
   (`background`, `frost`, `terminal`). All controls stay visible in both appearances;
   in dark mode, **Glass frost** adjusts smoked tint from clear (0%) to the
@@ -917,13 +924,13 @@ What's about the user, never a look:
   frames own the fill (by default 90–98% in light mode and 10–30% in dark mode;
   Terminal background overrides either range);
   light panel surfaces also follow White frost. Rectangular terminal fills are transparent
-  so every card keeps rounded corners. Terminal cards use soft shadows, including
+  so every card keeps rounded corners. Dark terminal cards use soft shadows, including
   in Seamless mode;
   disabling Glass restores their prior fills and look.
   It is per layout; enabling on a bundled layout creates a personal copy named
   `<layout>-glass` (with a suffix if needed). It never rewrites bundled layouts.
   Glass and Seamless can be enabled independently or together. Together,
-  Seamless clears panel fills and outlines while Glass keeps terminal-card shadows,
+  Seamless clears panel fills and outlines while Glass keeps dark terminal-card shadows,
   the frost and stable terminal fills. Disabling either preserves
   the other; disabling Glass restores
   prior overrides, preserving independent edits. The Settings and tabs mods own
