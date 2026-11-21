@@ -1392,7 +1392,7 @@ pub fn handle_link(
     window: &mut gpui::Window,
     cx: &mut App,
 ) -> impl std::future::Future<Output = anyhow::Result<String>> + use<> {
-    let (_, policy) = mod_policy(&Instance { name: name.to_owned(), props: Value::Null });
+    let (_, policy) = mod_policy(&Instance::new(name.to_owned(), Value::Null));
     gpui_shell::ShellRuntime::call_module(dir, "link.js", "handleLink", click, Rc::new(policy), window, cx)
 }
 
