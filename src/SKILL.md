@@ -288,8 +288,9 @@ Light Glass defaults to 82–87% white backdrop opacity to retain a white froste
 look over dark content. Its White frost slider blends from the earlier clear
 finish (0%) to white frost (100%), independently of Glass background strength.
 Both values are saved per layout. White frost also whitens panel surfaces and
-terminal card fills without changing the chosen backdrop; dark Glass keeps
-its existing smoke tint.
+terminal card fills without changing the chosen backdrop. Both sliders remain
+visible in dark mode: Glass frost adjusts clear-to-smoked tint, preserving the
+existing smoke finish at 100%.
 The Settings/tabs mods own per-layout preference and restoration in `glass.json`;
 do not edit that journal while enabled. Reduced transparency or a failed native
 accessibility query selects opaque fills (checked at most every fifteen seconds).

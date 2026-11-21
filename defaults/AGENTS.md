@@ -903,7 +903,9 @@ What's about the user, never a look:
   In light mode, **White frost** blends from the earlier clear finish (0%) to
   white frost (100%, the default), independently of **Glass background**.
   Both sliders are saved per layout in the mod-owned `glass.json` journal
-  (`background` and `frost`); dark themes keep their smoked tint.
+  (`background` and `frost`). Both controls stay visible in both appearances;
+  in dark mode, **Glass frost** adjusts smoked tint from clear (0%) to the
+  existing smoked finish (100%).
   **Glass background** adjusts backdrop
   strength per layout: 0% uses the base window tint, 100% (the default)
   adds the former resting-terminal frost so Seamless panel text is easier to read.
