@@ -10,7 +10,7 @@ sharing artifacts, not files the app requires to load a mod. A layout's root
 | Component | Recipe and screenshot | Runtime files |
 | --- | --- | --- |
 | Native panel workspace | `prototype/RECIPE.md`, `prototype/preview.png` | `prototype/layouts/panel-workspace-native.json`, matching SVG, `prototype/workspaces/panel-workspace-native.json` |
-| Earlier fixed-layout demo | Covered by the workspace recipe; its own Settings SVG | `prototype/layouts/panel-workspace-prototype.json`, matching SVG, `prototype/mods/workspace-prototype/{main.js,actions.js,mod.json}` |
+| Earlier fixed-layout demo | Covered by the workspace recipe; its own Settings SVG | `prototype/layouts/panel-workspace-prototype.json`, matching SVG, `../mods/workspace-prototype/{main.js,actions.js,mod.json}` |
 | Context | `mods/context` package: `RECIPE.md`, `preview.png` | Build/installer emits `main.js`, `mod.json`, `context.svg`, `native/`, `src/`; configured CLI, launcher and guide are also required |
 | Toolbox | `mods/toolbox` package: `RECIPE.md`, `preview.png` | Build emits `dist/mods/toolbox/` and companion `toolbox-tabs/`, including JS, manifests, SVG and setup guide |
 | Rigs | `mods/rigs` package: `RECIPE.md`, `preview.png` | `mods/rigs/{main.js,setup.js,mod.json,AGENTS.md}` plus installed Node/CLI checkout paths |
@@ -22,9 +22,13 @@ Handlr under `mods/`, with original Git histories preserved. See
 [the mod development guide](../mods/README.md) for builds and installation paths.
 Existing installed mods may still reference the original sibling checkouts;
 importing sources does not rewrite personal installations or layouts.
-The bundled Machines panel belongs to `defaults/mods/machines/`; it is not an
-independent gallery package and needs no separate gallery recipe. Shipped
-default mods use the host guide/API contract.
+Bundled panel sources, including Machines and Layouts, live directly under
+`mods/`; `mods/bundled.txt` selects what ships in the app. Internal UI mods
+(Settings, Palette and the other app screens) live under `mods/frame/`.
+Installed paths and panel identities stay unchanged. These source packages
+use the host guide/API contract and need no separate gallery recipe.
+The optional Context/Toolbox/Rigs/Ticket packages and the legacy prototype
+are not included merely because their sources share `mods/`.
 
 `npm run build` regenerates the prototype layouts and native workspace document.
 The macOS portable packager reads the native layout rather than defining a

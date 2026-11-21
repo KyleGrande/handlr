@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-const source = await readFile(new URL("../defaults/mods/machine-add/main.js", import.meta.url), "utf8");
+const source = await readFile(new URL("../mods/machine-add/main.js", import.meta.url), "utf8");
 
 function setup(result: any) {
   const calls: string[][] = [];

@@ -15,8 +15,6 @@ Input-SHA256: add9d7531d1b21646317a8958e38fc727506fa39d24bdecb44154d943c82753a d
 Input-SHA256: b495047bd93a9b06913511076f504daba17d5bbeb3e0650f3bb53a4220329c57 defaults/icons/LICENSE-Lucide.txt
 Input-SHA256: 16c45f9d667442781f03fa198914cc39abcaa48ec5ed8f644643e554ca2fbf63 defaults/icons/LICENSE-oh-my-pi.txt
 Input-SHA256: df51f0268b1749b0c94b3cfb9ba2851e94632062bae6935365c6f7a6c8e1cc50 defaults/icons/LICENSES.md
-Input-SHA256: e7bae1721866dc0152e9e8f9fb8c0033a6f8ee98f63c4d64b0f06bf6f27a13e8 defaults/mods/win98/fonts/LICENSE-MSSansSerif.txt
-Input-SHA256: 9348ddfd44da5a127c59141981954746a860ec8e03e0412cf3af7134af0f97e2 defaults/mods/win98/fonts/LICENSE-PxPlus.txt
 Input-SHA256: 3f941b3b89cf7b8370ceb83cc76d2120d471b58735d8ca60238a751a48d7f72f licenses/CC-BY-SA-3.0.txt
 Input-SHA256: a2010f343487d3f7618affe54f789f5487602331c0a8d03f49e9a7c547cf0499 licenses/CC0-1.0.txt
 Input-SHA256: 22c1bd99806822d9b184c4e5079ff3845b1e9fcaaabfd3a6e48dd9f443fd4cff licenses/QuickJS-source.txt
@@ -36,6 +34,8 @@ Input-SHA256: fc8dbc04e03ad4efc08a647ffe7f995b811a95bc04c0e85a56d5277c6593fa5f l
 Input-SHA256: de219cece932aad5a817bf763393d8d149d378a15d2ad5320e3331eac07626dd licenses/uucode-LICENSE_Bjoern_Hoehrmann.txt
 Input-SHA256: 1eda5a3b026870c737b22e8bcd4954338612c790db688242e003f41a4fa95175 licenses/uucode-LICENSE_unicode.txt
 Input-SHA256: 312e901e142be2477b4ca859e9311f9e3f80d33372991759b7921c1893605f33 licenses/uucode.txt
+Input-SHA256: e7bae1721866dc0152e9e8f9fb8c0033a6f8ee98f63c4d64b0f06bf6f27a13e8 mods/win98/fonts/LICENSE-MSSansSerif.txt
+Input-SHA256: 9348ddfd44da5a127c59141981954746a860ec8e03e0412cf3af7134af0f97e2 mods/win98/fonts/LICENSE-PxPlus.txt
 Input-SHA256: d78ac01638fd241bde2eb2952e75c40e5f5fc8dce026971b547265d3845e8333 scripts/notices.hbs
 Input-SHA256: b72254346b6bb1b9bf4debda3628dd4850e6a63f633629efc3ffc3e6ba9ca90b scripts/notices.ts
 Input-SHA256: 386211873e5b7a02f663ae4d7adf96285999f91608f8f9f31fecfd0f4095e6f1 vendor/ghostty/LICENSE
@@ -20663,7 +20663,7 @@ SOFTWARE.
 Pixelated MS Sans Serif fonts (Herdr 98)
 https://github.com/jdan/98.css; unchanged font conversion.
 
---- defaults/mods/win98/fonts/LICENSE-MSSansSerif.txt ---
+--- mods/win98/fonts/LICENSE-MSSansSerif.txt ---
 Pixelated MS Sans Serif (Regular and Bold)
 
 Copyright lou 2017. Built with FontStruct:
@@ -21042,7 +21042,7 @@ Creative Commons Notice
 PxPlus IBM VGA font (Herdr 98)
 https://int10h.org/oldschool-pc-fonts/
 
---- defaults/mods/win98/fonts/LICENSE-PxPlus.txt ---
+--- mods/win98/fonts/LICENSE-PxPlus.txt ---
 Attribution-ShareAlike 4.0 International
 
 =======================================================================
@@ -21474,7 +21474,7 @@ Creative Commons may be contacted at creativecommons.org.
 
 ----------------------------------------------------------------------
 Herdr logo artwork
-Ram path adapted from https://github.com/herdrdev/herdr/blob/HEAD/assets/logo.svg (Apache-2.0). Herdr 98 artwork is drawn by defaults/mods/win98/art/generate.ts, under the app's Apache-2.0 license.
+Ram path adapted from https://github.com/herdrdev/herdr/blob/HEAD/assets/logo.svg (Apache-2.0). Herdr 98 artwork is drawn by mods/win98/art/generate.ts, under the app's Apache-2.0 license.
 
 --- LICENSE ---
 Apache License

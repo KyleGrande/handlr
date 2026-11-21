@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import * as pure from '../../defaults/frame/settings/glass-state.js';
+import * as pure from '../../mods/frame/settings/glass-state.js';
 
-const source = (await readFile(new URL('../../defaults/frame/settings/glass.js', import.meta.url), 'utf8'))
+const source = (await readFile(new URL('../../mods/frame/settings/glass.js', import.meta.url), 'utf8'))
   .replace(/^import .*;\n/gm, '').replace(/export /g, '');
 const palette = {
   background: '#17191d', canvas: '#111316', chrome: '#0b0d10', surface: '#17191d',
@@ -158,13 +158,13 @@ test('manual blur disable selects opaque fills and survives disabling Glass', as
 
 test('controller copies remain synchronized across the mod module sandbox', async () => {
   for (const file of ['glass.js', 'glass-state.js']) {
-    assert.equal(await readFile(new URL(`../../defaults/frame/settings/${file}`, import.meta.url), 'utf8'),
-      await readFile(new URL(`../../defaults/mods/tabs/${file}`, import.meta.url), 'utf8'), 'run node handlr/scripts/sync-glass.mjs');
+    assert.equal(await readFile(new URL(`../../mods/frame/settings/${file}`, import.meta.url), 'utf8'),
+      await readFile(new URL(`../../mods/tabs/${file}`, import.meta.url), 'utf8'), 'run node handlr/scripts/sync-glass.mjs');
   }
 });
 
 test('Settings toggles Glass and Seamless independently and immediately refreshes their combination', async () => {
-  const text = (await readFile(new URL('../../defaults/frame/settings/main.js', import.meta.url), 'utf8'))
+  const text = (await readFile(new URL('../../mods/frame/settings/main.js', import.meta.url), 'utf8'))
     .replace(/^import .*;\n/gm, '').replace('export default class Settings', 'class Settings');
   const events = [];
   let enabled = false;

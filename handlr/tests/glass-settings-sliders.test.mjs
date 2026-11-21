@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 
-const source = await readFile(new URL('../../defaults/frame/settings/main.js', import.meta.url), 'utf8');
+const source = await readFile(new URL('../../mods/frame/settings/main.js', import.meta.url), 'utf8');
 test('all three sliders coalesce changed values for their captured layout without saving untouched defaults', async () => {
   const timers = [], tasks = [], writes = [];
   let name = 'Handlr';

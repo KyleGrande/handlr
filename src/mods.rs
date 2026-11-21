@@ -1658,6 +1658,28 @@ mod tests {
     }
 
     #[test]
+    fn bundled_source_packages_keep_installed_paths_and_bytes() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+        let names: std::collections::BTreeSet<_> = include_str!("../mods/bundled.txt").lines()
+            .map(str::trim).filter(|line| !line.is_empty() && !line.starts_with('#')).collect();
+        for required in ["machines", "layouts", "spaces", "agents", "tabs", "pane"] {
+            assert!(DEFAULT_MODS.iter().any(|(path, _)| *path == format!("{required}/main.js")));
+        }
+        for (path, bytes) in DEFAULT_MODS {
+            assert!(names.contains(path.split('/').next().unwrap()), "unlisted source package bundled: {path}");
+            assert_eq!(*bytes, std::fs::read(root.join("mods").join(path)).unwrap(), "mod bytes: {path}");
+        }
+        for optional in ["context", "rigs", "toolbox", "ticket", "workspace-prototype"] {
+            assert!(!names.contains(optional), "optional package must not be bundled implicitly");
+        }
+        for (path, bytes) in FRAME_MODS {
+            assert!(!path.starts_with("frame/"), "internal source folder must not change installed frame paths");
+            assert_eq!(*bytes, std::fs::read(root.join("mods/frame").join(path)).unwrap(), "frame bytes: {path}");
+        }
+        assert!(FRAME_MODS.iter().any(|(path, _)| *path == "settings/main.js"));
+    }
+
+    #[test]
     fn default_mods_preserve_user_versions_and_offer_bundled_updates() {
         let root = std::env::temp_dir().join(format!("herdr-app-sync-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);

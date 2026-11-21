@@ -1433,3 +1433,10 @@ right-hand pane can be moved before the left-hand pane. These moves support undo
 While dragging, the outer dock drop bands span 40px on all four sides,
 center-only top/bottom bands span 96px, and neighboring pane insertion bands
 span up to 48px. Dock guides appear only during the drag.
+
+
+For Handlr source development, bundled mod code lives in the repository's
+`mods/<name>/` directories, selected by `mods/bundled.txt`; internal UI source
+lives in `mods/frame/`. These repository paths do not change the app home's
+installed `mods/` and `frame/` paths. Optional tool packages remain separate
+from the embedded bundle; preserve installed customization/update ownership.

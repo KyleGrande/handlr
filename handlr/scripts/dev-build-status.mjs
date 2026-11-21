@@ -5,12 +5,13 @@ import { spawnSync } from 'node:child_process';
 import { dirname, join, resolve } from 'node:path';
 import { homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
+import { bundledModNames } from './mod-sources.mjs';
 
 export const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 export const installedApp = join(homedir(), 'Applications/Handlr Dev.app');
-const inputs = ['Cargo.toml', 'Cargo.lock', 'build.rs', '.cargo', 'src', 'defaults', 'crates', 'vendor',
+const inputs = ['Cargo.toml', 'Cargo.lock', 'build.rs', '.cargo', 'src', 'defaults', 'mods/bundled.txt', 'mods/frame', 'crates', 'vendor',
   'assets/icons', 'handlr/assets/icons/Handlr.icns', 'handlr/scripts/release-macos.mjs', 'handlr/scripts/toolchain.mjs',
-  'handlr/scripts/dev-build-status.mjs'];
+  'handlr/scripts/dev-build-status.mjs', 'handlr/scripts/mod-sources.mjs'];
 const excluded = new Set(['.git', 'target', 'node_modules', '.zig-cache', 'zig-cache', 'zig-out', 'dist', '.DS_Store']);
 const digest = value => createHash('sha256').update(value).digest('hex');
 
@@ -40,7 +41,7 @@ export function sourceSnapshot(root = repoRoot) {
       visit(`${relative}/${name}`, next);
     }
   };
-  for (const input of inputs) visit(input);
+  for (const input of [...inputs, ...bundledModNames(root).map(name => `mods/${name}`)]) visit(input);
   const entries = Object.entries(files).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0);
   return { fingerprint: digest(JSON.stringify(entries)), files: Object.fromEntries(entries) };
 }

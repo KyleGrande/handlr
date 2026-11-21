@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 
-const source = await readFile(new URL('../../defaults/frame/settings/main.js', import.meta.url), 'utf8');
+const source = await readFile(new URL('../../mods/frame/settings/main.js', import.meta.url), 'utf8');
 const toggle = new Function(source.slice(source.indexOf('function toggleSeamless'), source.indexOf('export default class Settings')) + '; return toggleSeamless;')();
 
 test('seamless preserves the app background and hides panel layers and outlines', () => {

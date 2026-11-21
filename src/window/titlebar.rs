@@ -301,9 +301,9 @@ mod win {
             .w_full()
             .flex()
             .child(div().flex_1().h_full().window_control_area(WindowControlArea::Drag))
-            .child(button("win-min", include_bytes!("../../defaults/mods/tabs/win-min.svg"), WindowControlArea::Min, c("raised"), c("foreground")))
-            .child(button("win-max", if maximized { include_bytes!("../../defaults/mods/tabs/win-restore.svg") } else { include_bytes!("../../defaults/mods/tabs/win-max.svg") }, WindowControlArea::Max, c("raised"), c("foreground")))
-            .child(button("win-close", include_bytes!("../../defaults/mods/tabs/win-close.svg"), WindowControlArea::Close, red, gpui::white()))
+            .child(button("win-min", include_bytes!("../../mods/tabs/win-min.svg"), WindowControlArea::Min, c("raised"), c("foreground")))
+            .child(button("win-max", if maximized { include_bytes!("../../mods/tabs/win-restore.svg") } else { include_bytes!("../../mods/tabs/win-max.svg") }, WindowControlArea::Max, c("raised"), c("foreground")))
+            .child(button("win-close", include_bytes!("../../mods/tabs/win-close.svg"), WindowControlArea::Close, red, gpui::white()))
             .into_any_element()
     }
 }

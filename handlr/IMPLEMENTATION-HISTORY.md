@@ -83,7 +83,7 @@ Files:
 - [audit/HOST-AUDIT.md](audit/HOST-AUDIT.md): actual source integration points,
   storage migration findings, transfer constraints, approval scope and test limits.
 - [prototype/layouts/panel-workspace-prototype.json](prototype/layouts/panel-workspace-prototype.json): separate layout, ready for isolated testing.
-- [prototype/mods/workspace-prototype](prototype/mods/workspace-prototype/main.js): personal controls; shipped mods are referenced without edits.
+- [../mods/workspace-prototype](../mods/workspace-prototype/main.js): personal controls; shipped mods are referenced without edits.
 - `host/`: shallow clone of `herdrdev/herdr-app` at
   `ce0fd1b245a7fdaa4e6c9e3c7ddac23ddbb1e799`, with local implementation changes.
 - `host/crates/panel-workspace/`: shared model, operations, persistence and tests.
@@ -96,7 +96,7 @@ automated checks. Run `npm run prepare:checks` to prepare the tab-bar native
 checker fixture. Native checks use:
 
 ```sh
-herdr-app check '/absolute/path/to/this/workspace/prototype/mods/workspace-prototype'
+herdr-app check '/absolute/path/to/this/workspace/../mods/workspace-prototype'
 herdr-app check '/absolute/path/to/this/workspace/.checks/tabs'
 ```
 

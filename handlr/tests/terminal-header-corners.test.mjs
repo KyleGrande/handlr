@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 
-const source = await readFile(new URL('../../defaults/mods/pane/main.js', import.meta.url), 'utf8');
+const source = await readFile(new URL('../../mods/pane/main.js', import.meta.url), 'utf8');
 function header(frame, focused) {
   const calls = [];
   const element = () => {

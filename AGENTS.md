@@ -43,9 +43,12 @@ the full API.
 
 ## What ships in the box
 
-`defaults/` is built into the app: mods, `layouts/*.json`, `keys.json`
-(Linux, Windows) and `keys.macos.json` (Mac). Shipped layouts are replaced on
-start; edited layouts are moved to personal copies. Edited bundled mods become
+`mods/bundled.txt` lists the app-provided mod sources under `mods/<name>/`;
+internal UI mods live under `mods/frame/`. The build embeds them at the same
+installed `mods/` and `frame/` paths. Optional packages (Context, Toolbox, Rigs
+and Ticket) stay outside that bundle. `defaults/` holds built-in layouts, icons,
+`keys.json` (Linux, Windows), `keys.macos.json` (Mac) and the installed guide/API.
+Shipped layouts are replaced on start; edited layouts are moved to personal copies. Edited bundled mods become
 user-owned in place; later app-provided content changes are offered through
 Review Panel Updates instead of replacing them. Layout clicks are kept separately. `keys.json` is installed when missing; files matching
 an earlier shipped original byte-for-byte are upgraded to the current defaults.

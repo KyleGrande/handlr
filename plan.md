@@ -28,7 +28,7 @@ Glass is off by default and preserves existing layouts and installed user data.
 The app already exposes root-level `window_blur`, theme colors with alpha, and
 layout-level terminal background opacity. `src/window/titlebar.rs` applies the
 native window background appearance. The Settings mod's Seamless preset in
-`defaults/frame/settings/main.js` demonstrates reversible color overrides, with
+`mods/frame/settings/main.js` demonstrates reversible color overrides, with
 coverage in `handlr/tests/seamless.test.mjs`.
 
 These are implementation starting points, not proof that every platform or

@@ -5,10 +5,10 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { readMods, modCommand, modPanels } from '../../defaults/frame/settings/mods.js';
+import { readMods, modCommand, modPanels } from '../../mods/frame/settings/mods.js';
 
 const execute = promisify(execFile);
-const source = await readFile(new URL('../../defaults/frame/settings/main.js', import.meta.url), 'utf8');
+const source = await readFile(new URL('../../mods/frame/settings/main.js', import.meta.url), 'utf8');
 
 test('inventory reads actual installed entry points, treats paths as data, and isolates bad manifests', async () => {
   const base = await mkdtemp(join(tmpdir(), 'handlr-mods-'));

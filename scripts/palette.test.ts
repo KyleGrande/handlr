@@ -18,7 +18,7 @@ class Element {
     return proxy;
   }
 }
-const source = await readFile(new URL("../defaults/frame/palette/main.js", import.meta.url), "utf8");
+const source = await readFile(new URL("../mods/frame/palette/main.js", import.meta.url), "utf8");
 const element = () => new Element();
 let platform = "linux";
 const icons: string[] = [];

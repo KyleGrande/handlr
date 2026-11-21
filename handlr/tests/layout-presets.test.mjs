@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { capture, compose, emptyLibrary, editLibrary, validateSnapshot, presetName } from '../../defaults/mods/layouts/library.js';
-import { LibraryStore } from '../../defaults/mods/layouts/store.js';
+import { capture, compose, emptyLibrary, editLibrary, validateSnapshot, presetName } from '../../mods/layouts/library.js';
+import { LibraryStore } from '../../mods/layouts/store.js';
 
 function workspace() {
   return {
