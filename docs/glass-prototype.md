@@ -243,7 +243,9 @@ card geometry and restoration ownership stay unchanged.
 
 The backdrop formula and persisted slider values stay unchanged. Light panel
 surfaces now blend from 14% alpha in Clear to 82% in White frost. Rounded terminal
-frames blend from 30.34% to 82%, with the same fill whether focused or resting.
+frames now blend from 90% to 98%, with the same fill whether focused or resting.
+This near-white floor is independent of the window backdrop: low slider values
+clear the surrounding glass without making the light terminal gray.
 Dark cards retain their 30.34% fill. Terminal frame hover reuses the existing
 authored focus-border color without changing border width or card fill; no
 new layout field or mod API is added. Rounded corners and floating shadows remain.
