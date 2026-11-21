@@ -30,7 +30,8 @@ for (const name of names) {
   const cwd = fileURLToPath(new URL(`../../mods/${name}/`, import.meta.url));
   const run = (command, args) => {
     console.log(`\n${name}: ${command} ${args.join(' ')}`);
-    const result = spawnSync(command, args, { cwd, stdio: 'inherit', shell: process.platform === 'win32' });
+    // Only npm.cmd needs a shell; executable paths/arguments may contain spaces.
+    const result = spawnSync(command, args, { cwd, stdio: 'inherit', shell: command.endsWith('.cmd') });
     if (result.error) throw result.error;
     if (result.status !== 0) process.exit(result.status ?? 1);
   };
