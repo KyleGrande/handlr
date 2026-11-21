@@ -509,3 +509,18 @@ test('unconfigured terminal strength follows the old material until explicitly c
   await f.api.setGlass(true);
   assert.equal(f.api.glassTerminal(), 10);
 });
+
+test('delayed slider edits save to their layout and defer painting with another layout’s palette', async () => {
+  const f = fixture('Handlr', { id: 'terminal', content: { pane: {} }, children: [{ id: 'tabs', content: { mod: 'tabs' } }] });
+  f.current.dark = false;
+  await f.api.setGlass(true);
+  const before = f.files.get('/app/layouts/Handlr.json');
+  f.values.layout = 'another-layout';
+  f.current.dark = true;
+  await f.api.setGlassFinish({ terminal: 35 }, 'Handlr');
+  assert.equal(f.files.get('/app/layouts/Handlr.json'), before);
+  assert.equal(JSON.parse(f.files.get('/app/glass.json')).layouts.Handlr.terminal, 35);
+  f.values.layout = 'Handlr'; f.current.dark = false;
+  await f.api.setGlass(true);
+  assert.equal(f.root().content.pane.background, '#ffffff59');
+});

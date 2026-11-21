@@ -155,7 +155,10 @@ export async function setGlassFinish(values, name = String(shared("layout") ?? "
     }
     const updated = JSON.stringify(state, null, 2) + "\n";
     await writeTextFile(statePath(), updated, raw);
-    await sync(state, updated, name);
+    // Save a delayed edit to its owner, but wait for that layout to be selected
+    // before applying material with the active layout's resolved palette.
+    if (String(shared("layout") ?? "main") === name) await sync(state, updated, name);
+    else publish(state);
   });
   if (!completed) throw new Error("Appearance is updating; try again in a moment");
 }
