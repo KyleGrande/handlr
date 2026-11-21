@@ -246,6 +246,14 @@ surfaces now blend from 14% alpha in Clear to 82% in White frost. Rounded termin
 frames now blend from 90% to 98%, with the same fill whether focused or resting.
 This near-white floor is independent of the window backdrop: low slider values
 clear the surrounding glass without making the light terminal gray.
+An independent **Terminal background** slider overrides the card fill from 0%
+(reveals the window glass) to 100% (solid theme background), without changing
+glyph opacity, backdrop, or panel frost. Its optional `terminal` value is saved
+per layout; older layouts retain their material until it is changed. Pending
+slider edits are coalesced per layout and include only changed controls.
+The header rounds its outward corners to the authored frame radius minus the
+active border width, so its fill stays within the highlighted frame at either
+header position.
 Dark cards retain their 30.34% fill. Terminal frame hover reuses the existing
 authored focus-border color without changing border width or card fill; no
 new layout field or mod API is added. Rounded corners and floating shadows remain.

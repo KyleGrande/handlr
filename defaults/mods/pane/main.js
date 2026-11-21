@@ -64,7 +64,10 @@ export default class Pane extends View {
     const pic = icon(p.program, 14, t.dim);
     const st = p.status;
     const pane = p.pane;
-    const bottom = paneFrame(layout())?.header?.position === "bottom";
+    const frame = paneFrame(layout());
+    const bottom = frame?.header?.position === "bottom";
+    const border = p.focused ? frame?.focus ?? frame?.border : frame?.border;
+    const radius = Math.max(0, (frame?.radius ?? 0) - (border?.width ?? 0));
     return h_flex()
       .id(`pane-head-${pane}`)
       .size_full()
@@ -72,6 +75,8 @@ export default class Pane extends View {
       .gap(8)
       .items_center()
       .bg(t.background)
+      .when(bottom, el => el.rounded_b(radius))
+      .when(!bottom, el => el.rounded_t(radius))
       .when(bottom, el => el.border_t(1))
       .when(!bottom, el => el.border_b(1))
       .border_color(t.border)

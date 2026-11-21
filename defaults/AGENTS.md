@@ -902,16 +902,20 @@ What's about the user, never a look:
   (82–87% backdrop opacity at the default) so dark desktop content does not turn them gray.
   In light mode, **White frost** blends from the earlier clear finish (0%) to
   white frost (100%, the default), independently of **Glass background**.
-  Both sliders are saved per layout in the mod-owned `glass.json` journal
-  (`background` and `frost`). Both controls stay visible in both appearances;
+  **Terminal background** independently controls the terminal card’s fill over
+  the window glass: 0% is clear, 100% is solid; glyphs stay opaque. It does not
+  change the backdrop or panel frost. Layouts without a terminal preference
+  retain their existing card material until this control is changed.
+  All three sliders are saved per layout in the mod-owned `glass.json` journal
+  (`background`, `frost`, `terminal`). All controls stay visible in both appearances;
   in dark mode, **Glass frost** adjusts smoked tint from clear (0%) to the
   existing smoked finish (100%).
   **Glass background** adjusts backdrop
   strength per layout: 0% uses the base window tint, 100% (the default)
   adds the former resting-terminal frost so Seamless panel text is easier to read.
   This percentage is material strength, not window opacity. Rounded terminal
-  frames own the fill (90–98% in light mode, staying whitish even with both
-  sliders low; dark glass retains its existing 10–30% range);
+  frames own the fill (by default 90–98% in light mode and 10–30% in dark mode;
+  Terminal background overrides either range);
   light panel surfaces also follow White frost. Rectangular terminal fills are transparent
   so every card keeps rounded corners. Terminal cards use soft shadows, including
   in Seamless mode;
