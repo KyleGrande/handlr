@@ -67,7 +67,8 @@ export default class Settings extends View {
       state.on("change", (_value, cx) => {
         if (this.glassSeeding) return;
         const name = String(shared("layout") ?? "main");
-        const job = { values: { ...this.glassWrites.get(name)?.values, [key]: state.value() } };
+        const savedKey = key === "terminal" ? (settings().dark ? "terminal_dark" : "terminal_light") : key;
+        const job = { values: { ...this.glassWrites.get(name)?.values, [savedKey]: state.value() } };
         this.glassWrites.set(name, job);
         cx.notify();
         // Coalesce changed controls per layout without pinning untouched defaults.
@@ -739,7 +740,7 @@ export default class Settings extends View {
         ? "Clear glass at 0%; smoked frost at 100%. Saved for this layout."
         : "Clear glass at 0%; translucent white frost at 100%. Saved for this layout.", this.glassBackgroundControl(t, "frost"))))
       .when(glassEnabled(), el => el.child(this.row(t, "Glass background", "Lighter at 0%; resting-terminal frost at 100%. Saved for this layout.", this.glassBackgroundControl(t))))
-      .when(glassEnabled(), el => el.child(this.row(t, "Terminal background", "Clear at 0%; solid at 100%. Text stays opaque. Saved for this layout.", this.glassBackgroundControl(t, "terminal"))))
+      .when(glassEnabled(), el => el.child(this.row(t, "Terminal background", "0% matches the window glass; 100% is solid. Saved separately for light and dark appearance.", this.glassBackgroundControl(t, "terminal"))))
       .child(this.row(t, "No Headers", "Hide panel title rows. Turn off to restore panel controls and drag handles.",
         this.toggle(t, "st-no-headers", Boolean(p.no_headers), (_e, cx) => this.change(q => { q.no_headers = !q.no_headers; }, cx))))
       .child(div().h(18))

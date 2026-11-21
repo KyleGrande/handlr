@@ -6,9 +6,10 @@ const source = await readFile(new URL('../../defaults/frame/settings/main.js', i
 test('all three sliders coalesce changed values for their captured layout without saving untouched defaults', async () => {
   const timers = [], tasks = [], writes = [];
   let name = 'Handlr';
+  let dark = false;
   const values = {
     View: class {}, window: () => ({ platform: 'macos' }), props: () => ({ section: 'look' }), startGlass() {},
-    shared: () => name, glassBackground: () => 10, glassFrost: () => 20, glassTerminal: () => 90,
+    settings: () => ({ dark }), shared: () => name, glassBackground: () => 10, glassFrost: () => 20, glassTerminal: () => 90,
     InputState: { new: () => ({ on() {} }) },
     SliderState: { new: ({ value }) => { let changed; return { value: () => value, on(_event, callback) { changed = callback; }, change(next, cx) { value = next; changed(next, cx); } }; } },
     setGlassFinish: async (values, layout) => writes.push({ values, layout }),
@@ -26,11 +27,17 @@ test('all three sliders coalesce changed values for their captured layout withou
   for (const callback of timers.splice(0)) callback(cx);
   await Promise.all(tasks.splice(0));
   assert.deepEqual(writes.splice(0), [
-    { layout: 'Handlr', values: { background: 42, frost: 60, terminal: 35 } },
-    { layout: 'another-layout', values: { terminal: 15 } },
+    { layout: 'Handlr', values: { background: 42, frost: 60, terminal_light: 35 } },
+    { layout: 'another-layout', values: { terminal_light: 15 } },
   ]);
   view.glassSliders.background.change(10, cx);
   for (const callback of timers.splice(0)) callback(cx);
   await Promise.all(tasks.splice(0));
   assert.deepEqual(writes, [{ layout: 'another-layout', values: { background: 10 } }]);
+  writes.length = 0;
+  dark = true; view.glassSliders.terminal.change(60, cx);
+  dark = false; view.glassSliders.terminal.change(25, cx);
+  for (const callback of timers.splice(0)) callback(cx);
+  await Promise.all(tasks.splice(0));
+  assert.deepEqual(writes, [{ layout: 'another-layout', values: { terminal_dark: 60, terminal_light: 25 } }]);
 });

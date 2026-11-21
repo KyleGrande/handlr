@@ -20,7 +20,7 @@ bundled tabs, including Handlr. Shipped layouts are copied before enabling;
 personal layouts retain their composition, theme and unrelated colors. Glass
 and Seamless can be enabled independently or together. In the combined mode,
 Seamless clears panel fills and outlines while Glass keeps floating terminal
-cards, their shadows and the frost. Disabling either keeps the other active.
+cards, dark-mode shadows and the frost. Disabling either keeps the other active.
 Disabling Glass restores fields
 it still owns, preserving independent color, opacity, blur and structural edits.
 The file writes use compare-and-swap guards and a write-ahead restoration journal.
@@ -76,7 +76,7 @@ focus immediately; mods do not poll focus or rewrite layout files on clicks.
 Glyphs and explicitly colored application cells stay opaque. Popovers and
 raised controls retain dense fills for readability.
 
-Terminal cards use soft shadows and 12px corners. Their background, focused
+Terminal cards use 12px corners and, in dark mode, soft shadows. Their background, focused
 background, shadow and radius are journaled; disabling Glass restores prior
 values and preserves independent edits without replaying layout structure.
 Opaque accessibility fallback restores the authored pane fills.
@@ -251,6 +251,14 @@ An independent **Terminal background** slider overrides the card fill from 0%
 glyph opacity, backdrop, or panel frost. Its optional `terminal` value is saved
 per layout; older layouts retain their material until it is changed. Pending
 slider edits are coalesced per layout and include only changed controls.
+Terminal background is also independent by appearance: `terminal_light` and
+`terminal_dark` override the legacy `terminal` fallback. At 0%, terminal cards
+add no fill and reveal exactly the surrounding window glass. This lets light
+terminals match that material while preserving an existing dark-mode finish.
+Light terminal frames omit drop shadows: the shadow is drawn underneath the
+whole translucent card, so it darkens the interior as well as its edges. Dark
+glass retains its existing shadow. The authored shadow still restores when
+Glass is disabled, and independent shadow edits remain protected.
 The header rounds its outward corners to the authored frame radius minus the
 active border width, so its fill stays within the highlighted frame at either
 header position.
